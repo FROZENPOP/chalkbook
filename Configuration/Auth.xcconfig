@@ -1,0 +1,5 @@
+// Public identifiers only. See AUTH_SETUP.md. No client secret belongs in an iOS app.
+GOOGLE_CLIENT_ID =
+GOOGLE_REVERSED_CLIENT_ID =
+APPLE_SIGN_IN_ENABLED = NO
+#include? "Auth.local.xcconfig"

@@ -1,0 +1,34 @@
+# macOS and editor metadata
+.DS_Store
+._*
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Xcode / Swift build output and per-user state
+.build/
+build/
+DerivedData/
+*.xcarchive
+*.ipa
+*.dSYM/
+*.xcuserstate
+xcuserdata/
+*.xcresult
+
+# Script caches
+__pycache__/
+*.py[cod]
+
+# Local provider configuration and signing material
+Configuration/Auth.local.xcconfig
+.env
+.env.*
+!.env.example
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
+
+# Keep the shared Xcode scheme and Package.resolved tracked.

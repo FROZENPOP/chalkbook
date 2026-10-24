@@ -1,0 +1,119 @@
+import AuthenticationServices
+import GoogleSignIn
+import SwiftUI
+import SwiftData
+
+@main
+struct ClimbingApp: App {
+    @State private var auth: AccountSession
+    @Environment(\.scenePhase) private var scenePhase
+    private let testing = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+
+    init() {
+        let testing = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+        let configured = LoginConfiguration.appleEnabled || LoginConfiguration.googleClientID != nil
+        let vault: any AccountVault = testing || !configured ? GuestAccountVault() : KeychainAccountVault()
+        _auth = State(initialValue: AccountSession(vault: vault))
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            WorkspaceRoot(accountKey: auth.account?.storageKey, testing: testing)
+                .id(auth.account?.storageKey ?? "guest")
+                .environment(auth)
+                .onOpenURL { url in _ = GIDSignIn.sharedInstance.handle(url) }
+                .task { if !testing { await auth.restore() } }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active && !testing { Task { await auth.verifyExistingSession() } }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: ASAuthorizationAppleIDProvider.credentialRevokedNotification)) { _ in
+                    if auth.account?.provider == .apple { auth.signOut() }
+                }
+
+        }
+    }
+}
+
+private struct WorkspaceRoot: View {
+    let accountKey: String?
+    let testing: Bool
+    @State private var container: ModelContainer?
+    @State private var startupError: String?
+
+    var body: some View {
+        Group {
+            if let container {
+                AppRoot(container: container)
+                    .modelContainer(container)
+                    .defaultAppStorage(accountKey.flatMap { UserDefaults(suiteName: "ClimbLog.\($0)") } ?? .standard)
+            } else if let startupError {
+                ContentUnavailableView {
+                    Label("Your log couldn’t open", systemImage: "externaldrive.badge.exclamationmark")
+                } description: { Text("Your stored data has not been replaced.\n\n\(startupError)") }
+                actions: { Button("Try again", action: load) }
+            } else {
+                SwiftUI.ProgressView("Opening your log…")
+            }
+        }
+        .task { load() }
+    }
+
+    private func load() {
+        do {
+            if testing {
+                #if DEBUG
+                // Seed source files only; the UI tests still import them through the real Files picker.
+                let documents = URL.documentsDirectory
+                try FileManager.default.createDirectory(at: documents, withIntermediateDirectories: true)
+                for (key, filename) in [("CLIMB_TEST_PHOTO", "route-photo.png"), ("CLIMB_TEST_VIDEO", "route-video.mov")] {
+                    if let value = ProcessInfo.processInfo.environment[key], let data = Data(base64Encoded: value), data.count < 1_000_000 {
+                        try data.write(to: documents.appending(path: filename), options: .atomic)
+                    }
+                }
+                #endif
+                let schema = Schema(versionedSchema: ClimbingSchemaV2.self)
+                let url = URL.applicationSupportDirectory.appending(path: "ClimbingUITests.store")
+                try FileManager.default.createDirectory(at: URL.applicationSupportDirectory, withIntermediateDirectories: true)
+                if ProcessInfo.processInfo.arguments.contains("--reset-test-data") {
+                    for suffix in ["", "-shm", "-wal"] {
+                        let path = URL(fileURLWithPath: url.path + suffix)
+                        if FileManager.default.fileExists(atPath: path.path) { try FileManager.default.removeItem(at: path) }
+                    }
+                }
+                let config = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+                let store = try ModelContainer(for: schema, migrationPlan: ClimbingMigrationPlan.self, configurations: [config])
+                store.mainContext.autosaveEnabled = false
+                container = store
+            } else {
+                container = try Persistence.container(accountKey: accountKey)
+            }
+            startupError = nil
+        } catch { startupError = error.localizedDescription }
+    }
+}
+
+struct AppRoot: View {
+    @State private var store: ClimbingStore
+
+    init(container: ModelContainer) {
+        _store = State(initialValue: ClimbingStore(context: container.mainContext))
+    }
+
+    var body: some View {
+        TabView {
+            NavigationStack { HomeView() }.tabItem { Label("Today", systemImage: "mountain.2") }
+            NavigationStack { HistoryView() }.tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
+            NavigationStack { ProgressViewScreen() }.tabItem { Label("Progress", systemImage: "chart.bar.xaxis") }
+            NavigationStack { SettingsView() }.tabItem { Label("Settings", systemImage: "slider.horizontal.3") }
+        }
+        .id(store.dataRevision)
+        .tint(ClimbTheme.forest)
+        .safeAreaInset(edge: .top) { SaveErrorBanner() }
+        .environment(store)
+    }
+}
+
+#Preview {
+    let container = try! Persistence.container(inMemory: true)
+    AppRoot(container: container).modelContainer(container).environment(AccountSession(vault: GuestAccountVault()))
+}

@@ -1,0 +1,497 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 71;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1A1526D7D820797F2FD087ED /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 66AA74C421F5F7595483D2E1 /* GoogleSignInSwift */; };
+		79FA1778DFC145355BBE0C7B /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 112082040B0F47469967FB3C /* GoogleSignIn */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		BB24649DEEEB10568063436A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 985959785319747668373CC6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E238379B1F3090229D4A778D;
+			remoteInfo = ClimbingApp;
+		};
+		EDD2F7A23C5680F5615292DF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 985959785319747668373CC6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E238379B1F3090229D4A778D;
+			remoteInfo = ClimbingApp;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		060602332BE3E81813DCDA12 /* ClimbingAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClimbingAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		90D001D0D008B0794CD2972C /* ClimbingApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClimbingApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B980BAA837E59DDE9DED5404 /* Configuration/Auth.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Configuration/Auth.xcconfig; sourceTree = "<group>"; };
+		E83A07B9DB361E01C9920D6C /* ClimbingAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClimbingAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		65EB695734788BEF99BB03CD /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = E238379B1F3090229D4A778D /* ClimbingApp */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		4E1C7F3CD7E9CA15A91A6DC1 /* ClimbingAppUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = ClimbingAppUITests; sourceTree = "<group>"; };
+		7D444333ACCEF4165C827FE0 /* ClimbingAppTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = ClimbingAppTests; sourceTree = "<group>"; };
+		B6C4B935D7938416CAFC6099 /* ClimbingApp */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (65EB695734788BEF99BB03CD /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ClimbingApp; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		225C3615831DECE5407F1AD3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				79FA1778DFC145355BBE0C7B /* GoogleSignIn in Frameworks */,
+				1A1526D7D820797F2FD087ED /* GoogleSignInSwift in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		63FA78FF359E434D500ACD65 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EDAE4FB3B11D60B1AF8D6F1E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		44CB005EE2E65D9CC817B0A0 = {
+			isa = PBXGroup;
+			children = (
+				B6C4B935D7938416CAFC6099 /* ClimbingApp */,
+				7D444333ACCEF4165C827FE0 /* ClimbingAppTests */,
+				4E1C7F3CD7E9CA15A91A6DC1 /* ClimbingAppUITests */,
+				4EDC8BFAFC6BD936B849F38C /* Products */,
+				B980BAA837E59DDE9DED5404 /* Configuration/Auth.xcconfig */,
+			);
+			sourceTree = "<group>";
+		};
+		4EDC8BFAFC6BD936B849F38C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				90D001D0D008B0794CD2972C /* ClimbingApp.app */,
+				E83A07B9DB361E01C9920D6C /* ClimbingAppTests.xctest */,
+				060602332BE3E81813DCDA12 /* ClimbingAppUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		266599C90BFD1FE4A54883E7 /* ClimbingAppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F11628C996BFA2E7DFDF9D6B /* Build configuration list for PBXNativeTarget "ClimbingAppUITests" */;
+			buildPhases = (
+				3C1FE13136F16DEBD6DF37F2 /* Sources */,
+				63FA78FF359E434D500ACD65 /* Frameworks */,
+				40A1EC3BAEA9D5A9789FAA06 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C1048F93F19AE42350E76665 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				4E1C7F3CD7E9CA15A91A6DC1 /* ClimbingAppUITests */,
+			);
+			name = ClimbingAppUITests;
+			packageProductDependencies = (
+			);
+			productName = ClimbingAppUITests;
+			productReference = 060602332BE3E81813DCDA12 /* ClimbingAppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		682F20E806809E573A60586E /* ClimbingAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 98C2419123810486E4CD7976 /* Build configuration list for PBXNativeTarget "ClimbingAppTests" */;
+			buildPhases = (
+				BD409E11F0F9264FD6A7DBAC /* Sources */,
+				EDAE4FB3B11D60B1AF8D6F1E /* Frameworks */,
+				8364ED86F61E1E3C78DA10A5 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				51D46FEC93687EDD26BCFC5C /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				7D444333ACCEF4165C827FE0 /* ClimbingAppTests */,
+			);
+			name = ClimbingAppTests;
+			packageProductDependencies = (
+			);
+			productName = ClimbingAppTests;
+			productReference = E83A07B9DB361E01C9920D6C /* ClimbingAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		E238379B1F3090229D4A778D /* ClimbingApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D1B78DDEE6C2E6D404B08BA7 /* Build configuration list for PBXNativeTarget "ClimbingApp" */;
+			buildPhases = (
+				548B99B63C943D996C80CB47 /* Sources */,
+				225C3615831DECE5407F1AD3 /* Frameworks */,
+				A064D12E4913FE0CAD0F5F7C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B6C4B935D7938416CAFC6099 /* ClimbingApp */,
+			);
+			name = ClimbingApp;
+			packageProductDependencies = (
+				112082040B0F47469967FB3C /* GoogleSignIn */,
+				66AA74C421F5F7595483D2E1 /* GoogleSignInSwift */,
+			);
+			productName = ClimbingApp;
+			productReference = 90D001D0D008B0794CD2972C /* ClimbingApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		985959785319747668373CC6 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastSwiftUpdateCheck = 2710;
+				LastUpgradeCheck = 2710;
+			};
+			buildConfigurationList = 689997C79BA63D4A31FDE57B /* Build configuration list for PBXProject "ClimbingApp" */;
+			compatibilityVersion = "Xcode 16.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 44CB005EE2E65D9CC817B0A0;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A44B551D07F01C41D4849B81 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
+			productRefGroup = 4EDC8BFAFC6BD936B849F38C /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E238379B1F3090229D4A778D /* ClimbingApp */,
+				682F20E806809E573A60586E /* ClimbingAppTests */,
+				266599C90BFD1FE4A54883E7 /* ClimbingAppUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		40A1EC3BAEA9D5A9789FAA06 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8364ED86F61E1E3C78DA10A5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A064D12E4913FE0CAD0F5F7C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		3C1FE13136F16DEBD6DF37F2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		548B99B63C943D996C80CB47 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BD409E11F0F9264FD6A7DBAC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		51D46FEC93687EDD26BCFC5C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E238379B1F3090229D4A778D /* ClimbingApp */;
+			targetProxy = EDD2F7A23C5680F5615292DF /* PBXContainerItemProxy */;
+		};
+		C1048F93F19AE42350E76665 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E238379B1F3090229D4A778D /* ClimbingApp */;
+			targetProxy = BB24649DEEEB10568063436A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		433548979C024CC63B5F3B8D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B980BAA837E59DDE9DED5404 /* Configuration/Auth.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		506497B98FE92219966A9500 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B980BAA837E59DDE9DED5404 /* Configuration/Auth.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ClimbingApp/ClimbingApp.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ClimbingApp/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Climb Log";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.sports";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.frozenpop.ClimbingApp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		547E82E34ED2A74CEC2B2C92 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B980BAA837E59DDE9DED5404 /* Configuration/Auth.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.frozenpop.ClimbingAppUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = ClimbingApp;
+			};
+			name = Release;
+		};
+		57DF475614CCB4BED6B842C7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B980BAA837E59DDE9DED5404 /* Configuration/Auth.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.frozenpop.ClimbingAppTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ClimbingApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ClimbingApp";
+			};
+			name = Debug;
+		};
+		B2130FABCF87D85D8B13852E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B980BAA837E59DDE9DED5404 /* Configuration/Auth.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.frozenpop.ClimbingAppUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = ClimbingApp;
+			};
+			name = Debug;
+		};
+		B800A40FDE6F0A0218D9BCD2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B980BAA837E59DDE9DED5404 /* Configuration/Auth.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		BD0A04DBC532673EB3083138 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B980BAA837E59DDE9DED5404 /* Configuration/Auth.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.frozenpop.ClimbingAppTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ClimbingApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ClimbingApp";
+			};
+			name = Release;
+		};
+		E8533619F81B03317C9D5387 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B980BAA837E59DDE9DED5404 /* Configuration/Auth.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ClimbingApp/ClimbingApp.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ClimbingApp/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Climb Log";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.sports";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.frozenpop.ClimbingApp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		689997C79BA63D4A31FDE57B /* Build configuration list for PBXProject "ClimbingApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				433548979C024CC63B5F3B8D /* Debug */,
+				B800A40FDE6F0A0218D9BCD2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		98C2419123810486E4CD7976 /* Build configuration list for PBXNativeTarget "ClimbingAppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				57DF475614CCB4BED6B842C7 /* Debug */,
+				BD0A04DBC532673EB3083138 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D1B78DDEE6C2E6D404B08BA7 /* Build configuration list for PBXNativeTarget "ClimbingApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				506497B98FE92219966A9500 /* Debug */,
+				E8533619F81B03317C9D5387 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F11628C996BFA2E7DFDF9D6B /* Build configuration list for PBXNativeTarget "ClimbingAppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B2130FABCF87D85D8B13852E /* Debug */,
+				547E82E34ED2A74CEC2B2C92 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A44B551D07F01C41D4849B81 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = exactVersion;
+				version = 10.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		112082040B0F47469967FB3C /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A44B551D07F01C41D4849B81 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		66AA74C421F5F7595483D2E1 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A44B551D07F01C41D4849B81 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 985959785319747668373CC6 /* Project object */;
+}
