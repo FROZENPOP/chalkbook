@@ -4,10 +4,12 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(AccountSession.self) private var auth
+    @AppStorage("healthEnabled") private var healthEnabled = false
     @State private var showLogin = false
     @State private var confirmSignOut = false
     @Environment(ClimbingStore.self) private var store
     @Query(sort: \SavedGym.name) private var gyms: [SavedGym]
+    @Query private var allClimbs: [ClimbEntry]
     @Query private var sessions: [ClimbingSession]
     @AppStorage("defaultGradeScale") private var defaultScale = GradeScale.vScale.rawValue
     @State private var exportDocument = BackupDocument()
@@ -28,6 +30,15 @@ struct SettingsView: View {
                 if let gym = gyms.first(where: \.isDefault) {
                     LabeledContent("Default gym", value: gym.name)
                 }
+            }
+            Section("Apple Health") {
+                Toggle("Health workout linking", isOn: Binding(get: { healthEnabled }, set: { value in
+                    if value { healthEnabled = true }
+                    else if store.save({
+                        for link in try store.context.fetch(FetchDescriptor<HealthWorkoutLink>()) { store.context.delete(link) }
+                    }) { healthEnabled = false }
+                }))
+                Text("Read access is requested only from a session’s Link Apple Health workout action. Turning this off removes local links. Measurements are never included in journal backups, and no workouts are exported.").font(.caption)
             }
             Section("Climbing") {
                 Picker("Default grade scale", selection: $defaultScale) {
@@ -98,7 +109,7 @@ struct SettingsView: View {
 
     private func export() {
         do {
-            let backup = ClimbingBackup(sessions: sessions, defaultScale: GradeScale(rawValue: defaultScale) ?? .vScale, gyms: gyms)
+            let backup = ClimbingBackup(sessions: sessions, defaultScale: GradeScale(rawValue: defaultScale) ?? .vScale, gyms: gyms, climbs: allClimbs)
             exportDocument = BackupDocument(data: try backup.encoded())
             exporting = true
         } catch { message = error.localizedDescription }

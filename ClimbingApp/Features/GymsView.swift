@@ -80,6 +80,7 @@ struct GymEditorView: View {
     @State private var scale = GradeScale.vScale
     @State private var customName = ""
     @State private var gradesText = ""
+    @State private var colorGuide = ""
     @State private var isDefault = true
     @State private var confirmDelete = false
     @State private var initialized = false
@@ -113,6 +114,10 @@ struct GymEditorView: View {
                 } header: { Text("How does this gym grade climbs?") } footer: {
                     Text(scale == .custom ? "Optionally list grades from easiest to hardest, separated by commas. You can also type any grade when logging a climb." : "We’ll preselect this scale whenever you log a climb at this gym.")
                 }
+                Section("Local color guide (optional)") {
+                    TextField("e.g. Blue: V2–V4, Red: V4–V6", text: $colorGuide, axis: .vertical).lineLimit(2...5)
+                    Text("Your descriptions are notes, not grade conversions. They are copied into new climbs so later changes do not rewrite history.").font(.caption)
+                }
                 if gym != nil {
                     Section { Button("Remove saved gym", role: .destructive) { confirmDelete = true } }
                 }
@@ -124,7 +129,7 @@ struct GymEditorView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         if let saved = store.saveGym(existing: gym, name: name, scale: scale, customName: customName,
-                                                     grades: GymGrades.orderedLabels(from: gradesText), isDefault: isDefault) {
+                                                     grades: GymGrades.orderedLabels(from: gradesText), isDefault: isDefault, colorGuide: colorGuide) {
                             onSaved?(saved)
                             dismiss()
                         }
@@ -135,6 +140,7 @@ struct GymEditorView: View {
                 guard !initialized else { return }
                 initialized = true
                 if let gym {
+                    colorGuide = gym.colorGuide
                     name = gym.name; scale = gym.scale; customName = gym.customScaleName
                     gradesText = gym.customGrades.joined(separator: ", "); isDefault = gym.isDefault
                 } else { isDefault = (try? store.defaultGym()) == nil }

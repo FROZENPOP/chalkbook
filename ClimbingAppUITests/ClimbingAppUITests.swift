@@ -27,19 +27,23 @@ final class ClimbingAppUITests: XCTestCase {
         expectation(for: enabled, evaluatedWith: send)
         waitForExpectations(timeout: 5)
         send.tap()
-        XCTAssertTrue(app.staticTexts["2 attempts · 1 sends"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["2 attempts · 1 sends this session"].waitForExistence(timeout: 5))
         app.terminate()
         app.launchArguments = ["--ui-testing"]
         app.launch()
         XCTAssertTrue(app.buttons["resumeSession"].waitForExistence(timeout: 10))
         app.buttons["resumeSession"].tap()
         XCTAssertTrue(app.staticTexts["Blue slab"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["2 attempts · 1 sends"].exists)
+        XCTAssertTrue(app.staticTexts["2 attempts · 1 sends this session"].exists)
         let finish = app.buttons["finishSession"]
         if !finish.isHittable { app.swipeUp() }
         finish.tap()
+        app.buttons["confirmFinishSession"].tap()
         XCTAssertTrue(app.staticTexts["Session complete"].waitForExistence(timeout: 5))
-        app.tabBars.buttons["History"].tap()
+        app.navigationBars.buttons.firstMatch.tap()
+        let history = app.buttons["Browse all history"]
+        for _ in 0..<5 { if history.isHittable { break }; app.swipeUp() }
+        history.tap()
         XCTAssertTrue(app.staticTexts["Test Gym"].waitForExistence(timeout: 5))
         app.tabBars.buttons["Progress"].tap()
         XCTAssertTrue(app.staticTexts["Every attempt counts."].waitForExistence(timeout: 5))

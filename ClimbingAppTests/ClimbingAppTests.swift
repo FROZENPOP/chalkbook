@@ -107,13 +107,13 @@ final class ClimbingStoreTests: XCTestCase {
         XCTAssertNotEqual(store.start(date: .now, location: "", notes: "")?.id, session.id)
     }
 
-    func testDeletingSessionCascadesToClimbsAndAttempts() throws {
+    func testDeletingSessionPreservesIndependentClimbAndDeletesAttempts() throws {
         let store = try makeStore()
         let session = try XCTUnwrap(store.start(date: .now, location: "", notes: ""))
         let climb = addClimb(to: session, store: store)
         store.record(sent: true, on: climb)
         XCTAssertTrue(store.delete(session))
-        XCTAssertEqual(try store.context.fetchCount(FetchDescriptor<ClimbEntry>()), 0)
+        XCTAssertEqual(try store.context.fetchCount(FetchDescriptor<ClimbEntry>()), 1)
         XCTAssertEqual(try store.context.fetchCount(FetchDescriptor<ClimbAttempt>()), 0)
     }
 
@@ -173,13 +173,13 @@ final class ClimbingStoreTests: XCTestCase {
         XCTAssertThrowsError(try backup.validated())
     }
 
-    func testRejectsNoncontiguousAttemptSequences() throws {
+    func testRejectsInvalidAttemptSequences() throws {
         let store = try makeStore()
         let session = try XCTUnwrap(store.start(date: .now, location: "", notes: ""))
         let climb = addClimb(to: session, store: store)
         store.record(sent: true, on: climb)
         var backup = ClimbingBackup(sessions: [session], defaultScale: .vScale)
-        backup.sessions[0].climbs[0].attempts[0].sequence = 2
+        backup.sessions[0].climbs[0].attempts[0].sequence = 0
         XCTAssertThrowsError(try backup.validated())
     }
 
@@ -187,7 +187,7 @@ final class ClimbingStoreTests: XCTestCase {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let schema = Schema(versionedSchema: ClimbingSchemaV2.self)
+        let schema = Schema(versionedSchema: ClimbingSchemaV4.self)
         let config = ModelConfiguration(schema: schema, url: directory.appending(path: "test.store"), cloudKitDatabase: .none)
         let first = try ModelContainer(for: schema, migrationPlan: ClimbingMigrationPlan.self, configurations: [config])
         let store = ClimbingStore(context: first.mainContext)

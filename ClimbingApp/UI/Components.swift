@@ -15,6 +15,7 @@ struct SaveErrorBanner: View {
                 Label("Couldn’t save", systemImage: "exclamationmark.triangle.fill")
                     .font(.headline)
                 Text(message).font(.subheadline)
+                Text("Your editor input is kept. Retry with Save or repeat the logging action after resolving the issue.").font(.caption)
                 Button("Dismiss") { store.errorMessage = nil }
                     .frame(minHeight: 44)
             }
@@ -80,5 +81,19 @@ struct EmptyState: View {
     var body: some View {
         ContentUnavailableView(title, systemImage: symbol, description: Text(message))
             .padding(.vertical, 24)
+    }
+}
+
+struct JournalMetrics: View {
+    @Environment(\.dynamicTypeSize) private var size
+    let first: String
+    let firstLabel: String
+    let second: String
+    let secondLabel: String
+    let third: String
+    let thirdLabel: String
+    var body: some View {
+        let layout = size.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16)) : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+        layout { Metric(value: first, label: firstLabel); Metric(value: second, label: secondLabel); Metric(value: third, label: thirdLabel) }
     }
 }

@@ -45,7 +45,7 @@ private struct WorkspaceRoot: View {
             if let container {
                 AppRoot(container: container)
                     .modelContainer(container)
-                    .defaultAppStorage(accountKey.flatMap { UserDefaults(suiteName: "ClimbLog.\($0)") } ?? .standard)
+                    .defaultAppStorage(testing ? UserDefaults(suiteName: "ClimbLog.UITesting")! : accountKey.flatMap { UserDefaults(suiteName: "ClimbLog.\($0)") } ?? .standard)
             } else if let startupError {
                 ContentUnavailableView {
                     Label("Your log couldn’t open", systemImage: "externaldrive.badge.exclamationmark")
@@ -71,10 +71,11 @@ private struct WorkspaceRoot: View {
                     }
                 }
                 #endif
-                let schema = Schema(versionedSchema: ClimbingSchemaV2.self)
+                let schema = Schema(versionedSchema: ClimbingSchemaV4.self)
                 let url = URL.applicationSupportDirectory.appending(path: "ClimbingUITests.store")
                 try FileManager.default.createDirectory(at: URL.applicationSupportDirectory, withIntermediateDirectories: true)
                 if ProcessInfo.processInfo.arguments.contains("--reset-test-data") {
+                    UserDefaults.standard.removePersistentDomain(forName: "ClimbLog.UITesting")
                     for suffix in ["", "-shm", "-wal"] {
                         let path = URL(fileURLWithPath: url.path + suffix)
                         if FileManager.default.fileExists(atPath: path.path) { try FileManager.default.removeItem(at: path) }
@@ -101,10 +102,9 @@ struct AppRoot: View {
 
     var body: some View {
         TabView {
-            NavigationStack { HomeView() }.tabItem { Label("Today", systemImage: "mountain.2") }
-            NavigationStack { HistoryView() }.tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
+            NavigationStack { HomeView() }.tabItem { Label("Journal", systemImage: "book") }
+            NavigationStack { ProjectsView() }.tabItem { Label("Projects", systemImage: "figure.climbing") }
             NavigationStack { ProgressViewScreen() }.tabItem { Label("Progress", systemImage: "chart.bar.xaxis") }
-            NavigationStack { SettingsView() }.tabItem { Label("Settings", systemImage: "slider.horizontal.3") }
         }
         .id(store.dataRevision)
         .tint(ClimbTheme.forest)

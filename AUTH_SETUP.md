@@ -54,3 +54,7 @@ This version has no server-side account database, API session, cloud sync, or cl
 
 
 Route attachments can be chosen from Photos or Files. The app’s Documents folder is available through Files for user-supplied source files; private account databases and attached media live separately under Application Support. Import copies file contents into the selected account’s store, so removing an attachment does not delete the source file from Photos or Files.
+
+## Apple Health configuration
+
+The entitlement and read-purpose string are present. Enable HealthKit for the chosen App ID/team and target before signed-device testing. The implementation requests **read** access only to climbing workouts, active energy, and heart rate when the user explicitly chooses the session linking action. No Health write entitlement purpose, workout recording, background delivery, export, or wearable compatibility is advertised. Health links/statistics are omitted from JSON backup and private account movement.

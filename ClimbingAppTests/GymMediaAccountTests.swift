@@ -80,7 +80,7 @@ final class GymMediaAccountTests: XCTestCase {
             store.context.insert(media); climb.media.append(media)
         })
         let backup = try ClimbingBackup.decode(ClimbingBackup(sessions: [session], defaultScale: .vScale, gyms: [gym]).encoded())
-        XCTAssertEqual(backup.version, 2)
+        XCTAssertEqual(backup.version, 3)
         XCTAssertTrue(store.restore(backup), store.errorMessage ?? "Restore failed")
         XCTAssertTrue(store.restore(backup), store.errorMessage ?? "Second restore failed")
         let restored = try XCTUnwrap(store.context.fetch(FetchDescriptor<ClimbEntry>()).first)
@@ -133,7 +133,7 @@ final class GymMediaAccountTests: XCTestCase {
             session.climbs.append(climb); climb.attempts.append(attempt)
             try old.mainContext.save()
         }
-        let schema = Schema(versionedSchema: ClimbingSchemaV2.self)
+        let schema = Schema(versionedSchema: ClimbingSchemaV4.self)
         let updated = try ModelContainer(for: schema, migrationPlan: ClimbingMigrationPlan.self,
                                          configurations: [ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)])
         let session = try XCTUnwrap(updated.mainContext.fetch(FetchDescriptor<ClimbingSession>()).first)

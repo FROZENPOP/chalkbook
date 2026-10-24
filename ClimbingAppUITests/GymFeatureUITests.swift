@@ -70,7 +70,7 @@ final class GymFeatureUITests: XCTestCase {
     @MainActor
     func testAccountPortalExplainsPendingProviderSetup() {
         let app = launch()
-        app.tabBars.buttons["Settings"].tap()
+        app.buttons["openSettings"].tap()
         app.buttons["openLogin"].tap()
         let setup = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Account setup is still being completed")).firstMatch
         for _ in 0..<3 { if setup.isHittable { break }; app.scrollViews.firstMatch.swipeUp() }
@@ -97,7 +97,7 @@ final class GymFeatureUITests: XCTestCase {
         app.buttons["resumeSession"].tap()
         app.buttons["addClimb"].tap()
         let media = app.buttons["addRouteMedia"]
-        for _ in 0..<4 { if media.isHittable { break }; app.swipeUp() }
+        for _ in 0..<8 { if media.isHittable { break }; app.swipeUp() }
         XCTAssertTrue(media.isHittable)
         media.tap()
         let cancelButtons = app.buttons.matching(NSPredicate(format: "label == 'Cancel'"))
@@ -107,7 +107,7 @@ final class GymFeatureUITests: XCTestCase {
         }
         cancel.tap()
         let files = app.buttons["addRouteMediaFromFiles"]
-        for _ in 0..<4 { if files.isHittable { break }; app.swipeUp() }
+        for _ in 0..<8 { if files.isHittable { break }; app.swipeUp() }
         XCTAssertTrue(files.isHittable)
         files.tap()
         let browse = app.buttons.matching(NSPredicate(format: "label == 'Browse' OR label == 'Recents' OR label == 'On My iPhone'")).firstMatch
@@ -122,7 +122,7 @@ final class GymFeatureUITests: XCTestCase {
     @MainActor
     private func chooseRouteFile(_ app: XCUIApplication, name: String) {
         let files = app.buttons["addRouteMediaFromFiles"]
-        for _ in 0..<4 { if files.isHittable { break }; app.swipeUp() }
+        for _ in 0..<8 { if files.isHittable { break }; app.swipeUp() }
         files.tap()
         let item = app.cells.matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
         if !item.isHittable {

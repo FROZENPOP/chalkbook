@@ -8,7 +8,7 @@ extension ClimbingStore {
     }
 
     func saveGym(existing: SavedGym?, name: String, scale: GradeScale, customName: String,
-                 grades: [String], isDefault: Bool) -> SavedGym? {
+                 grades: [String], isDefault: Bool, colorGuide: String = "") -> SavedGym? {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let customName = customName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, name.count <= 100, scale != .custom || !customName.isEmpty else {
@@ -25,6 +25,8 @@ extension ClimbingStore {
             let makeDefault = isDefault || others.filter { $0.id != gym.id }.isEmpty
             if makeDefault { for other in others { other.isDefault = false } }
             gym.name = name
+            gym.colorGuide = colorGuide
+            gym.updatedAt = .now
             gym.scaleRaw = scale.rawValue
             gym.customScaleName = scale == .custom ? customName : ""
             gym.customGrades = scale == .custom ? grades : []

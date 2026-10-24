@@ -8,6 +8,12 @@ struct SessionEditorView: View {
     @State private var selectedGymID: UUID?
     @State private var initialized = false
     var session: ClimbingSession?
+    var isRecap = false
+    @State private var startTime = Date.now
+    @State private var endTime = Date.now
+    @State private var durationKnown = false
+    @State private var minutes = ""
+    @State private var created: ClimbingSession?
     @State private var date = Date.now
     @State private var location = ""
     @State private var notes = ""
@@ -21,7 +27,15 @@ struct SessionEditorView: View {
                         TextField("Other location (optional)", text: $location).textInputAutocapitalization(.words)
                             .accessibilityIdentifier("sessionLocation")
                     }
-                    DatePicker("Date", selection: $date, in: ...Date.now, displayedComponents: .date)
+                    if session == nil { DatePicker("Date", selection: $date, in: ...Date.now, displayedComponents: .date) }
+                }
+                Section("Time (optional for a recap)") {
+                    if session != nil {
+                        DatePicker("Started", selection: $startTime, in: ...Date.now, displayedComponents: [.date, .hourAndMinute])
+                        if session?.isComplete == true { DatePicker("Ended", selection: $endTime, in: ...Date.now, displayedComponents: [.date, .hourAndMinute]) }
+                    }
+                    Toggle("Duration is known", isOn: $durationKnown)
+                    if isRecap { TextField("Minutes", text: $minutes).keyboardType(.numberPad) }
                 }
                 Section("Notes") {
                     TextField("How are you feeling?", text: $notes, axis: .vertical).lineLimit(3...6)
@@ -30,12 +44,12 @@ struct SessionEditorView: View {
                     Section { Text("Everything saves on your device. You can resume this session anytime.").foregroundStyle(.secondary) }
                 }
             }
-            .navigationTitle(session == nil ? "New session" : "Edit session")
+            .navigationTitle(session == nil ? (isRecap ? "Past session recap" : "New session") : "Edit session")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(session == nil ? "Start" : "Save", action: submit).fontWeight(.semibold)
+                    Button(session == nil ? (isRecap ? "Create recap" : "Start") : "Save", action: submit).fontWeight(.semibold)
                         .accessibilityIdentifier("saveSession")
                 }
             }
@@ -46,9 +60,12 @@ struct SessionEditorView: View {
                     date = SessionDay.date(for: session.day) ?? .now
                     location = session.location
                     notes = session.notes
+                    startTime = session.startedAt; endTime = session.endedAt ?? .now; durationKnown = session.durationKnown
                 } else { selectedGymID = gyms.first(where: \.isDefault)?.id ?? gyms.first?.id }
             }
         }
+        .environment(\.timeZone, session.flatMap { TimeZone(identifier: $0.timeZoneID) } ?? .current)
+        .sheet(item: $created, onDismiss: { dismiss() }) { AggregateEditorView(session: $0) }
         .safeAreaInset(edge: .top) { SaveErrorBanner() }
     }
 
@@ -56,11 +73,19 @@ struct SessionEditorView: View {
         let gym = gyms.first { $0.id == selectedGymID }
         if let session {
             if store.save({
-                session.day = SessionDay.key(for: date)
+                let oldDay = session.day
+                session.day = SessionDay.key(for: startTime, in: TimeZone(identifier: session.timeZoneID) ?? .current)
                 session.location = gym?.name ?? location.trimmingCharacters(in: .whitespacesAndNewlines)
                 session.gymID = gym?.id
+                guard session.isComplete == false || endTime >= startTime else { throw BackupError.invalid("End time must follow start time.") }
+                session.startedAt = startTime; if session.isComplete { session.endedAt = endTime }
+                session.durationKnown = durationKnown; session.updatedAt = .now
+                for attempt in session.recordedAttempts where attempt.daySnapshot == oldDay || attempt.daySnapshot.isEmpty { attempt.daySnapshot = session.day; attempt.timePrecision = "day" }
                 session.notes = notes
             }) { dismiss() }
+        } else if isRecap {
+            if durationKnown && (Int(minutes) == nil || (Int(minutes) ?? -1) < 0) { store.errorMessage = "Enter a duration in whole minutes or mark it unknown."; return }
+            created = store.createRecap(date: date, gym: gym, location: location, notes: notes, minutes: durationKnown ? Int(minutes) : nil)
         } else if store.start(date: date, location: location, notes: notes, gym: gym) != nil {
             dismiss()
         }
