@@ -23,11 +23,12 @@ final class GymFeatureUITests: XCTestCase {
         app.buttons["Add a new gym…"].tap()
         let nameField = app.textFields["gymName"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 5))
-        nameField.tap(); nameField.typeText(name)
+        nameField.tap(); nameField.typeText(name + "\n")
         if custom {
             app.buttons["gymScale"].tap()
             app.buttons["Custom scale"].firstMatch.tap()
             let scale = app.textFields["customScaleName"]
+            for _ in 0..<4 { if scale.isHittable { break }; app.swipeUp() }
             scale.tap(); scale.typeText("Color circuits")
             let order = app.descendants(matching: .any)["customGradeOrder"].firstMatch
             order.tap(); order.typeText("Green, Blue, Red")

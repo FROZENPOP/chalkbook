@@ -8,23 +8,25 @@ extension ClimbingStore {
     }
 
     func saveGym(existing: SavedGym?, name: String, scale: GradeScale, customName: String,
-                 grades: [String], isDefault: Bool, colorGuide: String = "") -> SavedGym? {
+                 grades: [String], isDefault: Bool, colorGuide: String = "", address: String = "") -> SavedGym? {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let customName = customName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, name.count <= 100, scale != .custom || !customName.isEmpty else {
             errorMessage = "Enter a gym name and, for a custom scale, a scale name."
             return nil
         }
+        let address = address.trimmingCharacters(in: .whitespacesAndNewlines)
         let gym = existing ?? SavedGym(name: name)
         let success = save {
             let others = try context.fetch(FetchDescriptor<SavedGym>())
-            guard !others.contains(where: { $0.id != gym.id && $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+            guard !others.contains(where: { $0.id != gym.id && $0.name.caseInsensitiveCompare(name) == .orderedSame && $0.address.caseInsensitiveCompare(address) == .orderedSame }) else {
                 throw BackupError.invalid("This gym is already saved. Choose it from your gyms list.")
             }
             if existing == nil { context.insert(gym) }
             let makeDefault = isDefault || others.filter { $0.id != gym.id }.isEmpty
             if makeDefault { for other in others { other.isDefault = false } }
             gym.name = name
+            gym.address = address
             gym.colorGuide = colorGuide
             gym.updatedAt = .now
             gym.scaleRaw = scale.rawValue

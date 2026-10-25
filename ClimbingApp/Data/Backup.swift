@@ -42,6 +42,7 @@ struct ClimbingBackup: Codable {
     struct GymRecord: Codable {
         var id: UUID
         var name: String
+        var address: String? = nil
         var scale: GradeScale
         var customScaleName: String
         var customGrades: [String]
@@ -120,7 +121,7 @@ struct ClimbingBackup: Codable {
     @MainActor
     init(sessions: [ClimbingSession], defaultScale: GradeScale, gyms: [SavedGym] = [], climbs: [ClimbEntry]? = nil) {
         self.defaultScale = defaultScale
-        self.gyms = gyms.map { GymRecord(id: $0.id, name: $0.name, scale: $0.scale, customScaleName: $0.customScaleName, customGrades: $0.customGrades, isDefault: $0.isDefault, colorGuide: $0.colorGuide) }
+        self.gyms = gyms.map { GymRecord(id: $0.id, name: $0.name, address: $0.address, scale: $0.scale, customScaleName: $0.customScaleName, customGrades: $0.customGrades, isDefault: $0.isDefault, colorGuide: $0.colorGuide) }
         var seen = Set<UUID>()
         let all = (climbs ?? sessions.flatMap(\.allClimbs)).filter { seen.insert($0.id).inserted }
         self.sessions = sessions.map { session in
@@ -286,6 +287,7 @@ extension ClimbingStore {
                 let gym = gymsByID[record.id] ?? SavedGym(id: record.id, name: record.name)
                 if gymsByID[record.id] == nil { context.insert(gym) }
                 gym.colorGuide = record.colorGuide ?? ""
+                gym.address = record.address ?? ""
                 gym.name = record.name; gym.scaleRaw = record.scale.rawValue
                 gym.customScaleName = record.customScaleName; gym.customGrades = record.customGrades
                 gym.isDefault = record.isDefault

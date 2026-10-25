@@ -38,7 +38,7 @@ xcodebuild -project ClimbingApp.xcodeproj -scheme ClimbingApp \
   -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO test
 ```
 
-The shared scheme includes 48 domain/persistence/Health boundary tests and nine UI checks for logging, cross-session projects, honest recaps, gyms, custom grades, the account portal, and optional media selection, preview, and persistence. UI tests use a separate persistent store and reset only that test store. Tiny bundled route fixtures are seeded into the test app’s Files folder automatically; tests still attach them through the real importer.
+The shared scheme includes 50 domain/persistence/Health boundary tests and nine UI checks for logging, cross-session projects, honest recaps, gyms, custom grades, the account portal, and optional media selection, preview, and persistence. UI tests use a separate persistent store and reset only that test store. Tiny bundled route fixtures are seeded into the test app’s Files folder automatically; tests still attach them through the real importer.
 
 Source folders are synchronized with Xcode: adding a Swift file does not require editing the project. `scripts/create_project.py` reproduces the project configuration using Python's standard library. Avoid regenerating after manual project-setting changes without updating that script.
 
@@ -55,7 +55,7 @@ Source folders are synchronized with Xcode: adding a Swift file does not require
 - Distinguish flashes, first-try sends this session, and repeats.
 - Browse session history by gym or calendar date, with a completed-session filter.
 - View activity by week, attempts, sends, completion rate, and highest send per grade scale over 30 days, 90 days, or all time.
-- Save gyms, choose a default gym, and switch or add gyms directly from session/climb forms.
+- Save gyms, choose a default gym, and switch or add gyms directly from session/climb forms. Gym names offer Apple Maps suggestions with editable addresses; manual entry works offline.
 - Give each gym its own named scale; type a grade freely or tap a saved grade choice.
 - Attach up to 3 route photos or videos (25 MB each) from Photos or Files and view them from the route.
 - Sign in/out using Apple or Google once provider setup is complete; each identity has a separate local log.

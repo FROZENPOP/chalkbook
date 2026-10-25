@@ -17,7 +17,6 @@ struct SettingsView: View {
     @State private var importing = false
     @State private var pendingBackup: ClimbingBackup?
     @State private var confirmRestore = false
-    @State private var confirmDelete = false
     @State private var message: String?
 
     var body: some View {
@@ -67,7 +66,6 @@ struct SettingsView: View {
                 LabeledContent("Version", value: "0.1.0")
                 Text("Made for your next move.").foregroundStyle(.secondary)
             }
-            Section { Button("Delete all climbing data", role: .destructive) { confirmDelete = true } }
         }
         .navigationTitle("Settings")
         .sheet(isPresented: $showLogin) { LoginPortalView() }
@@ -97,11 +95,6 @@ struct SettingsView: View {
                 }
             }
         } message: { Text("Current sessions will be replaced. Export a backup first if you want to keep them.") }
-        .confirmationDialog("Delete all sessions, gyms, climbs, and route media?", isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("Delete all climbing data", role: .destructive) {
-                if store.deleteAll() { pendingBackup = nil }
-            }
-        } message: { Text("This cannot be undone. Export a backup first if you want to keep your log.") }
         .alert("Backup", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") { message = nil }
         } message: { Text(message ?? "") }

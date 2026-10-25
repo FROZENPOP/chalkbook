@@ -71,7 +71,7 @@ private struct WorkspaceRoot: View {
                     }
                 }
                 #endif
-                let schema = Schema(versionedSchema: ClimbingSchemaV4.self)
+                let schema = Schema(versionedSchema: ClimbingSchemaV5.self)
                 let url = URL.applicationSupportDirectory.appending(path: "ClimbingUITests.store")
                 try FileManager.default.createDirectory(at: URL.applicationSupportDirectory, withIntermediateDirectories: true)
                 if ProcessInfo.processInfo.arguments.contains("--reset-test-data") {

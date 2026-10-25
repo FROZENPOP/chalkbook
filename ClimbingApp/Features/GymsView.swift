@@ -14,6 +14,7 @@ struct GymsView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(gym.name).foregroundStyle(.primary).font(.headline)
+                                if !gym.address.isEmpty { Text(gym.address).font(.caption).foregroundStyle(.secondary) }
                                 Text(gym.scaleLabel).foregroundStyle(.secondary).font(.subheadline)
                             }
                             Spacer()
@@ -43,7 +44,7 @@ struct GymSelectionRow: View {
     @Query(sort: \SavedGym.name) private var gyms: [SavedGym]
     @Binding var selectedID: UUID?
     @State private var sheet: GymSheet?
-    var selectedName: String { gyms.first { $0.id == selectedID }?.name ?? "No gym selected" }
+    var selectedName: String { gyms.first { $0.id == selectedID }?.menuLabel ?? "No gym selected" }
 
     var body: some View {
         Menu {
@@ -51,7 +52,7 @@ struct GymSelectionRow: View {
                 Button {
                     selectedID = gym.id
                 } label: {
-                    if selectedID == gym.id { Label(gym.name, systemImage: "checkmark") } else { Text(gym.name) }
+                    if selectedID == gym.id { Label(gym.menuLabel, systemImage: "checkmark") } else { Text(gym.menuLabel) }
                 }
             }
             if !gyms.isEmpty { Divider() }
@@ -77,6 +78,7 @@ struct GymEditorView: View {
     var gym: SavedGym?
     var onSaved: ((SavedGym) -> Void)?
     @State private var name = ""
+    @State private var address = ""
     @State private var scale = GradeScale.vScale
     @State private var customName = ""
     @State private var gradesText = ""
@@ -99,7 +101,8 @@ struct GymEditorView: View {
         NavigationStack {
             Form {
                 Section("Gym") {
-                    TextField("Gym name", text: $name).textInputAutocapitalization(.words).accessibilityIdentifier("gymName")
+                    GymPlaceNameField(name: $name, address: $address)
+                    TextField("Address or city (optional)", text: $address).textContentType(.fullStreetAddress).accessibilityIdentifier("gymAddress")
                     Toggle("Use as my default gym", isOn: $isDefault)
                 }
                 Section {
@@ -122,6 +125,7 @@ struct GymEditorView: View {
                     Section { Button("Remove saved gym", role: .destructive) { confirmDelete = true } }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle(gym == nil ? "Add gym" : "Edit gym")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -129,7 +133,7 @@ struct GymEditorView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         if let saved = store.saveGym(existing: gym, name: name, scale: scale, customName: customName,
-                                                     grades: GymGrades.orderedLabels(from: gradesText), isDefault: isDefault, colorGuide: colorGuide) {
+                                                     grades: GymGrades.orderedLabels(from: gradesText), isDefault: isDefault, colorGuide: colorGuide, address: address) {
                             onSaved?(saved)
                             dismiss()
                         }
@@ -140,6 +144,7 @@ struct GymEditorView: View {
                 guard !initialized else { return }
                 initialized = true
                 if let gym {
+                    address = gym.address
                     colorGuide = gym.colorGuide
                     name = gym.name; scale = gym.scale; customName = gym.customScaleName
                     gradesText = gym.customGrades.joined(separator: ", "); isDefault = gym.isDefault
