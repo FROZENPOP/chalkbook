@@ -60,8 +60,15 @@ def main():
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     build_dir = ROOT / "build"
     build_dir.mkdir(exist_ok=True)
+    # Synced Documents folders can inject Finder metadata into bundles, breaking codesign.
+    # Simulator builds use Xcode's local ad-hoc signing; no paid Apple team is required.
+    cache_dir = Path.home() / "Library/Caches/ClimbLog"
+    derived_data = cache_dir / "DerivedData"
+    legacy_packages = build_dir / "DerivedData/SourcePackages"
+    packages = legacy_packages if legacy_packages.exists() else cache_dir / "SourcePackages"
     command = base + ["-destination", f"platform=iOS Simulator,id={identifier}",
-                      "-derivedDataPath", str(build_dir / "DerivedData"), "CODE_SIGNING_ALLOWED=NO"]
+                      "-derivedDataPath", str(derived_data), "-clonedSourcePackagesDirPath", str(packages),
+                      "CODE_SIGNING_ALLOWED=YES", "CODE_SIGN_IDENTITY=-"]
     if args.action == "test":
         command += ["-parallel-testing-enabled", "NO", "-resultBundlePath",
                     str(build_dir / f"{args.device}-{stamp}.xcresult"), "test"]
@@ -76,8 +83,11 @@ def main():
         raise RuntimeError(f"Xcode failed; see {log}")
     print(f"{args.action.capitalize()} succeeded.")
     if args.action == "run":
-        app = build_dir / "DerivedData/Build/Products/Debug-iphonesimulator/ClimbingApp.app"
+        app = derived_data / "Build/Products/Debug-iphonesimulator/ClimbingApp.app"
         run("xcrun", "simctl", "install", identifier, str(app))
+        # Ensure a prior UI-test launch cannot leave the app in its isolated guest mode.
+        subprocess.run(["xcrun", "simctl", "terminate", identifier, "com.frozenpop.ClimbingApp"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         run("xcrun", "simctl", "launch", identifier, "com.frozenpop.ClimbingApp")
         developer = Path(run("xcode-select", "-p", capture=True).strip())
         # Xcode 27 uses Device Hub; older versions use Simulator.app.

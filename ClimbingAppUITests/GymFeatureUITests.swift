@@ -69,19 +69,17 @@ final class GymFeatureUITests: XCTestCase {
     }
 
     @MainActor
-    func testAccountPortalExplainsPendingProviderSetup() {
+    func testAccountPortalShowsProviderAvailabilityAndCloses() {
         let app = launch()
         app.buttons["openSettings"].tap()
         app.buttons["openLogin"].tap()
-        let setup = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Account setup is still being completed")).firstMatch
-        for _ in 0..<3 { if setup.isHittable { break }; app.scrollViews.firstMatch.swipeUp() }
-        let before = XCTAttachment(screenshot: app.screenshot())
-        before.name = "Login portal visual check"; before.lifetime = .keepAlways; add(before)
         XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5))
-        XCTAssertTrue(setup.waitForExistence(timeout: 10))
-        app.scrollViews.firstMatch.swipeDown()
-        XCTAssertFalse(app.buttons["Sign in with Apple"].isEnabled)
-        XCTAssertFalse(app.buttons["Sign in"].isEnabled)
+        let google = app.buttons["googleLogin"]
+        for _ in 0..<4 { if google.isHittable { break }; app.scrollViews.firstMatch.swipeUp() }
+        XCTAssertTrue(app.buttons["appleLogin"].exists)
+        XCTAssertTrue(google.exists)
+        if app.staticTexts["googleSetupMessage"].exists { XCTAssertFalse(google.isEnabled) }
+        else { XCTAssertTrue(google.isEnabled) }
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "Apple and Google login portal"
         screenshot.lifetime = .keepAlways

@@ -41,9 +41,13 @@ struct LoginPortalView: View {
                     Image(systemName: "figure.climbing").font(.system(size: 50)).foregroundStyle(ClimbTheme.forest)
                     Text("Your climbing,\nyour account.").font(.system(.largeTitle, design: .rounded, weight: .bold))
                     Text("Sign in with your existing Apple or Google account. No new password to remember.").foregroundStyle(.secondary)
-                    if !LoginConfiguration.appleEnabled || LoginConfiguration.googleClientID == nil {
-                        Text("Account setup is still being completed for this development build. You can keep logging on this device.")
-                            .font(.subheadline).foregroundStyle(.secondary).accessibilityIdentifier("loginSetupMessage")
+                    if !LoginConfiguration.appleEnabled {
+                        Text("Apple sign-in isn’t available in this build. You can still use Google when configured, or continue without an account.")
+                            .font(.subheadline).foregroundStyle(.secondary).accessibilityIdentifier("appleSetupMessage")
+                    }
+                    if LoginConfiguration.googleClientID == nil {
+                        Text("Google sign-in isn’t configured in this build. You can continue without an account.")
+                            .font(.subheadline).foregroundStyle(.secondary).accessibilityIdentifier("googleSetupMessage")
                     }
                     VStack(spacing: 14) {
                         SignInWithAppleButton(.signIn) { request in

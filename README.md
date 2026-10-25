@@ -27,7 +27,7 @@ Command-line build:
 ```sh
 xcodebuild -project ClimbingApp.xcodeproj -scheme ClimbingApp \
   -destination 'generic/platform=iOS Simulator' \
-  -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build
+  -derivedDataPath "$HOME/Library/Caches/ClimbLog/DerivedData" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build
 ```
 
 List available simulators with `xcrun simctl list devices available`, then use a device's UUID:
@@ -35,10 +35,10 @@ List available simulators with `xcrun simctl list devices available`, then use a
 ```sh
 xcodebuild -project ClimbingApp.xcodeproj -scheme ClimbingApp \
   -destination 'platform=iOS Simulator,id=SIMULATOR_UUID' \
-  -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO test
+  -derivedDataPath "$HOME/Library/Caches/ClimbLog/DerivedData" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test
 ```
 
-The shared scheme includes 50 domain/persistence/Health boundary tests and nine UI checks for logging, cross-session projects, honest recaps, gyms, custom grades, the account portal, and optional media selection, preview, and persistence. UI tests use a separate persistent store and reset only that test store. Tiny bundled route fixtures are seeded into the test app’s Files folder automatically; tests still attach them through the real importer.
+The shared scheme includes 51 domain/persistence/Health/Keychain boundary tests and eleven UI checks for logging, cross-session projects, honest recaps, gyms, custom grades, the account portal, and optional media selection, preview, and persistence. UI tests use a separate persistent store and reset only that test store. Tiny bundled route fixtures are seeded into the test app’s Files folder automatically; tests still attach them through the real importer.
 
 Source folders are synchronized with Xcode: adding a Swift file does not require editing the project. `scripts/create_project.py` reproduces the project configuration using Python's standard library. Avoid regenerating after manual project-setting changes without updating that script.
 
@@ -83,3 +83,5 @@ Repository: [FROZENPOP/ClimbingAppIOS](https://github.com/FROZENPOP/ClimbingAppI
 4. Open **Settings → Sign in or create an account** for the Apple/Google portal. Provider activation is documented in AUTH_SETUP.md.
 
 Projects can be saved while creating/editing a climb. Use **Choose existing climb or project** in a later session; use **Log a past session** for a recap without individual attempt details. Apple Health linking is available in session details and does not require app login.
+
+Simulator builds use local ad-hoc signing so Google’s SDK and the account vault can access Keychain. Build products live in `~/Library/Caches/ClimbLog/DerivedData`, outside synced Documents folders that can add metadata incompatible with signing. This needs no paid Apple membership for Simulator; physical-device signing and Sign in with Apple have separate requirements.
