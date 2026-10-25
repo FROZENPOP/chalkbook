@@ -46,7 +46,7 @@ See the official [Google provider setup](https://supabase.com/docs/guides/auth/s
 - Test airplane mode: journal logging still works; social mutations show a retryable error and do not claim a successful save. Reopen the app and reconnect. Test sign-out/account switching for data isolation.
 - Delete a social profile from its editor; friendships and shared entries cascade away while the local journal remains. This removes social data, not the provider account or Supabase Auth identity.
 
-Discovery currently lists up to 200 profiles, with a local name filter. The shared feed contains the newest 200 visible snapshots; progress totals explicitly cover only these shared entries and preserve unknown denominators. Pagination, remote avatar storage, full private journal sync, and Apple backend authentication are follow-up work.
+Add friends searches Supabase by username prefix after a 300 ms debounce. Type 2–24 letters, numbers or underscores, optionally beginning with @. Search returns up to 30 matches; type more to narrow results. Your own account and blocked profiles are excluded. It is no longer limited to a locally loaded discovery list. The shared feed contains the newest 200 visible snapshots; progress totals explicitly cover only these shared entries and preserve unknown denominators. Pagination, remote avatar storage, full private journal sync, and Apple backend authentication are follow-up work.
 
 Backup replacement affects local journal records only; independently published snapshots remain until explicitly removed or the social profile is deleted. Review shares before replacing a journal from a backup.
 
@@ -63,4 +63,4 @@ from public.social_reports order by created_at;
 
 No automated moderation, email alerts, or service-role dashboard is shipped in the iOS app. Review reports and take account action through the secured backend. Do not expose this table or administrative credentials to clients.
 
-Current verification: native simulator build and isolated PostgreSQL fixtures are available locally. Hosted credentials, two-account OAuth/API integration, and physical-device verification remain pending project setup.
+Current verification: native simulator builds, isolated PostgreSQL permission fixtures, and Google-to-Supabase connection and live username search with the configured account have been verified. Two-account friendship/sharing integration and physical-device verification remain pending.

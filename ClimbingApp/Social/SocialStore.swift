@@ -77,16 +77,30 @@ final class SocialStore {
 
     private func reload() async throws {
         // Load into temporary values first so a failed refresh doesn't present partial results as current.
-        let profiles = try JSONDecoder().decode([SocialProfile].self, from: await request("/rest/v1/climber_profiles?select=*&order=username&limit=200"))
         let links = try JSONDecoder().decode([Friendship].self, from: await request("/rest/v1/friendships?select=*"))
         let shared = try JSONDecoder().decode([SharedSession].self, from: await request("/rest/v1/shared_sessions?select=*&order=session_day.desc&limit=200"))
         // Always retrieve own profile even if it falls outside the discovery page.
         let own = try JSONDecoder().decode([SocialProfile].self, from: await request("/rest/v1/climber_profiles?id=eq.\(userID!.uuidString)&select=*"))
         let blocked = try JSONDecoder().decode([ClimberBlock].self, from: await request("/rest/v1/climber_blocks?select=target_id"))
+        let ids = Set(links.flatMap { [$0.requester, $0.recipient] } + shared.map(\.owner_id)).sorted { $0.uuidString < $1.uuidString }
+        var profiles = own
+        // Fetch people actually referenced in the feed/requests. Discovery uses a separate server search.
+        for start in stride(from: 0, to: ids.count, by: 50) {
+            let batch = ids[start..<min(start + 50, ids.count)].map(\.uuidString).joined(separator: ",")
+            let rows = try JSONDecoder().decode([SocialProfile].self, from: await request("/rest/v1/climber_profiles?id=in.(\(batch))&select=*"))
+            profiles += rows.filter { row in !profiles.contains { $0.id == row.id } }
+        }
         people = profiles; friendships = links; entries = shared; me = own.first; blocks = blocked
     }
 
     func refresh(_ auth: AccountSession) async { await perform(auth) { try await self.reload() } }
+
+    func searchProfiles(_ auth: AccountSession, query: FriendSearchQuery) async throws -> [SocialProfile] {
+        try await authorize(auth)
+        try Task.checkCancellation()
+        let profiles = try JSONDecoder().decode([SocialProfile].self, from: await request(query.path))
+        return profiles.filter { $0.id != userID }
+    }
 
     func saveProfile(_ auth: AccountSession, username: String, name: String, isPrivate: Bool) async -> Bool {
         let username = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()

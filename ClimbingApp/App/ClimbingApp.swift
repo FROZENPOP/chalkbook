@@ -112,7 +112,7 @@ struct AppRoot: View {
             NavigationStack { HomeView() }.tabItem { Label("Journal", systemImage: "book") }
             NavigationStack { ProjectsView() }.tabItem { Label("Projects", systemImage: "figure.climbing") }
             NavigationStack { ProgressViewScreen() }.tabItem { Label("Progress", systemImage: "chart.bar.xaxis") }
-            NavigationStack { FriendsView() }.tabItem { Label("Friends", systemImage: "person.2") }
+            NavigationStack { friendsRoot }.tabItem { Label("Friends", systemImage: "person.2") }
         }
         .id(store.dataRevision)
         .tint(ClimbTheme.forest)
@@ -124,6 +124,17 @@ struct AppRoot: View {
         .sheet(isPresented: $setupProfile) {
             ProfileEditorView(setup: true).environment(profiles)
         }
+    }
+
+    @ViewBuilder private var friendsRoot: some View {
+        #if DEBUG
+        // Isolated real search UI for keyboard/accessibility tests; never loads live accounts or fixture people.
+        if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-friend-search") {
+            AddFriendsView()
+        } else { FriendsView() }
+        #else
+        FriendsView()
+        #endif
     }
 }
 
