@@ -62,3 +62,5 @@ The entitlement and read-purpose string are present. Enable HealthKit for the ch
 ### Simulator Keychain errors
 
 A configured client ID does not prove secure credential storage works. The earlier `CODE_SIGNING_ALLOWED=NO` launcher left only a linker signature, without normal app signing/entitlements. The updated helper uses Xcode local simulator signing (`CODE_SIGN_IDENTITY=-`) and builds outside synced Documents folders. A dedicated test writes, reads, and removes a fixture under a separate Keychain service; it never signs in a fake account or touches the current account’s item. Complete Google authorization still requires the user’s real account consent.
+
+After the first successful provider sign-in on this installation, the app offers local profile setup. Users can choose their own display name, an optional photo, and a short bio; editing these later never changes the provider subject or sign-in email. Profiles stay isolated per provider identity, including separate guest information, and remain on the phone after sign-out.

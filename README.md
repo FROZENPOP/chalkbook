@@ -38,7 +38,7 @@ xcodebuild -project ClimbingApp.xcodeproj -scheme ClimbingApp \
   -derivedDataPath "$HOME/Library/Caches/ClimbLog/DerivedData" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test
 ```
 
-The shared scheme includes 51 domain/persistence/Health/Keychain boundary tests and eleven UI checks for logging, cross-session projects, honest recaps, gyms, custom grades, the account portal, and optional media selection, preview, and persistence. UI tests use a separate persistent store and reset only that test store. Tiny bundled route fixtures are seeded into the test app’s Files folder automatically; tests still attach them through the real importer.
+The shared scheme includes 55 domain/persistence/Health/Keychain/profile boundary tests and twelve UI checks for logging, cross-session projects, honest recaps, gyms, custom grades, the account portal, and optional media selection, preview, and persistence. UI tests use a separate persistent store and reset only that test store. Tiny bundled route fixtures are seeded into the test app’s Files folder automatically; tests still attach them through the real importer.
 
 Source folders are synchronized with Xcode: adding a Swift file does not require editing the project. `scripts/create_project.py` reproduces the project configuration using Python's standard library. Avoid regenerating after manual project-setting changes without updating that script.
 
@@ -59,6 +59,7 @@ Source folders are synchronized with Xcode: adding a Swift file does not require
 - Give each gym its own named scale; type a grade freely or tap a saved grade choice.
 - Attach up to 3 route photos or videos (25 MB each) from Photos or Files and view them from the route.
 - Sign in/out using Apple or Google once provider setup is complete; each identity has a separate local log.
+- Set up or edit a private display name, optional profile photo, and bio. New signed-in accounts are offered profile setup; Sign out sits at the bottom of Settings.
 - Export versioned JSON backups, validate and preview a restore, replace the log with confirmation, and delete local data.
 - Save every mutation explicitly; roll back failed changes and show an error.
 
@@ -85,3 +86,5 @@ Repository: [FROZENPOP/ClimbingAppIOS](https://github.com/FROZENPOP/ClimbingAppI
 Projects can be saved while creating/editing a climb. Use **Choose existing climb or project** in a later session; use **Log a past session** for a recap without individual attempt details. Apple Health linking is available in session details and does not require app login.
 
 Simulator builds use local ad-hoc signing so Google’s SDK and the account vault can access Keychain. Build products live in `~/Library/Caches/ClimbLog/DerivedData`, outside synced Documents folders that can add metadata incompatible with signing. This needs no paid Apple membership for Simulator; physical-device signing and Sign in with Apple have separate requirements.
+
+Profile photos are copied, resized to at most 512 pixels, and re-encoded without original location metadata. Profiles are protected local files, separated by provider/account identity and guest. Profile changes do not change your Google/Apple email and are not included in journal backups or cloud sync.

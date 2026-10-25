@@ -43,7 +43,7 @@ private struct WorkspaceRoot: View {
     var body: some View {
         Group {
             if let container {
-                AppRoot(container: container)
+                AppRoot(container: container, profileKey: accountKey ?? "guest", profileDirectory: testing ? URL.applicationSupportDirectory.appending(path: "UITestProfiles") : nil)
                     .modelContainer(container)
                     .defaultAppStorage(testing ? UserDefaults(suiteName: "ClimbLog.UITesting")! : accountKey.flatMap { UserDefaults(suiteName: "ClimbLog.\($0)") } ?? .standard)
             } else if let startupError {
@@ -76,6 +76,8 @@ private struct WorkspaceRoot: View {
                 try FileManager.default.createDirectory(at: URL.applicationSupportDirectory, withIntermediateDirectories: true)
                 if ProcessInfo.processInfo.arguments.contains("--reset-test-data") {
                     UserDefaults.standard.removePersistentDomain(forName: "ClimbLog.UITesting")
+                    let profiles = URL.applicationSupportDirectory.appending(path: "UITestProfiles")
+                    if FileManager.default.fileExists(atPath: profiles.path) { try FileManager.default.removeItem(at: profiles) }
                     for suffix in ["", "-shm", "-wal"] {
                         let path = URL(fileURLWithPath: url.path + suffix)
                         if FileManager.default.fileExists(atPath: path.path) { try FileManager.default.removeItem(at: path) }
@@ -94,10 +96,14 @@ private struct WorkspaceRoot: View {
 }
 
 struct AppRoot: View {
+    @Environment(AccountSession.self) private var auth
     @State private var store: ClimbingStore
+    @State private var profiles: ProfileStore
+    @State private var setupProfile = false
 
-    init(container: ModelContainer) {
+    init(container: ModelContainer, profileKey: String = "guest", profileDirectory: URL? = nil) {
         _store = State(initialValue: ClimbingStore(context: container.mainContext))
+        _profiles = State(initialValue: ProfileStore(key: profileKey, directory: profileDirectory))
     }
 
     var body: some View {
@@ -110,6 +116,11 @@ struct AppRoot: View {
         .tint(ClimbTheme.forest)
         .safeAreaInset(edge: .top) { SaveErrorBanner() }
         .environment(store)
+        .environment(profiles)
+        .task { setupProfile = auth.account != nil && profiles.profile == nil && profiles.errorMessage == nil }
+        .sheet(isPresented: $setupProfile) {
+            ProfileEditorView(setup: true).environment(profiles)
+        }
     }
 }
 

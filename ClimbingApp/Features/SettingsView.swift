@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(AccountSession.self) private var auth
     @AppStorage("healthEnabled") private var healthEnabled = false
     @State private var showLogin = false
+    @State private var editProfile = false
     @State private var confirmSignOut = false
     @Environment(ClimbingStore.self) private var store
     @Query(sort: \SavedGym.name) private var gyms: [SavedGym]
@@ -21,7 +22,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            AccountSection(openPortal: { showLogin = true }, requestSignOut: { confirmSignOut = true })
+            AccountSection(openPortal: { showLogin = true }, editProfile: { editProfile = true })
             Section("My gyms") {
                 NavigationLink { GymsView() } label: {
                     Label("Saved gyms (\(gyms.count))", systemImage: "building.2")
@@ -66,8 +67,15 @@ struct SettingsView: View {
                 LabeledContent("Version", value: "0.1.0")
                 Text("Made for your next move.").foregroundStyle(.secondary)
             }
+            if auth.account != nil {
+                Section {
+                    Button("Sign out", role: .destructive) { confirmSignOut = true }
+                        .frame(minHeight: 44).accessibilityIdentifier("signOut")
+                }
+            }
         }
         .navigationTitle("Settings")
+        .sheet(isPresented: $editProfile) { ProfileEditorView() }
         .sheet(isPresented: $showLogin) { LoginPortalView() }
         .confirmationDialog("Sign out of your account?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Sign out", role: .destructive) { auth.signOut() }

@@ -4,20 +4,32 @@ import SwiftUI
 
 struct AccountSection: View {
     @Environment(AccountSession.self) private var auth
+    @Environment(ProfileStore.self) private var profiles
     let openPortal: () -> Void
-    let requestSignOut: () -> Void
+    let editProfile: () -> Void
 
     var body: some View {
-        Section("Account") {
+        Section("Your profile") {
+            HStack(spacing: 16) {
+                ProfileAvatar(photo: profiles.profile?.photo)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(profiles.profile?.name ?? auth.account?.name ?? "Your climbing profile").font(.headline).accessibilityIdentifier("profileDisplayName")
+                    if let bio = profiles.profile?.bio, !bio.isEmpty { Text(bio).font(.subheadline).foregroundStyle(.secondary) }
+                    if let email = auth.account?.email { Text(email).font(.subheadline).foregroundStyle(.secondary) }
+                }
+            }.padding(.vertical, 8)
+            Button(profiles.profile == nil || profiles.profile?.setupComplete == false ? "Set up profile" : "Edit profile", systemImage: "person.crop.circle.badge.pencil", action: editProfile)
+                .frame(minHeight: 44).disabled(profiles.errorMessage != nil).accessibilityIdentifier("editProfile")
+            if let message = profiles.errorMessage {
+                Text(message).foregroundStyle(.red)
+                Button("Retry opening profile") { profiles.retryLoading() }
+            }
             if let message = auth.errorMessage {
                 Text(message).font(.subheadline).foregroundStyle(.red)
                 Button("Dismiss account message") { auth.errorMessage = nil }
             }
             if let account = auth.account {
-                Label(account.name, systemImage: "person.crop.circle.fill").font(.headline)
-                if let email = account.email { Text(email).font(.subheadline).foregroundStyle(.secondary) }
                 Text("Signed in with \(account.provider == .apple ? "Apple" : "Google")").font(.caption).foregroundStyle(.secondary)
-                Button("Sign out", role: .destructive, action: requestSignOut).accessibilityIdentifier("signOut")
             } else {
                 Button(action: openPortal) {
                     Label("Sign in or create an account", systemImage: "person.crop.circle")
@@ -25,7 +37,6 @@ struct AccountSection: View {
                 Text("You’re logging on this device without an account.").font(.caption).foregroundStyle(.secondary)
             }
         }
-
     }
 }
 
