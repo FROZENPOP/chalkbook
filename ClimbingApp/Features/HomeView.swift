@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct HomeView: View {
+    @Environment(ProfileStore.self) private var profiles
     @Query(sort: \ClimbingSession.day, order: .reverse) private var sessions: [ClimbingSession]
     @State private var pastRecap = false
     @State private var sheet: SessionSheet?
@@ -62,7 +63,18 @@ struct HomeView: View {
         }
         .background(ClimbTheme.background)
         .navigationTitle("Journal")
-        .toolbar { NavigationLink { SettingsView() } label: { Label("Settings", systemImage: "slider.horizontal.3") }.accessibilityIdentifier("openSettings") }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink { SettingsView() } label: {
+                    ProfileAvatar(photo: profiles.profile?.photo, size: 32)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Your profile")
+                .accessibilityIdentifier("openSettings")
+            }
+        }
         .sheet(isPresented: $pastRecap) { SessionEditorView(isRecap: true) }
         .sheet(item: $sheet) { _ in SessionEditorView() }
     }
