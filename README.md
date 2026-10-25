@@ -39,7 +39,7 @@ xcodebuild -project ClimbingApp.xcodeproj -scheme ClimbingApp \
   -derivedDataPath "$HOME/Library/Caches/ClimbLog/DerivedData" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test
 ```
 
-The shared scheme includes 64 domain/persistence/Health/Keychain/profile/social boundary tests and fourteen UI checks for logging, cross-session projects, honest recaps, gyms, custom grades, the account portal, and optional media selection, preview, and persistence. UI tests use a separate persistent store and reset only that test store. Tiny bundled route fixtures are seeded into the test app’s Files folder automatically; tests still attach them through the real importer.
+The shared scheme includes 71 domain/persistence/Health/Keychain/profile/social boundary tests and fifteen UI checks for logging, cross-session projects, honest recaps, gyms, custom grades, the account portal, and optional media selection, preview, and persistence. UI tests use a separate persistent store and reset only that test store. Tiny bundled route fixtures are seeded into the test app’s Files folder automatically; tests still attach them through the real importer.
 
 Source folders are synchronized with Xcode: adding a Swift file does not require editing the project. `scripts/create_project.py` reproduces the project configuration using Python's standard library. Avoid regenerating after manual project-setting changes without updating that script.
 
@@ -91,3 +91,5 @@ Simulator builds use local ad-hoc signing so Google’s SDK and the account vaul
 Profile photos are copied, resized to at most 512 pixels, and re-encoded without original location metadata. Profiles are protected local files, separated by provider/account identity and guest. Profile changes do not change your Google/Apple email and are not included in journal backups or cloud sync.
 
 Friends uses a dedicated Add friends screen inspired by friend-first apps: username search, a shareable username card, clear request states, and separate Activity / Friends / Requests views. Search is debounced and queries Supabase directly; no contact upload or group feature is included.
+
+Optional climbing bios/photos, ranked name and username discovery, friend QR/app links, and session reactions are implemented with an additional Supabase migration. Project notebooks support a pinned next move and private, editable photo markup. See SUPABASE_SETUP.md for deployment and invite hosting requirements. SwiftData V6 and JSON backup V4 preserve these additions without modifying original photos.

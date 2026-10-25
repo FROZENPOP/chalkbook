@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 
 struct ClimbingBackup: Codable {
     static let maximumBytes = 150_000_000
-    var version = 3
+    var version = 4
     var exportedAt = Date.now
     var defaultScale: GradeScale
     var sessions: [SessionRecord]
@@ -26,6 +26,7 @@ struct ClimbingBackup: Codable {
         var createdAt: Date; var updatedAt: Date; var durationKnown: Bool
     }
     struct ClimbExtras: Codable {
+        var pinnedNoteID: UUID? = nil
         var id: UUID; var projectRaw: String; var historyIncomplete: Bool
         var gradeKind: String; var gradeUpper: String; var updatedAt: Date
     }
@@ -51,6 +52,7 @@ struct ClimbingBackup: Codable {
     }
 
     struct MediaRecord: Codable {
+        var annotationJSON: String? = nil
         var id: UUID
         var kind: RouteMediaKind
         var filename: String
@@ -113,7 +115,7 @@ struct ClimbingBackup: Codable {
                           sessionID: $0.effectiveSessionID, daySnapshot: $0.sessionDay, gradeSnapshot: $0.gradeSnapshot, timePrecision: $0.timePrecision)
         }, gymID: climb.gymID, gymName: climb.gymName, customScaleName: climb.customScaleName,
                     customGradeOrder: climb.customGradeOrder, media: climb.media.map {
-            MediaRecord(id: $0.id, kind: $0.kind, filename: $0.filename, contentType: $0.contentType,
+            MediaRecord(annotationJSON: $0.annotationJSON, id: $0.id, kind: $0.kind, filename: $0.filename, contentType: $0.contentType,
                         data: $0.data, checksum: Self.checksum($0.data))
         }, colorGuide: climb.colorGuide)
     }
@@ -135,7 +137,7 @@ struct ClimbingBackup: Codable {
             SessionExtras(id: $0.id, linkedClimbIDs: $0.linkedClimbs.map(\.id), selectedClimbID: $0.selectedClimbID,
                           createdAt: $0.createdAt, updatedAt: $0.updatedAt, durationKnown: $0.durationKnown)
         }, climbs: all.map {
-            ClimbExtras(id: $0.id, projectRaw: $0.projectRaw, historyIncomplete: $0.historyIncomplete, gradeKind: $0.gradeKindRaw, gradeUpper: $0.gradeUpper, updatedAt: $0.updatedAt)
+            ClimbExtras(pinnedNoteID: $0.pinnedNoteID, id: $0.id, projectRaw: $0.projectRaw, historyIncomplete: $0.historyIncomplete, gradeKind: $0.gradeKindRaw, gradeUpper: $0.gradeUpper, updatedAt: $0.updatedAt)
         }, notes: all.flatMap { climb in climb.notebook.map {
             NoteRecord(id: $0.id, climbID: climb.id, sessionID: $0.sessionID, text: $0.text, createdAt: $0.createdAt, updatedAt: $0.updatedAt)
         } }, aggregates: sessions.flatMap { session in session.aggregates.map {
@@ -144,7 +146,7 @@ struct ClimbingBackup: Codable {
     }
 
     func validated() throws -> Self {
-        guard version == 1 || version == 2 || version == 3 else { throw BackupError.invalid("This backup version is not supported.") }
+        guard (1...4).contains(version) else { throw BackupError.invalid("This backup version is not supported.") }
         guard sessions.filter({ !$0.isComplete }).count <= 1 else {
             throw BackupError.invalid("A backup can contain only one active session.")
         }
@@ -161,6 +163,9 @@ struct ClimbingBackup: Codable {
                   gym.customGrades == GymGrades.orderedLabels(from: gym.customGrades.joined(separator: "\n")) else {
                 throw BackupError.invalid("The backup contains an invalid gym or grade order.")
             }
+        }
+        for media in allClimbRecords.flatMap({ $0.media ?? [] }) {
+            if let json = media.annotationJSON { _ = try RouteAnnotations.decode(json) }
         }
         let gymIDs = Set(gyms.map(\.id))
         var validationSessions = sessions
@@ -212,6 +217,9 @@ struct ClimbingBackup: Codable {
             }
             for item in journal.climbs {
                 guard ["", "active", "sent", "archived"].contains(item.projectRaw), GradeKind(rawValue: item.gradeKind) != nil else { throw BackupError.invalid("Invalid project or grade descriptor.") }
+            }
+            for item in journal.climbs {
+                if let pinned = item.pinnedNoteID, !journal.notes.contains(where: { $0.id == pinned && $0.climbID == item.id }) { throw BackupError.invalid("A pinned note refers to a missing notebook entry.") }
             }
             for note in journal.notes {
                 try register(note.id)
@@ -321,7 +329,7 @@ extension ClimbingStore {
                         let media = mediaByID[record.id] ?? RouteMedia(id: record.id, kind: record.kind, filename: record.filename, contentType: record.contentType, data: record.data)
                         if mediaByID[record.id] == nil { context.insert(media) }
                         media.kindRaw = record.kind.rawValue; media.filename = record.filename
-                        media.contentType = record.contentType; media.data = record.data
+                        media.contentType = record.contentType; media.data = record.data; media.annotationJSON = record.annotationJSON ?? ""
                         return media
                     }
                     climb.label = item.label
@@ -366,7 +374,7 @@ extension ClimbingStore {
                 }
                 for item in journal.climbs {
                     guard let climb = currentClimbs[item.id] else { continue }
-                    climb.projectRaw = item.projectRaw; climb.historyIncomplete = item.historyIncomplete
+                    climb.pinnedNoteID = item.pinnedNoteID; climb.projectRaw = item.projectRaw; climb.historyIncomplete = item.historyIncomplete
                     climb.gradeKindRaw = item.gradeKind; climb.gradeUpper = item.gradeUpper; climb.updatedAt = item.updatedAt
                 }
                 for item in journal.notes {

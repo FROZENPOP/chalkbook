@@ -11,6 +11,7 @@ $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
 grant usage on schema auth to authenticated,anon;
 grant execute on function auth.uid() to authenticated,anon;`);
 await db.exec(await readFile(new URL('../migrations/202610240001_friends.sql', import.meta.url), 'utf8'));
+await db.exec(await readFile(new URL('../migrations/202610250002_profiles_search_reactions.sql', import.meta.url), 'utf8'));
 const [a,b,c] = [1,2,3].map(i => `00000000-0000-0000-0000-00000000000${i}`);
 const source = '10000000-0000-0000-0000-000000000001';
 for (const id of [a,b,c]) await db.query('insert into auth.users values($1)',[id]);
@@ -69,6 +70,40 @@ where n.nspname in ('public','social_private') and p.prosecdef and not ('search_
 await db.exec('set role anon');
 await denied('select * from public.shared_sessions'); checks++;
 await denied("select public.save_social_profile('fake','Fake',false)"); checks++;
+await as(a);
+await db.exec("select public.save_social_profile_v2('alice','Alice Rock',true,'Working on slabs',null)");
+await as(c); equal(await count(`select * from public.climber_profile_details where id='${a}'`),0);
+await as(a); await db.query("select public.friend_action($1,'request')",[b]);
+await as(b); await db.query("select public.friend_action($1,'accept')",[a]);
+equal((await db.query(`select bio from public.climber_profile_details where id='${a}'`)).rows[0].bio,'Working on slabs');
+await db.query("select public.save_social_profile_v2('bob','Alice Rock',false,'Public bio',null)");
+await as(c); equal(await count(`select * from public.climber_profile_details where id='${b}'`),1);
+equal((await db.query("select username from public.search_climbers('bob')")).rows[0].username,'bob');
+equal((await db.query("select username from public.search_climbers('alice rock')")).rows.length,2);
+equal((await db.query("select username from public.search_climbers('alice')")).rows[0].username,'alice');
+equal(await count("select * from public.search_climbers('_')"),0);
+equal(await count("select * from public.search_climbers('al_ce')"),0);
+equal(await count("select * from public.search_climbers('alice%')"),0);
+await as(a); equal(await count("select * from public.search_climbers('alice')"),1); // Own account excluded; Bob's display name matches.
+await denied("select public.save_social_profile_v2('alice','Wrong name',true,'Bad',repeat('a',100000))"); checks++;
+equal((await db.query("select display_name from public.climber_profiles where username='alice'")).rows[0].display_name,'Alice Rock'); // Atomic rollback.
+const entry=(await db.query('select id from public.shared_sessions')).rows[0].id;
+await as(b); await db.query("select public.set_session_reaction($1,'clap')",[entry]);
+await db.query("select public.set_session_reaction($1,'clap')",[entry]);
+equal((await db.query('select * from public.reaction_summary($1)',[[entry]])).rows[0].total,1);
+await db.query("select public.set_session_reaction($1,'fire')",[entry]);
+equal((await db.query('select * from public.reaction_summary($1)',[[entry]])).rows[0].kind,'fire');
+await as(c); equal(await count(`select * from public.session_reactions where entry_id='${entry}'`),0);
+await denied(`select * from public.reaction_summary(array['${entry}']::uuid[])`);checks++;
+await denied(`select public.set_session_reaction('${entry}','clap')`); checks++;
+await as(a); await denied(`select public.set_session_reaction('${entry}','clap')`); checks++;
+await db.query('select public.block_climber($1)',[b]);
+await as(b); equal(await count('select * from public.climber_profile_details'),1); // Own details only.
+equal(await count('select * from public.session_reactions'),0);
+await db.exec('reset role'); await db.exec('set role anon');
+await denied("select public.search_climbers('alice')"); checks++;
+await denied('select * from public.climber_profile_details'); checks++;
+await denied('select * from public.session_reactions'); checks++;
 await as(a); await db.exec('select public.delete_social_profile()');
 equal(await count('select * from public.shared_sessions'),0);
 await db.close();

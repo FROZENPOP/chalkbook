@@ -18,7 +18,7 @@ struct ProjectsView: View {
                     NavigationLink { ProjectDetailView(climb: climb) } label: {
                         Surface {
                             VStack(alignment: .leading, spacing: 12) {
-                                if let photo = climb.media.first(where: { $0.kind == .photo }) { RouteThumbnail(data: photo.data) }
+                                if let photo = climb.media.first(where: { $0.kind == .photo }) { RouteThumbnail(data: photo.data,annotationJSON:photo.annotationJSON) }
                                 Text(climb.title).font(.title3.bold())
                                 Text("\(climb.descriptor.label) · \(climb.gymName)").font(.subheadline)
                                 Text("\(climb.attempts.count) recorded attempts · \(climb.projectStatus.capitalized)").font(.caption).foregroundStyle(.secondary)
@@ -36,10 +36,14 @@ struct ProjectsView: View {
 
 struct RouteThumbnail: View {
     let data: Data
+    var annotationJSON: String = ""
     @State private var image: UIImage?
     var body: some View {
         Group {
-            if let image { Image(uiImage: image).resizable().scaledToFill().frame(height: 160).clipped().clipShape(RoundedRectangle(cornerRadius: 12)).accessibilityLabel("Route photo") }
+            if let image {
+                if let strokes = try? RouteAnnotations.decode(annotationJSON), !strokes.isEmpty { RouteMarkupImage(image:image,strokes:strokes).clipShape(RoundedRectangle(cornerRadius:12)) }
+                else { Image(uiImage: image).resizable().scaledToFill().frame(height: 160).clipped().clipShape(RoundedRectangle(cornerRadius: 12)).accessibilityLabel("Route photo") }
+            }
             else { Image(systemName: "photo").frame(height: 80).accessibilityLabel("Route photo preview unavailable") }
         }.task(id: data.count) {
             image = await Task.detached(priority: .utility) {
@@ -55,21 +59,25 @@ struct ProjectDetailView: View {
     @Query private var sessions: [ClimbingSession]
     let climb: ClimbEntry
     @State private var editing = false
-    @State private var noteEditor = false
-    @State private var selectedNote: ClimbNote?
+    @State private var notebookEditor: NotebookDestination?
     @State private var attempt: ClimbAttempt?
     @State private var preview: RouteMediaDraft?
     @State private var trying: ClimbingSession?
+    @State private var annotating: RouteMedia?
     private var historySessions: Int { Set(climb.attempts.compactMap(\.effectiveSessionID)).count }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                if let photo = climb.media.first(where: { $0.kind == .photo }) { RouteThumbnail(data: photo.data) }
+                if let photo = climb.media.first(where: { $0.kind == .photo }) { RouteThumbnail(data: photo.data,annotationJSON:photo.annotationJSON) }
                 Text(climb.descriptor.label).font(.title.bold())
                 Text(climb.gymName).foregroundStyle(.secondary)
                 Text(climb.isSent ? "Completion observed in recorded attempts" : (climb.prior == .sent ? "Historical completion declared before the journal" : "No recorded completion"))
                 if !climb.notes.isEmpty { Surface { Text(climb.notes) } }
-                ForEach(climb.media) { media in Button { preview = media.draft } label: { MediaLabel(kind: media.kind, filename: media.filename) } }
+                ForEach(climb.media) { media in
+                    Button { preview = media.draft } label: { MediaLabel(kind: media.kind, filename: media.filename) }
+                    if media.kind == .photo { Button("Annotate \(media.filename)",systemImage:"pencil.tip.crop.circle") { annotating=media }.frame(minHeight:44).accessibilityIdentifier("annotateRoutePhoto") }
+                }
+                ProjectNotebookSummary(climb:climb)
                 Button("Try this session", systemImage: "figure.climbing") {
                     let session = sessions.first { !$0.isComplete } ?? store.start(date: .now, location: climb.gymName, notes: "")
                     if let session, store.select(climb, in: session) { trying = session }
@@ -80,11 +88,11 @@ struct ProjectDetailView: View {
                     Button("Remove project status") { _ = store.setProject(climb, status: "") }
                 }
                 Text("Removing status keeps the climb, notebook, and history. A recorded or declared completion appears in Sent; repeating it keeps this same climb.").font(.caption).foregroundStyle(.secondary)
-                HStack { Text("Private notebook").font(.title2.bold()); Spacer(); Button("Add note") { selectedNote = nil; noteEditor = true }.frame(minHeight: 44) }
+                HStack { Text("Private notebook").font(.title2.bold()); Spacer(); Button("Add note") { notebookEditor=NotebookDestination(note:nil) }.frame(minHeight: 44) }
                 ForEach(climb.notebook.sorted { $0.createdAt > $1.createdAt }) { note in
-                    Button { selectedNote = note; noteEditor = true } label: {
-                        Surface { VStack(alignment: .leading) { Text(note.text); Text(note.updatedAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(.secondary) } }
-                    }.buttonStyle(.plain)
+                    Button { notebookEditor=NotebookDestination(note:note) } label: {
+                        Surface { VStack(alignment: .leading) { if climb.pinnedNoteID == note.id { Label("Pinned next move",systemImage:"pin.fill").font(.caption.bold()) };Text(note.text); Text(note.updatedAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(.secondary) } }
+                    }.buttonStyle(.plain).accessibilityIdentifier("editNotebookNote")
                 }
                 if let firstSend = climb.orderedAttempts.firstIndex(where: \.sent) {
                     let before = Array(climb.orderedAttempts.prefix(firstSend + 1))
@@ -102,11 +110,18 @@ struct ProjectDetailView: View {
         }.background(ClimbTheme.background).navigationTitle(climb.title)
         .toolbar { Button("Edit climb", systemImage: "pencil") { editing = true } }
         .sheet(isPresented: $editing) { ClimbEditorView(climb: climb) }
-        .sheet(isPresented: $noteEditor) { NotebookEditor(climb: climb, note: selectedNote) }
+        .sheet(item:$notebookEditor) { NotebookEditor(climb:climb,note:$0.note) }
         .sheet(item: $attempt) { AttemptEditorView(attempt: $0) }
         .sheet(item: $preview) { RouteMediaPreview(item: $0) }
+        .sheet(item:$annotating) { RouteAnnotationView(media:$0) }
         .sheet(item: $trying) { session in NavigationStack { SessionDetailView(session: session).toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { trying = nil } } } } }
     }
+}
+
+private struct NotebookDestination:Identifiable {
+    let id:UUID
+    let note:ClimbNote?
+    init(note:ClimbNote?) { self.note=note;id=note?.id ?? UUID() }
 }
 
 struct NotebookEditor: View {
@@ -115,15 +130,18 @@ struct NotebookEditor: View {
     let climb: ClimbEntry
     var note: ClimbNote?
     @State private var text = ""
+    @State private var pinned = false
+    @State private var initialized=false
     var body: some View {
         NavigationStack {
             Form {
-                TextField("What will you try next?", text: $text, axis: .vertical).lineLimit(5...15)
+                Toggle("Pin as next move",isOn:$pinned).accessibilityIdentifier("pinNotebookNote")
+                TextField("What will you try next?", text: $text, axis: .vertical).lineLimit(5...15).accessibilityIdentifier("notebookText")
                 if let note { Button("Delete note", role: .destructive) {
-                    if store.save({ climb.notebook.removeAll { $0.id == note.id }; store.context.delete(note) }) { dismiss() }
+                    if store.save({ if climb.pinnedNoteID == note.id { climb.pinnedNoteID=nil };climb.notebook.removeAll { $0.id == note.id }; store.context.delete(note) }) { dismiss() }
                 } }
             }.navigationTitle(note == nil ? "New private note" : "Edit private note")
-            .onAppear { text = note?.text ?? "" }
+            .onAppear { if !initialized { text = note?.text ?? "";pinned = note != nil && climb.pinnedNoteID == note?.id;initialized=true } }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") {
@@ -131,6 +149,8 @@ struct NotebookEditor: View {
                         let entry = note ?? ClimbNote(text: text)
                         if note == nil { store.context.insert(entry); climb.notebook.append(entry) }
                         entry.text = text; entry.updatedAt = .now
+                        if pinned { climb.pinnedNoteID=entry.id } else if climb.pinnedNoteID == entry.id { climb.pinnedNoteID=nil }
+                        climb.updatedAt = .now
                     }) { dismiss() }
                 }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
             }

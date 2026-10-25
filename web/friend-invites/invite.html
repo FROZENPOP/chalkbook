@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Climb together · Climb Log</title>
+<style>
+[hidden]{display:none!important}body{margin:0;background:#f4f5f3;color:#173e32;font:17px system-ui;display:grid;place-items:center;min-height:100svh}main{max-width:420px;margin:24px;padding:32px;background:white;border-radius:28px}h1{font-size:36px;letter-spacing:-1px;line-height:1.1}p{line-height:1.55;color:#50615a}a{display:block;padding:16px;border-radius:16px;background:#1f5b49;color:white;text-align:center;text-decoration:none;font-weight:650}small{display:block;margin-top:24px;color:#68766f;line-height:1.5}code{font-size:20px;overflow-wrap:anywhere}
+</style><main><p>CLIMB LOG</p><h1>Find your climbing people.</h1><p id="handle">A friend invited you to Climb Log.</p><a id="open" hidden>Open in Climb Log</a><p id="fallback">Climb Log needs to be installed on your iPhone. If you don’t have the current test build, ask your friend for access.</p><small>Your private journal stays private. Opening an invite never adds a friend automatically; review the profile and send a request in the app.</small></main>
+<script>
+const query=new URLSearchParams(location.search),id=query.get('id')||'',username=query.get('username')||'';
+if(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)){
+ const button=document.getElementById('open');button.hidden=false;button.href='climblog://friend/'+encodeURIComponent(id);
+ if(/^[a-z0-9_]{3,24}$/.test(username)) document.getElementById('handle').textContent='Search @'+username+' or open their profile below.';
+}else{document.getElementById('handle').textContent='This invitation is incomplete. Ask your friend to share a new link.';}
+</script></html>

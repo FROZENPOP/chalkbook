@@ -86,7 +86,7 @@ struct FriendsView: View {
                     Image(systemName: "magnifyingglass").font(.title3)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Add friends").font(.headline)
-                        Text("Find them by username").font(.subheadline).foregroundStyle(.secondary)
+                        Text("Name, username or QR code").font(.subheadline).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Image(systemName: "plus.circle.fill").font(.title2)
@@ -108,12 +108,13 @@ struct FriendsView: View {
                 Surface {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack(spacing: 12) {
-                            FriendInitials(name: person(entry.owner_id)?.display_name ?? "Climber")
+                            SocialAvatar(id:entry.owner_id,name:person(entry.owner_id)?.display_name ?? "Climber")
                             Text(person(entry.owner_id)?.display_name ?? "Climber").font(.headline)
                             Spacer()
                             Image(systemName: entry.visibility == .public ? "globe" : "person.2").foregroundStyle(.secondary).accessibilityLabel(entry.visibility.title)
                         }
                         SharedSessionPreview(entry: entry)
+                        SessionReactionBar(entry:entry)
                     }
                 }
             }

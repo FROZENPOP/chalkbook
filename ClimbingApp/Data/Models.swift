@@ -1,8 +1,8 @@
 import Foundation
 import SwiftData
 
-enum ClimbingSchemaV5: VersionedSchema {
-    static var versionIdentifier: Schema.Version { Schema.Version(5, 0, 0) }
+enum ClimbingSchemaV6: VersionedSchema {
+    static var versionIdentifier: Schema.Version { Schema.Version(6, 0, 0) }
     static var models: [any PersistentModel.Type] { [ClimbingSession.self, ClimbEntry.self, ClimbAttempt.self, SavedGym.self, RouteMedia.self, AggregateEntry.self, ClimbNote.self, HealthWorkoutLink.self] }
 
     @Model
@@ -54,6 +54,7 @@ enum ClimbingSchemaV5: VersionedSchema {
     @Model
     final class ClimbEntry {
         @Attribute(.unique) var id: UUID
+        var pinnedNoteID: UUID? = nil
         var label: String
         var color: String
         var scaleRaw: String
@@ -169,6 +170,7 @@ enum ClimbingSchemaV5: VersionedSchema {
     @Model
     final class RouteMedia {
         @Attribute(.unique) var id: UUID
+        var annotationJSON: String = ""
         var kindRaw: String
         var filename: String
         var contentType: String
@@ -231,18 +233,18 @@ enum ClimbingSchemaV5: VersionedSchema {
 
 }
 
-typealias ClimbingSession = ClimbingSchemaV5.ClimbingSession
-typealias ClimbEntry = ClimbingSchemaV5.ClimbEntry
-typealias ClimbAttempt = ClimbingSchemaV5.ClimbAttempt
-typealias SavedGym = ClimbingSchemaV5.SavedGym
-typealias RouteMedia = ClimbingSchemaV5.RouteMedia
+typealias ClimbingSession = ClimbingSchemaV6.ClimbingSession
+typealias ClimbEntry = ClimbingSchemaV6.ClimbEntry
+typealias ClimbAttempt = ClimbingSchemaV6.ClimbAttempt
+typealias SavedGym = ClimbingSchemaV6.SavedGym
+typealias RouteMedia = ClimbingSchemaV6.RouteMedia
 
-typealias HealthWorkoutLink = ClimbingSchemaV5.HealthWorkoutLink
-typealias AggregateEntry = ClimbingSchemaV5.AggregateEntry
-typealias ClimbNote = ClimbingSchemaV5.ClimbNote
+typealias HealthWorkoutLink = ClimbingSchemaV6.HealthWorkoutLink
+typealias AggregateEntry = ClimbingSchemaV6.AggregateEntry
+typealias ClimbNote = ClimbingSchemaV6.ClimbNote
 
 enum ClimbingMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [ClimbingSchemaV1.self, ClimbingSchemaV2.self, ClimbingSchemaV3.self, ClimbingSchemaV4.self, ClimbingSchemaV5.self] }
+    static var schemas: [any VersionedSchema.Type] { [ClimbingSchemaV1.self, ClimbingSchemaV2.self, ClimbingSchemaV3.self, ClimbingSchemaV4.self, ClimbingSchemaV5.self, ClimbingSchemaV6.self] }
     static var stages: [MigrationStage] { [.lightweight(fromVersion: ClimbingSchemaV1.self, toVersion: ClimbingSchemaV2.self), .lightweight(fromVersion: ClimbingSchemaV2.self, toVersion: ClimbingSchemaV3.self), .custom(fromVersion: ClimbingSchemaV3.self, toVersion: ClimbingSchemaV4.self, willMigrate: nil, didMigrate: { context in
         for climb in try context.fetch(FetchDescriptor<ClimbingSchemaV4.ClimbEntry>()) {
             for attempt in climb.attempts {
@@ -252,13 +254,13 @@ enum ClimbingMigrationPlan: SchemaMigrationPlan {
             }
         }
         try context.save()
-    }), .lightweight(fromVersion: ClimbingSchemaV4.self, toVersion: ClimbingSchemaV5.self)] }
+    }), .lightweight(fromVersion: ClimbingSchemaV4.self, toVersion: ClimbingSchemaV5.self), .lightweight(fromVersion: ClimbingSchemaV5.self, toVersion: ClimbingSchemaV6.self)] }
 }
 
 @MainActor
 enum Persistence {
     static func container(inMemory: Bool = false, accountKey: String? = nil, rootDirectory: URL? = nil) throws -> ModelContainer {
-        let schema = Schema(versionedSchema: ClimbingSchemaV5.self)
+        let schema = Schema(versionedSchema: ClimbingSchemaV6.self)
         let configuration: ModelConfiguration
         if let accountKey, !inMemory {
             guard accountKey.count == 64, accountKey.allSatisfy({ "0123456789abcdef".contains($0) }) else {

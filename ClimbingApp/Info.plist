@@ -19,5 +19,5 @@
 <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
 <key>GIDClientID</key><string>$(GOOGLE_CLIENT_ID)</string>
 <key>AppleSignInEnabled</key><string>$(APPLE_SIGN_IN_ENABLED)</string>
-<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>$(GOOGLE_REVERSED_CLIENT_ID)</string></array></dict></array>
+<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>climblog</string></array></dict><dict><key>CFBundleURLSchemes</key><array><string>$(GOOGLE_REVERSED_CLIENT_ID)</string></array></dict></array>
 </dict></plist>

@@ -64,3 +64,15 @@ from public.social_reports order by created_at;
 No automated moderation, email alerts, or service-role dashboard is shipped in the iOS app. Review reports and take account action through the secured backend. Do not expose this table or administrative credentials to clients.
 
 Current verification: native simulator builds, isolated PostgreSQL permission fixtures, and Google-to-Supabase connection and live username search with the configured account have been verified. Two-account friendship/sharing integration and physical-device verification remain pending.
+
+## Profiles, ranked discovery, reactions, and friend invitations
+
+After the original migration, apply `supabase/migrations/202610250002_profiles_search_reactions.sql`. It adds optional profile details, ranked name/username search, and one replaceable reaction per person/session. Existing journals and shared session rows are retained. New clients show a migration-required message until this is applied.
+
+Profile photos are opt-in 256-pixel JPEGs (at most 64 KiB), re-encoded without original metadata. Their base64 copies and short bios are stored in a separate RLS-protected table rather than a public storage bucket. Private accounts expose details only to their owner and accepted friends. Public account details are visible to authenticated climbers, subject to blocks. Local profile data is copied into the publication draft only when requested.
+
+Search accepts names or usernames, ranks exact usernames first, and limits results to 30. Reactions are applause, fire, or strong; tap the selected reaction again to remove it. Session access and blocking apply to both reaction reads and writes. No comments, messages, groups, or contact upload are added.
+
+The app registers `climblog://friend/UUID`. The QR screen and share action use that installed-app link until a web host is configured. For HTTPS invitations, host `web/friend-invites/invite.html` and set optional `inviteWebBaseURL` in the local JSON configuration. See that folder’s README for static hosting and the separate universal-link association step. Opening any invitation shows a profile for review and never sends or accepts a friend request automatically.
+
+Before release, test two real accounts: private bio/photo denial before friendship, access after acceptance, revocation on removal/block, changing/removing a photo, exact-name search ordering, reaction update/removal, and access denial after making a shared entry private. Assign report moderation as described above. Hosted deployment and HTTPS invite hosting require the project/domain owner’s access.

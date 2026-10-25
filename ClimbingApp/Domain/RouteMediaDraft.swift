@@ -13,6 +13,7 @@ struct RouteMediaDraft: Identifiable, Sendable {
     var filename: String
     var contentType: String
     var data: Data
+    var annotationJSON: String = ""
 
     init(id: UUID = UUID(), kind: RouteMediaKind, filename: String, contentType: String, data: Data) {
         self.id = id; self.kind = kind; self.filename = filename; self.contentType = contentType; self.data = data
@@ -48,5 +49,8 @@ struct ImportedRouteFile: Transferable, Sendable {
 }
 
 extension RouteMedia {
-    var draft: RouteMediaDraft { RouteMediaDraft(id: id, kind: kind, filename: filename, contentType: contentType, data: data) }
+    var draft: RouteMediaDraft {
+        var result=RouteMediaDraft(id: id, kind: kind, filename: filename, contentType: contentType, data: data)
+        result.annotationJSON=annotationJSON;return result
+    }
 }

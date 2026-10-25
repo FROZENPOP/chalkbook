@@ -20,7 +20,7 @@ struct AddFriendsView: View {
                 }
                 HStack(spacing: 12) {
                     Image(systemName: "magnifyingglass").foregroundStyle(ClimbTheme.forest).accessibilityHidden(true)
-                    TextField("Search by username", text: $query)
+                    TextField("Name or @username", text: $query)
                         .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.asciiCapable)
                         .submitLabel(.search).focused($focused).accessibilityIdentifier("friendSearchField")
                         .onSubmit { focused = false }
@@ -42,7 +42,7 @@ struct AddFriendsView: View {
                             HStack {
                                 Text("@\(me.username)").font(.system(.title3, design: .rounded, weight: .semibold)).textSelection(.enabled)
                                 Spacer()
-                                ShareLink(item: "Add me on Climb Log: @\(me.username)") { Image(systemName: "square.and.arrow.up").frame(width: 44, height: 44) }.accessibilityLabel("Share your username")
+                NavigationLink { FriendInviteView(profile:me) } label: { Image(systemName:"qrcode").frame(width:44,height:44) }.accessibilityLabel("Your friend QR code and invite link")
                             }
                             Text("Share your username with a climbing buddy.").font(.caption).foregroundStyle(.secondary)
                         }
@@ -59,17 +59,17 @@ struct AddFriendsView: View {
     @ViewBuilder private var results: some View {
         switch search.state {
         case .idle:
-            Label(query.isEmpty ? "Know their username? Start typing above." : "Use 2–24 letters, numbers or underscores. An @ at the start is fine.", systemImage: "at")
+            Label(query.isEmpty ? "Search a name or username to find a friend." : "Type at least two characters of their name or username.", systemImage: "at")
                 .font(.subheadline).foregroundStyle(.secondary)
         case .loading:
             SwiftUI.ProgressView("Finding climbers…").frame(maxWidth: .infinity, minHeight: 100)
         case .failed:
-            FriendsEmptyCard(symbol: "wifi.exclamationmark", title: "Search couldn’t connect.", message: "Your search is kept. Check your connection and try again.") {
+            FriendsEmptyCard(symbol: "wifi.exclamationmark", title: "Search couldn’t connect.", message: search.errorMessage ?? "Your search is kept. Check your connection and try again.") {
                 Button("Try again") { retry += 1 }.buttonStyle(.bordered)
             }
         case .results:
             if search.results.isEmpty {
-                FriendsEmptyCard(symbol: "magnifyingglass", title: "No climbers found.", message: "Check the username or try the first few letters. Your friend may still need to set up their profile.") { EmptyView() }
+                FriendsEmptyCard(symbol: "magnifyingglass", title: "No climbers found.", message: "Check their name or username. Your friend may still need to set up their profile.") { EmptyView() }
             } else {
                 Text("CLIMBERS").font(.caption.weight(.semibold)).tracking(1.4).foregroundStyle(.secondary)
                 ForEach(search.results.filter { person in !social.blocks.contains { $0.target_id == person.id } }) { person in FriendPersonRow(person: person, personID: person.id) }
@@ -85,6 +85,7 @@ struct FriendPersonRow: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     let person: SocialProfile?
     let personID: UUID
+    var showsProfileLink = true
     @State private var working = false
     @State private var failed = false
     private var link: Friendship? { social.friendships.first { $0.requester == personID || $0.recipient == personID } }
@@ -93,12 +94,13 @@ struct FriendPersonRow: View {
         Surface {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
-                    FriendInitials(name: person?.display_name ?? "Climber")
+                    SocialAvatar(id:personID,name:person?.display_name ?? "Climber")
                     VStack(alignment: .leading, spacing: 4) {
                         Text(person?.display_name ?? "Climber").font(.headline)
                         if let person { Text("@\(person.username)").font(.subheadline).foregroundStyle(.secondary) }
                     }
                     Spacer(minLength: 0)
+                    if showsProfileLink { NavigationLink { SocialClimberProfileView(climberID:personID) } label: { Image(systemName:"person.crop.circle").frame(width:44,height:44) }.accessibilityLabel("View profile") }
                     Menu {
                         if link?.status == "accepted" { Button("Remove friend", role: .destructive) { act("remove") } }
                         if link?.status == "pending" && link?.requester == social.userID { Button("Cancel request") { act("cancel") } }

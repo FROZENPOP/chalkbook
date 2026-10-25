@@ -28,7 +28,7 @@ final class SocialStore {
         let user: User
     }
 
-    private func request(_ path: String, method: String = "GET", values: [String: Any]? = nil, authenticated: Bool = true) async throws -> Data {
+    func request(_ path: String, method: String = "GET", values: [String: Any]? = nil, authenticated: Bool = true) async throws -> Data {
         guard let configuration else { throw SocialError.setup }
         guard let url = URL(string: path, relativeTo: configuration.projectURL) else { throw SocialError.setup }
         var request = URLRequest(url: url, timeoutInterval: 25)
@@ -42,11 +42,15 @@ final class SocialStore {
         }
         if let values { request.httpBody = try JSONSerialization.data(withJSONObject: values) }
         let (data, response) = try await network.data(for: request)
-        guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else { throw SocialError.server }
+        guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
+            let code = (try? JSONSerialization.jsonObject(with:data) as? [String:Any])?["code"] as? String
+            if ["PGRST202","PGRST205","42P01"].contains(code ?? "") { throw SocialError.migrationNeeded }
+            throw SocialError.server
+        }
         return data
     }
 
-    private func authorize(_ auth: AccountSession) async throws {
+    func authorize(_ auth: AccountSession) async throws {
         guard configuration != nil else { throw SocialError.setup }
         guard auth.account != nil else { throw SocialError.signIn }
         if accessToken != nil && expiresAt > .now { return }
@@ -98,18 +102,18 @@ final class SocialStore {
     func searchProfiles(_ auth: AccountSession, query: FriendSearchQuery) async throws -> [SocialProfile] {
         try await authorize(auth)
         try Task.checkCancellation()
-        let profiles = try JSONDecoder().decode([SocialProfile].self, from: await request(query.path))
+        let profiles = try JSONDecoder().decode([SocialProfile].self, from: await request(query.path,method:"POST",values:query.rpcValues))
         return profiles.filter { $0.id != userID }
     }
 
-    func saveProfile(_ auth: AccountSession, username: String, name: String, isPrivate: Bool) async -> Bool {
+    func saveProfile(_ auth: AccountSession, username: String, name: String, isPrivate: Bool, bio: String = "", photo: Data? = nil) async -> Bool {
         let username = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard username.range(of: "^[a-z0-9_]{3,24}$", options: .regularExpression) != nil, (1...60).contains(name.count) else {
+        guard username.range(of: "^[a-z0-9_]{3,24}$", options: .regularExpression) != nil, (1...60).contains(name.count),bio.count<=240,(photo?.count ?? 0)<=65_536 else {
             errorMessage = SocialError.invalidProfile.localizedDescription; return false
         }
         return await perform(auth) {
-            _ = try await self.request("/rest/v1/rpc/save_social_profile", method: "POST", values: ["username": username, "display_name": name, "is_private": isPrivate])
+            _ = try await self.request("/rest/v1/rpc/save_social_profile_v2", method: "POST", values: ["username": username, "display_name": name, "is_private": isPrivate,"bio":bio,"avatar_base64":photo?.base64EncodedString() as Any? ?? NSNull()])
             try await self.reload()
         }
     }

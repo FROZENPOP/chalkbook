@@ -168,6 +168,7 @@ struct ClimbCard: View {
                 }
                 if !climb.notes.isEmpty { Text(climb.notes).font(.subheadline).foregroundStyle(.secondary) }
                 if canLog {
+                    ProjectNotebookSummary(climb:climb)
                     let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))
                     layout {
                         Button { record(sent: false) } label: { Label("Failed", systemImage: "arrow.clockwise").frame(maxWidth: .infinity).frame(minHeight: 52) }

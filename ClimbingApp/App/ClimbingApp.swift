@@ -6,6 +6,7 @@ import SwiftData
 @main
 struct ClimbingApp: App {
     @State private var auth: AccountSession
+    @State private var invitations = FriendInviteRouter()
     @Environment(\.scenePhase) private var scenePhase
     private let testing = ProcessInfo.processInfo.arguments.contains("--ui-testing")
 
@@ -21,7 +22,9 @@ struct ClimbingApp: App {
             WorkspaceRoot(accountKey: auth.account?.storageKey, testing: testing)
                 .id(auth.account?.storageKey ?? "guest")
                 .environment(auth)
-                .onOpenURL { url in _ = GIDSignIn.sharedInstance.handle(url) }
+                .environment(invitations)
+                .onOpenURL { url in invitations.open(url); _ = GIDSignIn.sharedInstance.handle(url) }
+                .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in if let url=activity.webpageURL { invitations.open(url) } }
                 .task { if !testing { await auth.restore() } }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active && !testing { Task { await auth.verifyExistingSession() } }
@@ -71,7 +74,7 @@ private struct WorkspaceRoot: View {
                     }
                 }
                 #endif
-                let schema = Schema(versionedSchema: ClimbingSchemaV5.self)
+                let schema = Schema(versionedSchema: ClimbingSchemaV6.self)
                 let url = URL.applicationSupportDirectory.appending(path: "ClimbingUITests.store")
                 try FileManager.default.createDirectory(at: URL.applicationSupportDirectory, withIntermediateDirectories: true)
                 if ProcessInfo.processInfo.arguments.contains("--reset-test-data") {
@@ -97,6 +100,7 @@ private struct WorkspaceRoot: View {
 
 struct AppRoot: View {
     @Environment(AccountSession.self) private var auth
+    @Environment(FriendInviteRouter.self) private var invitations
     @State private var store: ClimbingStore
     @State private var profiles: ProfileStore
     @State private var social = SocialStore()
@@ -120,9 +124,17 @@ struct AppRoot: View {
         .environment(store)
         .environment(profiles)
         .environment(social)
-        .task { setupProfile = auth.account != nil && profiles.profile == nil && profiles.errorMessage == nil }
+        .task { setupProfile = invitations.target == nil && auth.account != nil && profiles.profile == nil && profiles.errorMessage == nil }
         .sheet(isPresented: $setupProfile) {
             ProfileEditorView(setup: true).environment(profiles)
+        }
+        .sheet(isPresented:Binding(get:{ invitations.target != nil },set:{ if !$0 { invitations.target=nil } })) {
+            NavigationStack {
+                if let target=invitations.target {
+                    if auth.account != nil { SocialClimberProfileView(climberID:target) }
+                    else { LoginPortalView() }
+                }
+            }
         }
     }
 
@@ -140,5 +152,5 @@ struct AppRoot: View {
 
 #Preview {
     let container = try! Persistence.container(inMemory: true)
-    AppRoot(container: container).modelContainer(container).environment(AccountSession(vault: GuestAccountVault()))
+    AppRoot(container: container).modelContainer(container).environment(AccountSession(vault: GuestAccountVault())).environment(FriendInviteRouter())
 }

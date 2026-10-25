@@ -2,14 +2,15 @@ import XCTest
 @testable import ClimbingApp
 
 @MainActor final class FriendSearchTests: XCTestCase {
-    func testUsernameNormalizationAndLiteralUnderscoreWithoutQueryInjection() throws {
+    func testNameAndUsernameNormalizationUseStructuredRPCParameters() throws {
         let query = try XCTUnwrap(FriendSearchQuery("  @Climb_Buddy  "))
-        XCTAssertEqual(query.username, "climb_buddy")
-        let components = try XCTUnwrap(URLComponents(string: query.path))
-        let filters = try XCTUnwrap(components.queryItems)
-        XCTAssertEqual(filters.first { $0.name == "username" }?.value, "ilike.climb\\_buddy*")
-        XCTAssertEqual(filters.first { $0.name == "limit" }?.value, "30")
-        for invalid in ["", "@a", "someone&select=*", "foo,bar", "%", "hello world", String(repeating: "a", count: 25)] {
+        XCTAssertEqual(query.term, "climb_buddy")
+        XCTAssertEqual(query.path,"/rest/v1/rpc/search_climbers")
+        XCTAssertEqual(query.rpcValues["search_text"] as? String,"climb_buddy")
+        XCTAssertEqual(FriendSearchQuery("Ana María")?.term,"ana maría")
+        XCTAssertEqual(FriendSearchQuery("Matt & Kim 🧗")?.term,"matt & kim 🧗")
+        XCTAssertEqual(FriendSearchQuery("someone&select=*")?.rpcValues["search_text"] as? String,"someone&select=*")
+        for invalid in ["", "@a", "%", "bad\u{0000}name", String(repeating: "a", count: 61)] {
             XCTAssertNil(FriendSearchQuery(invalid))
         }
     }

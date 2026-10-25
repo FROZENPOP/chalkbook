@@ -117,7 +117,8 @@ struct RouteMediaPreview: View {
         NavigationStack {
             Group {
                 if let image {
-                    Image(uiImage: image).resizable().scaledToFit().accessibilityLabel("Route photo")
+                    if let strokes=try? RouteAnnotations.decode(item.annotationJSON),!strokes.isEmpty { RouteMarkupImage(image:image,strokes:strokes) }
+                    else { Image(uiImage: image).resizable().scaledToFit().accessibilityLabel("Route photo") }
                 } else if let player { VideoPlayer(player: player) }
                 else if let message { ContentUnavailableView("Can’t open media", systemImage: "photo.badge.exclamationmark", description: Text(message)) }
                 else { SwiftUI.ProgressView("Opening media…") }

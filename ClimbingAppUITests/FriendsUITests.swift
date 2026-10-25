@@ -16,7 +16,7 @@ final class FriendsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Search couldn’t connect."].waitForExistence(timeout: 10))
         XCTAssertEqual(field.value as? String, "@climb_buddy")
         app.buttons["clearFriendSearch"].tap()
-        XCTAssertTrue(app.staticTexts["Know their username? Start typing above."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Search a name or username to find a friend."].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["clearFriendSearch"].exists)
         XCTAssertFalse(app.buttons["Add friend"].exists)
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "Add friends search at accessibility text size"; shot.lifetime = .keepAlways; add(shot)

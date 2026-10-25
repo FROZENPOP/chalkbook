@@ -13,6 +13,35 @@ struct SocialProfile: Codable, Identifiable, Equatable {
     let is_private: Bool
 }
 
+struct SocialProfileDetails: Codable, Equatable {
+    var id: UUID
+    var bio: String
+    var avatar_base64: String?
+    var photo: Data? {
+        guard let avatar_base64,avatar_base64.utf8.count<=90_000,let data=Data(base64Encoded:avatar_base64),data.count<=65_536 else { return nil }
+        return try? SocialPhoto.prepare(data)
+    }
+}
+
+struct SocialProfilePage {
+    var profile: SocialProfile
+    var details: SocialProfileDetails?
+    var entries: [SharedSession]
+}
+
+enum SessionReaction: String, CaseIterable, Identifiable {
+    case clap, fire, strong
+    var id: String { rawValue }
+    var emoji: String { switch self { case .clap: "👏";case .fire:"🔥";case .strong:"💪" } }
+    var label: String { switch self { case .clap: "Applause";case .fire:"Fire";case .strong:"Strong" } }
+}
+struct ReactionSummary: Decodable {
+    var entry_id: UUID
+    var kind: String
+    var total: Int
+    var mine: Bool
+}
+
 struct Friendship: Codable, Identifiable {
     let requester: UUID
     let recipient: UUID
@@ -58,6 +87,7 @@ struct SharedSession: Codable, Identifiable {
 struct SupabaseConfiguration: Decodable {
     let projectURL: URL
     let publishableKey: String
+    var inviteWebBaseURL: URL? = nil
     static func load(bundle: Bundle = .main) -> Self? {
         guard !ProcessInfo.processInfo.arguments.contains("--ui-testing"),
               let url = bundle.url(forResource: "Supabase.local", withExtension: "json"),
@@ -69,7 +99,7 @@ struct SupabaseConfiguration: Decodable {
 }
 
 enum SocialError: LocalizedError {
-    case setup, signIn, applePending, server, invalidProfile
+    case setup, signIn, applePending, server, invalidProfile, migrationNeeded
     var errorDescription: String? {
         switch self {
         case .setup: "Friends is waiting for Supabase setup. Your private journal still works offline."
@@ -77,6 +107,7 @@ enum SocialError: LocalizedError {
         case .applePending: "Apple account connection will be available after Apple developer setup. Your local journal is available."
         case .server: "The Friends service couldn’t complete this request. Check your connection and retry. No successful save has been confirmed."
         case .invalidProfile: "Choose a username with 3–24 lowercase letters, numbers or underscores, and a name with 1–60 characters."
+        case .migrationNeeded: "This Friends update isn’t available yet. Please try again later. Your local journal is unaffected."
         }
     }
 }
