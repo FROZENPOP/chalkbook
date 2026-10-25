@@ -1,0 +1,154 @@
+import Foundation
+import Observation
+
+/// The database enforces all audiences. This client never uses a service-role key.
+@MainActor @Observable
+final class SocialStore {
+    private(set) var userID: UUID?
+    private(set) var me: SocialProfile?
+    private(set) var people: [SocialProfile] = []
+    private(set) var friendships: [Friendship] = []
+    private(set) var entries: [SharedSession] = []
+    private(set) var blocks: [ClimberBlock] = []
+    private(set) var busy = false
+    var errorMessage: String?
+    let configuration: SupabaseConfiguration?
+    private var accessToken: String?
+    private var expiresAt = Date.distantPast
+    private let network: URLSession
+
+    init(configuration: SupabaseConfiguration? = .load(), network: URLSession = URLSession(configuration: .ephemeral)) {
+        self.configuration = configuration; self.network = network
+    }
+
+    private struct TokenResponse: Decodable {
+        struct User: Decodable { let id: UUID }
+        let access_token: String
+        let expires_in: Int
+        let user: User
+    }
+
+    private func request(_ path: String, method: String = "GET", values: [String: Any]? = nil, authenticated: Bool = true) async throws -> Data {
+        guard let configuration else { throw SocialError.setup }
+        guard let url = URL(string: path, relativeTo: configuration.projectURL) else { throw SocialError.setup }
+        var request = URLRequest(url: url, timeoutInterval: 25)
+        request.httpMethod = method
+        request.setValue(configuration.publishableKey, forHTTPHeaderField: "apikey")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        if authenticated {
+            guard let accessToken else { throw SocialError.signIn }
+            request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+        if let values { request.httpBody = try JSONSerialization.data(withJSONObject: values) }
+        let (data, response) = try await network.data(for: request)
+        guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else { throw SocialError.server }
+        return data
+    }
+
+    private func authorize(_ auth: AccountSession) async throws {
+        guard configuration != nil else { throw SocialError.setup }
+        guard auth.account != nil else { throw SocialError.signIn }
+        if accessToken != nil && expiresAt > .now { return }
+        let token = try await auth.googleIdentityTokenForFriends()
+        let data = try await request("/auth/v1/token?grant_type=id_token", method: "POST", values: ["provider": "google", "id_token": token], authenticated: false)
+        let session = try JSONDecoder().decode(TokenResponse.self, from: data)
+        // Tokens stay in memory. Google’s existing Keychain session supplies a fresh verified identity after relaunch.
+        accessToken = session.access_token; userID = session.user.id
+        expiresAt = .now.addingTimeInterval(TimeInterval(max(0, session.expires_in - 60)))
+    }
+
+    @discardableResult
+    func perform(_ auth: AccountSession, operation: () async throws -> Void) async -> Bool {
+        guard !busy else { return false }
+        busy = true; defer { busy = false }
+        do {
+            try await authorize(auth)
+            try await operation()
+            errorMessage = nil
+            return true
+        } catch {
+            accessToken = nil; expiresAt = .distantPast
+            entries = [] // Do not keep showing possibly revoked entries after a failed refresh.
+            errorMessage = (error as? SocialError)?.localizedDescription ?? SocialError.server.localizedDescription
+            return false
+        }
+    }
+
+    private func reload() async throws {
+        // Load into temporary values first so a failed refresh doesn't present partial results as current.
+        let profiles = try JSONDecoder().decode([SocialProfile].self, from: await request("/rest/v1/climber_profiles?select=*&order=username&limit=200"))
+        let links = try JSONDecoder().decode([Friendship].self, from: await request("/rest/v1/friendships?select=*"))
+        let shared = try JSONDecoder().decode([SharedSession].self, from: await request("/rest/v1/shared_sessions?select=*&order=session_day.desc&limit=200"))
+        // Always retrieve own profile even if it falls outside the discovery page.
+        let own = try JSONDecoder().decode([SocialProfile].self, from: await request("/rest/v1/climber_profiles?id=eq.\(userID!.uuidString)&select=*"))
+        let blocked = try JSONDecoder().decode([ClimberBlock].self, from: await request("/rest/v1/climber_blocks?select=target_id"))
+        people = profiles; friendships = links; entries = shared; me = own.first; blocks = blocked
+    }
+
+    func refresh(_ auth: AccountSession) async { await perform(auth) { try await self.reload() } }
+
+    func saveProfile(_ auth: AccountSession, username: String, name: String, isPrivate: Bool) async -> Bool {
+        let username = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard username.range(of: "^[a-z0-9_]{3,24}$", options: .regularExpression) != nil, (1...60).contains(name.count) else {
+            errorMessage = SocialError.invalidProfile.localizedDescription; return false
+        }
+        return await perform(auth) {
+            _ = try await self.request("/rest/v1/rpc/save_social_profile", method: "POST", values: ["username": username, "display_name": name, "is_private": isPrivate])
+            try await self.reload()
+        }
+    }
+
+    func action(_ auth: AccountSession, target: UUID, action: String) async {
+        await perform(auth) {
+            _ = try await self.request("/rest/v1/rpc/friend_action", method: "POST", values: ["target": target.uuidString, "action": action])
+            try await self.reload()
+        }
+    }
+
+    func publish(_ auth: AccountSession, entry: SharedSession) async -> Bool {
+        await perform(auth) {
+            _ = try await self.request("/rest/v1/rpc/save_shared_session", method: "POST", values: entry.rpcValues)
+            try await self.reload()
+        }
+    }
+
+    func removeShare(_ auth: AccountSession, sessionID: UUID) async -> Bool {
+        await perform(auth) {
+            _ = try await self.request("/rest/v1/rpc/remove_shared_session", method: "POST", values: ["source_id": sessionID.uuidString])
+            self.entries.removeAll { $0.owner_id == self.userID && $0.source_session_id == sessionID }
+        }
+    }
+
+    @discardableResult
+    func safetyAction(_ auth: AccountSession, target: UUID, block: Bool, reason: String = "") async -> Bool {
+        await perform(auth) {
+            _ = try await self.request("/rest/v1/rpc/\(block ? "block_climber" : "report_climber")", method: "POST", values: block ? ["target": target.uuidString] : ["target": target.uuidString, "reason": reason])
+            try await self.reload()
+        }
+    }
+
+    func unblock(_ auth: AccountSession, target: UUID) async {
+        await perform(auth) {
+            _ = try await self.request("/rest/v1/rpc/unblock_climber", method: "POST", values: ["target": target.uuidString])
+            try await self.reload()
+        }
+    }
+
+    func deleteProfile(_ auth: AccountSession) async -> Bool {
+        await perform(auth) {
+            _ = try await self.request("/rest/v1/rpc/delete_social_profile", method: "POST", values: [:])
+            self.me = nil; self.entries = []; self.friendships = []; self.people = []; self.blocks = []
+        }
+    }
+
+    func sharedEntry(_ auth: AccountSession, session: ClimbingSession) async -> SharedSession? {
+        var result: SharedSession?
+        let success = await perform(auth) {
+            let rows = try JSONDecoder().decode([SharedSession].self, from: await self.request("/rest/v1/shared_sessions?owner_id=eq.\(self.userID!.uuidString)&source_session_id=eq.\(session.id.uuidString)&select=*"))
+            result = rows.first ?? SharedSession(session: session, owner: self.userID!)
+        }
+        return success ? result : nil
+    }
+}

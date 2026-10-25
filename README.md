@@ -7,6 +7,7 @@ A native, offline-capable personal bouldering log built with SwiftUI, SwiftData,
 - Xcode 27.1 (27A9275), Swift 6.4 toolchain; project uses Swift 5 language mode.
 - iOS 17.0 minimum deployment target; standard iPhones are the initial supported device family. iPhone Duo and iPad-specific work are deferred.
 - Google Sign-In 10.0.0 is pinned through Swift Package Manager; Xcode resolves its dependencies. SwiftUI, SwiftData, PhotosUI, AVKit, and Charts ship with Xcode.
+- Friends and reviewed session sharing use Supabase; see [SUPABASE_SETUP.md](SUPABASE_SETUP.md). Mutual friend requests replace followers; groups are deferred. Until configured, Friends shows a setup state.
 - Guest logging needs no account configuration. See [AUTH_SETUP.md](AUTH_SETUP.md) to enable live Apple and Google sign-in.
 - Open `ClimbingApp.xcodeproj`, choose the **ClimbingApp** scheme, select **Climb Log - iPhone 16 (iOS 27.0)**, and Run.
 - A physical iPhone requires selecting your own development team in Signing & Capabilities. No team is embedded in this repository.
@@ -38,7 +39,7 @@ xcodebuild -project ClimbingApp.xcodeproj -scheme ClimbingApp \
   -derivedDataPath "$HOME/Library/Caches/ClimbLog/DerivedData" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test
 ```
 
-The shared scheme includes 55 domain/persistence/Health/Keychain/profile boundary tests and twelve UI checks for logging, cross-session projects, honest recaps, gyms, custom grades, the account portal, and optional media selection, preview, and persistence. UI tests use a separate persistent store and reset only that test store. Tiny bundled route fixtures are seeded into the test app’s Files folder automatically; tests still attach them through the real importer.
+The shared scheme includes 59 domain/persistence/Health/Keychain/profile/social boundary tests and thirteen UI checks for logging, cross-session projects, honest recaps, gyms, custom grades, the account portal, and optional media selection, preview, and persistence. UI tests use a separate persistent store and reset only that test store. Tiny bundled route fixtures are seeded into the test app’s Files folder automatically; tests still attach them through the real importer.
 
 Source folders are synchronized with Xcode: adding a Swift file does not require editing the project. `scripts/create_project.py` reproduces the project configuration using Python's standard library. Avoid regenerating after manual project-setting changes without updating that script.
 
@@ -67,7 +68,7 @@ Sessions retain calendar date and original time zone. Attempts retain difficulty
 
 ## Storage and scope
 
-Climbing data and route media stay in the app's local SwiftData store. Apple/Google sign-in uses the providers’ native SDKs; cloud log sync and cloud media upload are not configured. Export backups to Files; uninstalling the app can delete the local log. Grade scales remain separate and are never automatically converted. Backups include saved gyms and media; JSON backup files are limited to 150 MB.
+Climbing data and route media stay in the app's local SwiftData store. Apple/Google sign-in uses the providers’ native SDKs; full private log sync and cloud media upload are not configured. The optional Supabase integration publishes only explicitly reviewed session summaries; local notes, gym locations, media and Health data are excluded. Export backups to Files; uninstalling the app can delete the local log. Grade scales remain separate and are never automatically converted. Backups include saved gyms and media; JSON backup files are limited to 150 MB.
 
 This is a development build. Follow-up work includes broader history filters, goals, rope climbing, an app icon, private synchronization, and device testing. Physical-device signing, OAuth provider IDs, App Store distribution, and cloud sync are not configured. HealthKit read/link behavior and source compatibility require signed physical-device testing; workout export is absent.
 

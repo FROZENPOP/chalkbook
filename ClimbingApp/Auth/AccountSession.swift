@@ -168,6 +168,18 @@ final class AccountSession {
         await verifyExistingSession()
     }
 
+    func googleIdentityTokenForFriends() async throws -> String {
+        guard let current = account else { throw SocialError.signIn }
+        guard current.provider == .google else { throw SocialError.applePending }
+        guard let clientID = LoginConfiguration.googleClientID else { throw AccountError.unavailable }
+        GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientID)
+        let restored = try await GIDSignIn.sharedInstance.restorePreviousSignIn()
+        let refreshed = try await restored.refreshTokensIfNeeded()
+        guard account == current, refreshed.userID == current.subject,
+              let token = refreshed.idToken?.tokenString else { throw AccountError.missingIdentity }
+        return token
+    }
+
     func verifyExistingSession() async {
         guard let current = account else { return }
         let operation = revision

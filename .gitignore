@@ -19,10 +19,12 @@ xcuserdata/
 
 # Script caches
 __pycache__/
+node_modules/
 *.py[cod]
 
 # Local provider configuration and signing material
 Configuration/Auth.local.xcconfig
+ClimbingApp/Social/Supabase.local.json
 .env
 .env.*
 !.env.example

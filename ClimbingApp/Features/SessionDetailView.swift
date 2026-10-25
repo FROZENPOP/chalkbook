@@ -2,6 +2,8 @@ import SwiftUI
 
 struct SessionDetailView: View {
     @Environment(ClimbingStore.self) private var store
+    @Environment(SocialStore.self) private var social
+    @Environment(AccountSession.self) private var auth
     @Environment(\.dismiss) private var dismiss
     let session: ClimbingSession
     @State private var sheet: SessionSheet?
@@ -13,6 +15,7 @@ struct SessionDetailView: View {
     @State private var reviewing = false
     @State private var health = false
     @State private var manualAttempt = false
+    @State private var sharing = false
     private var selected: ClimbEntry? { session.allClimbs.first { $0.id == session.selectedClimbID } ?? session.orderedClimbs.last }
 
     var body: some View {
@@ -88,6 +91,7 @@ struct SessionDetailView: View {
         .toolbar {
             Menu {
                 Button("Edit session", systemImage: "pencil") { sheet = .edit }
+                if session.isComplete { Button("Share / privacy", systemImage: "square.and.arrow.up") { sharing = true } }
                 Button("Delete session", systemImage: "trash", role: .destructive) { confirmDelete = true }
             } label: { Label("Session options", systemImage: "ellipsis.circle") }
         }
@@ -105,11 +109,20 @@ struct SessionDetailView: View {
         .sheet(isPresented: $manualAttempt) { ManualAttemptView(session: session) }
         .sheet(isPresented: $health) { HealthLinkView(session: session) }
         .sheet(isPresented: $reviewing) { FinishReviewView(session: session) }
+        .sheet(isPresented: $sharing) { ShareSessionView(session: session) }
         .confirmationDialog("Delete this session and its recorded activity?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete session", role: .destructive) {
-                if store.delete(session) { dismiss() }
+                Task {
+                    // Remove any published snapshot first. On network failure retain the local session for retry.
+                    if social.configuration != nil && auth.account != nil {
+                        guard await social.removeShare(auth, sessionID: session.id) else {
+                            store.errorMessage = social.errorMessage; return
+                        }
+                    }
+                    if store.delete(session) { dismiss() }
+                }
             }
-        } message: { Text("Its attempts and recalled entries will be removed. Climbs, projects, notebooks, media, and other sessions stay in your journal.") }
+        } message: { Text("Its attempts, recalled entries, and any shared recap will be removed. Removing a shared recap needs a connection. Climbs, projects, notebooks, media, and other sessions stay in your journal.") }
     }
 }
 

@@ -99,6 +99,7 @@ struct AppRoot: View {
     @Environment(AccountSession.self) private var auth
     @State private var store: ClimbingStore
     @State private var profiles: ProfileStore
+    @State private var social = SocialStore()
     @State private var setupProfile = false
 
     init(container: ModelContainer, profileKey: String = "guest", profileDirectory: URL? = nil) {
@@ -111,12 +112,14 @@ struct AppRoot: View {
             NavigationStack { HomeView() }.tabItem { Label("Journal", systemImage: "book") }
             NavigationStack { ProjectsView() }.tabItem { Label("Projects", systemImage: "figure.climbing") }
             NavigationStack { ProgressViewScreen() }.tabItem { Label("Progress", systemImage: "chart.bar.xaxis") }
+            NavigationStack { FriendsView() }.tabItem { Label("Friends", systemImage: "person.2") }
         }
         .id(store.dataRevision)
         .tint(ClimbTheme.forest)
         .safeAreaInset(edge: .top) { SaveErrorBanner() }
         .environment(store)
         .environment(profiles)
+        .environment(social)
         .task { setupProfile = auth.account != nil && profiles.profile == nil && profiles.errorMessage == nil }
         .sheet(isPresented: $setupProfile) {
             ProfileEditorView(setup: true).environment(profiles)
