@@ -20,6 +20,7 @@ xcuserdata/
 # Script caches
 __pycache__/
 node_modules/
+supabase/.temp/
 *.py[cod]
 
 # Local provider configuration and signing material

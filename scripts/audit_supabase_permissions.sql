@@ -1,0 +1,95 @@
+-- Hosted permission smoke test. All fixture users/content are rolled back and never become visible to clients.
+begin;
+create temp table audit_context on commit drop as
+select a,b,c,source,'audit_a_'||left(replace(a::text,'-',''),12) ua,
+ 'audit_b_'||left(replace(b::text,'-',''),12) ub,'audit_c_'||left(replace(c::text,'-',''),12) uc,null::uuid entry_id
+from (select gen_random_uuid() a,gen_random_uuid() b,gen_random_uuid() c,gen_random_uuid() source) ids;
+do $$ begin execute format('grant usage on schema %I to authenticated,anon',(select nspname from pg_namespace where oid=pg_my_temp_schema())); end $$;
+grant select on audit_context to authenticated,anon;
+create function pg_temp.audit_assert(ok boolean,label text) returns void language plpgsql as $$
+begin if ok is distinct from true then raise exception 'Permission audit failed: %',label; end if; end $$;
+grant execute on function pg_temp.audit_assert(boolean,text) to authenticated,anon;
+insert into auth.users(id) select a from audit_context union all select b from audit_context union all select c from audit_context;
+select set_config('request.jwt.claim.sub',a::text,true) from audit_context;
+set local role authenticated;
+select public.save_social_profile_v2(ua,'Permission audit A',true,'Private audit bio',null) from audit_context;
+select public.save_shared_session(source,'friends','Uncommitted audit fixture','2026-10-26',12,4,null,'Recalled activity') from audit_context;
+reset role;
+update audit_context set entry_id=(select id from public.shared_sessions where owner_id=a and source_session_id=source);
+select set_config('request.jwt.claim.sub',b::text,true) from audit_context;
+set local role authenticated;
+select public.save_social_profile_v2(ub,'Permission audit B',true,'',null) from audit_context;
+select pg_temp.audit_assert(not exists(select 1 from public.shared_sessions where owner_id=(select a from audit_context)),'nonfriend session denied');
+select pg_temp.audit_assert(not exists(select 1 from public.climber_profile_details where id=(select a from audit_context)),'nonfriend private bio denied');
+select public.friend_action(a,'request') from audit_context;
+select public.friend_action(a,'accept') from audit_context;
+select pg_temp.audit_assert((select status='pending' from public.friendships where requester=(select b from audit_context) and recipient=(select a from audit_context)),'requester cannot self-approve');
+reset role;
+select set_config('request.jwt.claim.sub',a::text,true) from audit_context;
+set local role authenticated;
+select public.friend_action(b,'accept') from audit_context;
+reset role;
+select set_config('request.jwt.claim.sub',b::text,true) from audit_context;
+set local role authenticated;
+select pg_temp.audit_assert(exists(select 1 from public.shared_sessions where owner_id=(select a from audit_context)),'accepted friend sees session');
+select pg_temp.audit_assert(exists(select 1 from public.climber_profile_details where id=(select a from audit_context) and bio='Private audit bio'),'accepted friend sees bio');
+select public.set_session_reaction(entry_id,'clap') from audit_context;
+select public.set_session_reaction(entry_id,'fire') from audit_context;
+select pg_temp.audit_assert(exists(select 1 from public.reaction_summary(array[(select entry_id from audit_context)]) where total=1 and kind='fire' and mine),'reaction replacement remains one reaction');
+reset role;
+select set_config('request.jwt.claim.sub',c::text,true) from audit_context;
+set local role authenticated;
+select public.save_social_profile_v2(uc,'Permission audit C',true,'',null) from audit_context;
+select pg_temp.audit_assert((select count(*)=1 from public.search_climbers((select ua from audit_context))),'ranked discovery finds exact username');
+select pg_temp.audit_assert(not exists(select 1 from public.shared_sessions where owner_id=(select a from audit_context)),'third party session denied');
+do $$ begin
+ begin perform public.set_session_reaction((select entry_id from audit_context),'clap'); raise exception 'Unexpected reaction access';
+ exception when raise_exception then if sqlerrm<>'Entry unavailable' then raise; end if; end;
+end $$;
+reset role;
+select set_config('request.jwt.claim.sub',a::text,true) from audit_context;
+set local role authenticated;
+select public.save_shared_session(source,'public','','2026-10-26',12,4,null,'Recalled activity') from audit_context;
+reset role;
+select set_config('request.jwt.claim.sub',c::text,true) from audit_context;
+set local role authenticated;
+select pg_temp.audit_assert(not exists(select 1 from public.shared_sessions where owner_id=(select a from audit_context)),'private account caps public entries');
+reset role;
+select set_config('request.jwt.claim.sub',a::text,true) from audit_context;
+set local role authenticated;
+select public.save_social_profile_v2(ua,'Permission audit A',false,'Public audit bio',null) from audit_context;
+reset role;
+select set_config('request.jwt.claim.sub',c::text,true) from audit_context;
+set local role authenticated;
+select pg_temp.audit_assert(exists(select 1 from public.shared_sessions where owner_id=(select a from audit_context)),'public account public entry accessible');
+reset role;
+select set_config('request.jwt.claim.sub',a::text,true) from audit_context;
+set local role authenticated;
+select public.save_shared_session(source,'private','','2026-10-26',12,4,null,'Recalled activity') from audit_context;
+reset role;
+select set_config('request.jwt.claim.sub',b::text,true) from audit_context;
+set local role authenticated;
+select pg_temp.audit_assert(not exists(select 1 from public.shared_sessions where owner_id=(select a from audit_context)),'private entry hidden from friends');
+do $$ begin
+ begin perform * from public.reaction_summary(array[(select entry_id from audit_context)]); raise exception 'Unexpected reaction-count access';
+ exception when raise_exception then if sqlerrm<>'Entry unavailable' then raise; end if; end;
+end $$;
+reset role;
+select set_config('request.jwt.claim.sub',a::text,true) from audit_context;
+set local role authenticated;
+select public.block_climber(b) from audit_context;
+reset role;
+select set_config('request.jwt.claim.sub',b::text,true) from audit_context;
+set local role authenticated;
+select pg_temp.audit_assert(not exists(select 1 from public.climber_profiles where id=(select a from audit_context)),'block hides profile');
+select pg_temp.audit_assert(not exists(select 1 from public.climber_profile_details where id=(select a from audit_context)),'block hides profile details');
+reset role;
+select set_config('request.jwt.claim.sub','',true);
+set local role anon;
+do $$ begin
+ begin perform * from public.shared_sessions limit 1; raise exception 'Unexpected anonymous table access'; exception when insufficient_privilege then null; end;
+ begin perform public.search_climbers('audit'); raise exception 'Unexpected anonymous RPC access'; exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+rollback;
+select 'passed' as hosted_permission_audit,'all fixture users and content rolled back' as fixture_status;

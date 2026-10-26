@@ -10,8 +10,9 @@ create function auth.uid() returns uuid language sql stable as
 $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
 grant usage on schema auth to authenticated,anon;
 grant execute on function auth.uid() to authenticated,anon;`);
-await db.exec(await readFile(new URL('../migrations/202610240001_friends.sql', import.meta.url), 'utf8'));
-await db.exec(await readFile(new URL('../migrations/202610250002_profiles_search_reactions.sql', import.meta.url), 'utf8'));
+await db.exec(await readFile(new URL('../migrations/20261025033437_friends.sql', import.meta.url), 'utf8'));
+await db.exec(await readFile(new URL('../migrations/20261026223012_profiles_search_reactions.sql', import.meta.url), 'utf8'));
+await db.exec(await readFile(new URL('../migrations/20261026223942_social_access_audit.sql', import.meta.url), 'utf8'));
 const [a,b,c] = [1,2,3].map(i => `00000000-0000-0000-0000-00000000000${i}`);
 const source = '10000000-0000-0000-0000-000000000001';
 for (const id of [a,b,c]) await db.query('insert into auth.users values($1)',[id]);

@@ -1,11 +1,13 @@
 # Friends setup
 
+**Deployment status:** All three migrations are installed in `climbing-app-dev` and permission checks passed on October 26, 2026. See [SUPABASE_AUDIT.md](SUPABASE_AUDIT.md) for verified settings and the remaining optional password-auth advisory. The steps below also describe setting up a fresh project.
+
 Friends uses mutual requests, not followers. Groups are deferred. A public account still requires friend-request approval. Each reviewed session snapshot can be Private, Friends, or Public. Private accounts cap Public entries to approved friends. Local journals remain private and offline; this is not full journal synchronization.
 
 ## Create the backend
 
 1. Create a Supabase account and a project in your chosen organization/region. Keep the database password outside this repository.
-2. In the project SQL Editor, run `supabase/migrations/202610240001_friends.sql` once. It creates profiles, requests/friendships, blocks, reviewed session summaries, and a private reports queue, with row-level security and authenticated mutation functions. Use a dedicated development project first.
+2. In the project SQL Editor, run `supabase/migrations/20261025033437_friends.sql` once. It creates profiles, requests/friendships, blocks, reviewed session summaries, and a private reports queue, with row-level security and authenticated mutation functions. Use a dedicated development project first.
 3. In **Project Settings → API / API Keys**, copy the Project URL (`https://YOUR_PROJECT_REF.supabase.co`) and a **publishable** key (`sb_publishable_...`). Never put a secret key, service-role key, database password, or Google client secret in the app.
 4. Create the ignored file `ClimbingApp/Social/Supabase.local.json`:
 
@@ -67,7 +69,7 @@ Current verification: native simulator builds, isolated PostgreSQL permission fi
 
 ## Profiles, ranked discovery, reactions, and friend invitations
 
-After the original migration, apply `supabase/migrations/202610250002_profiles_search_reactions.sql`. It adds optional profile details, ranked name/username search, and one replaceable reaction per person/session. Existing journals and shared session rows are retained. New clients show a migration-required message until this is applied.
+For a fresh project, apply `supabase/migrations/20261026223012_profiles_search_reactions.sql` after the original migration, then `supabase/migrations/20261026223942_social_access_audit.sql`. These are already applied to the current development project. It adds optional profile details, ranked name/username search, and one replaceable reaction per person/session. Existing journals and shared session rows are retained. New clients show a migration-required message until this is applied.
 
 Profile photos are opt-in 256-pixel JPEGs (at most 64 KiB), re-encoded without original metadata. Their base64 copies and short bios are stored in a separate RLS-protected table rather than a public storage bucket. Private accounts expose details only to their owner and accepted friends. Public account details are visible to authenticated climbers, subject to blocks. Local profile data is copied into the publication draft only when requested.
 
@@ -75,4 +77,4 @@ Search accepts names or usernames, ranks exact usernames first, and limits resul
 
 The app registers `climblog://friend/UUID`. The QR screen and share action use that installed-app link until a web host is configured. For HTTPS invitations, host `web/friend-invites/invite.html` and set optional `inviteWebBaseURL` in the local JSON configuration. See that folder’s README for static hosting and the separate universal-link association step. Opening any invitation shows a profile for review and never sends or accepts a friend request automatically.
 
-Before release, test two real accounts: private bio/photo denial before friendship, access after acceptance, revocation on removal/block, changing/removing a photo, exact-name search ordering, reaction update/removal, and access denial after making a shared entry private. Assign report moderation as described above. Hosted deployment and HTTPS invite hosting require the project/domain owner’s access.
+Before release, test two real accounts: private bio/photo denial before friendship, access after acceptance, revocation on removal/block, changing/removing a photo, exact-name search ordering, reaction update/removal, and access denial after making a shared entry private. Assign report moderation as described above. The current hosted database deployment is complete. HTTPS invite hosting still needs a website host/domain; the default Supabase backend hostname does not host the landing page.
