@@ -9,8 +9,8 @@ final class ProfileUITests: XCTestCase {
         let fixture = try XCTUnwrap(bundle.url(forResource:"route-photo",withExtension:"png") ?? bundle.url(forResource:"route-photo",withExtension:"png",subdirectory:"Fixtures"))
         app.launchEnvironment["CLIMB_TEST_PHOTO"] = try Data(contentsOf:fixture).base64EncodedString()
         app.launch()
-        XCTAssertTrue(app.buttons["openSettings"].waitForExistence(timeout:15))
-        app.buttons["openSettings"].tap();app.buttons["editProfile"].tap()
+        XCTAssertTrue(app.profileButton.waitForExistence(timeout:15))
+        app.profileButton.tap();app.buttons["editProfile"].tap()
         let name = app.textFields["profileName"]
         XCTAssertTrue(name.waitForExistence(timeout:5));name.tap();name.typeText("Test climber")
         let bio = app.descendants(matching:.any)["profileBio"].firstMatch
@@ -31,7 +31,7 @@ final class ProfileUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Test climber"].waitForExistence(timeout:5))
         XCTAssertTrue(app.staticTexts["Working on footwork"].exists)
         app.terminate();app.launchArguments = ["--ui-testing"];app.launch()
-        app.buttons["openSettings"].tap()
+        app.profileButton.tap()
         XCTAssertTrue(app.staticTexts["Test climber"].waitForExistence(timeout:5))
         app.buttons["editProfile"].tap()
         let editName = app.textFields["profileName"]

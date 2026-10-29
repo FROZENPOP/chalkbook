@@ -40,7 +40,9 @@ struct RouteThumbnail: View {
     @State private var image: UIImage?
     var body: some View {
         Group {
-            if let image {
+            if (try? RouteAnnotations.document(annotationJSON).highlight) != nil {
+                HighlightedRoutePhoto(data: data, annotationJSON: annotationJSON)
+            } else if let image {
                 if let strokes = try? RouteAnnotations.decode(annotationJSON), !strokes.isEmpty { RouteMarkupImage(image:image,strokes:strokes).clipShape(RoundedRectangle(cornerRadius:12)) }
                 else { Image(uiImage: image).resizable().scaledToFill().frame(height: 160).clipped().clipShape(RoundedRectangle(cornerRadius: 12)).accessibilityLabel("Route photo") }
             }
@@ -112,7 +114,12 @@ struct ProjectDetailView: View {
         .sheet(isPresented: $editing) { ClimbEditorView(climb: climb) }
         .sheet(item:$notebookEditor) { NotebookEditor(climb:climb,note:$0.note) }
         .sheet(item: $attempt) { AttemptEditorView(attempt: $0) }
-        .sheet(item: $preview) { RouteMediaPreview(item: $0) }
+        .sheet(item: $preview) { item in
+            RouteMediaPreview(item: item) { json in
+                guard let media = climb.media.first(where: { $0.id == item.id }) else { return false }
+                return store.save { media.annotationJSON = json; media.updatedAt = .now }
+            }
+        }
         .sheet(item:$annotating) { RouteAnnotationView(media:$0) }
         .sheet(item: $trying) { session in NavigationStack { SessionDetailView(session: session).toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { trying = nil } } } } }
     }

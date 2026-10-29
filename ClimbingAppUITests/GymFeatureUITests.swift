@@ -71,7 +71,7 @@ final class GymFeatureUITests: XCTestCase {
     @MainActor
     func testAccountPortalShowsProviderAvailabilityAndCloses() {
         let app = launch()
-        app.buttons["openSettings"].tap()
+        app.profileButton.tap()
         app.buttons["openLogin"].tap()
         XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5))
         let google = app.buttons["googleLogin"]
@@ -151,7 +151,7 @@ final class GymFeatureUITests: XCTestCase {
         app.buttons["saveClimb"].tap()
         XCTAssertTrue(app.buttons["View route photo"].waitForExistence(timeout: 5))
         app.buttons["View route photo"].tap()
-        XCTAssertTrue(app.images["Route photo"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["routePhotoPreview"].firstMatch.waitForExistence(timeout: 10))
         app.buttons["Done"].tap()
         app.buttons["Play route video"].tap()
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))
