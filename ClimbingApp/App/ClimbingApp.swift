@@ -89,6 +89,18 @@ private struct WorkspaceRoot: View {
                 let config = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
                 let store = try ModelContainer(for: schema, migrationPlan: ClimbingMigrationPlan.self, configurations: [config])
                 store.mainContext.autosaveEnabled = false
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--health-insights-fixture"), try store.mainContext.fetchCount(FetchDescriptor<ClimbingSession>()) == 0 {
+                    let session = ClimbingSession(date: .now.addingTimeInterval(-7200), location: "Health fixture session")
+                    session.endedAt = session.startedAt.addingTimeInterval(3600); session.isComplete = true
+                    store.mainContext.insert(session)
+                    store.mainContext.insert(HealthWorkoutLink(sessionID: session.id, workoutID: HealthInsightsFixtureReader.workoutID, sourceName: "UI test watch", sourceBundle: "test.health"))
+                    let unlinked = ClimbingSession(date: .now.addingTimeInterval(-3600), location: "Unlinked fixture session")
+                    unlinked.endedAt = unlinked.startedAt.addingTimeInterval(1800); unlinked.isComplete = true
+                    store.mainContext.insert(unlinked)
+                    try store.mainContext.save()
+                }
+                #endif
                 container = store
             } else {
                 container = try Persistence.container(accountKey: accountKey)

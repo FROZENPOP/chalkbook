@@ -34,6 +34,7 @@ struct ProgressViewScreen: View {
             VStack(alignment: .leading, spacing: 20) {
                 Picker("Time range", selection: $range) { ForEach(ProgressRange.allCases) { Text($0.rawValue).tag($0) } }
                     .pickerStyle(.segmented)
+                ProgressHealthSection(sessionIDs: Set(filtered.map(\.id)))
                 if filtered.isEmpty {
                     EmptyState(title: "Progress takes practice", symbol: "chart.bar.xaxis", message: "Your sessions and sends will show up here as you climb.")
                 } else {
