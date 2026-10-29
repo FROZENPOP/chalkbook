@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct SessionDetailView: View {
     @Environment(ClimbingStore.self) private var store
@@ -6,6 +7,8 @@ struct SessionDetailView: View {
     @Environment(AccountSession.self) private var auth
     @Environment(\.dismiss) private var dismiss
     let session: ClimbingSession
+    @Query private var healthLinks: [HealthWorkoutLink]
+    @AppStorage("healthEnabled") private var healthEnabled = false
     @State private var sheet: SessionSheet?
     @State private var confirmDelete = false
     @State private var chooseExisting = false
@@ -46,6 +49,9 @@ struct SessionDetailView: View {
                 }
                 if session.allClimbs.isEmpty {
                     EmptyState(title: "Find your first boulder", symbol: "figure.climbing", message: "Add a climb and record each try along the way.")
+                }
+                if session.isComplete, healthEnabled, let link = healthLinks.first(where: { $0.sessionID == session.id }) {
+                    SessionHealthSection(workoutID: link.workoutID)
                 }
                 if let selected { ClimbCard(climb: selected, canLog: !session.isComplete, loggingSession: session) }
                 if !session.isComplete, !session.recordedAttempts.isEmpty {

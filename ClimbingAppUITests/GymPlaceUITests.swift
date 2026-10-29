@@ -6,8 +6,8 @@ final class GymPlaceUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing","--reset-test-data"]
         app.launch()
-        XCTAssertTrue(app.buttons["openSettings"].waitForExistence(timeout:15))
-        app.buttons["openSettings"].tap()
+        XCTAssertTrue(app.profileButton.waitForExistence(timeout:15))
+        app.profileButton.tap()
         app.buttons["savedGyms"].tap()
         app.buttons["addSavedGym"].tap()
         XCTAssertTrue(app.textFields["gymName"].waitForExistence(timeout:5))
@@ -15,7 +15,7 @@ final class GymPlaceUITests: XCTestCase {
     }
     @MainActor func testManualGymAddressAndRemovedBulkDelete() {
         let app = openGyms()
-        app.textFields["gymName"].tap();app.textFields["gymName"].typeText("Private training wall")
+        app.textFields["gymName"].tap();app.textFields["gymName"].typeText("Private training wall\n")
         app.textFields["gymAddress"].tap();app.textFields["gymAddress"].typeText("My garage")
         app.buttons["saveGym"].tap()
         XCTAssertTrue(app.staticTexts["My garage"].waitForExistence(timeout:5))

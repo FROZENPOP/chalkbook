@@ -10,7 +10,7 @@
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
 <key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
-<key>NSHealthShareUsageDescription</key><string>Link a climbing workout you choose to a journal session and view its available duration, energy, and heart rate. Manual logging works without Health access.</string>
+<key>NSHealthShareUsageDescription</key><string>Read the climbing workouts you choose, energy, heart rate, and optional resting heart rate and HRV for private Health insights. Manual logging works without Health access.</string>
 <key>LSRequiresIPhoneOS</key><true/>
 <key>UIFileSharingEnabled</key><true/>
 <key>LSSupportsOpeningDocumentsInPlace</key><true/>

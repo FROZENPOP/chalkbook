@@ -71,7 +71,7 @@ final class GymFeatureUITests: XCTestCase {
     @MainActor
     func testAccountPortalShowsProviderAvailabilityAndCloses() {
         let app = launch()
-        app.buttons["openSettings"].tap()
+        app.profileButton.tap()
         app.buttons["openLogin"].tap()
         XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5))
         let google = app.buttons["googleLogin"]
