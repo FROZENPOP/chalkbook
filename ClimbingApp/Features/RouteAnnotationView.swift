@@ -71,14 +71,21 @@ struct RouteAnnotationView: View {
                     ToolbarItem(placement:.cancellationAction) { Button("Cancel") { dismiss() } }
                     ToolbarItem(placement:.confirmationAction) { Button("Save") {
                         do {
-                            let json = try RouteAnnotations.encode(strokes)
+                            var document = try RouteAnnotations.document(media.annotationJSON)
+                            document.strokes = strokes
+                            let json = try RouteAnnotations.encode(document)
                             if store.save({ media.annotationJSON=json;media.updatedAt = .now }) { dismiss() }
                         } catch { store.errorMessage=error.localizedDescription }
                     }.disabled(image == nil || failed).accessibilityIdentifier("saveRouteMarkup") }
                 }
                 .task {
-                    image=RouteAnnotationImage.load(media.data)
-                    do { strokes=try RouteAnnotations.decode(media.annotationJSON) } catch { failed=true }
+                    do {
+                        let document = try RouteAnnotations.document(media.annotationJSON)
+                        strokes = document.strokes
+                        let processed = try await HoldHighlight.process(data: media.data, settings: document.highlight)
+                        try Task.checkCancellation()
+                        image = UIImage(cgImage: processed)
+                    } catch is CancellationError { } catch { failed=true }
                 }
         }.safeAreaInset(edge:.top) { SaveErrorBanner() }
     }

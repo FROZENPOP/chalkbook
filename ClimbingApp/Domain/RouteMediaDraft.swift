@@ -20,6 +20,7 @@ struct RouteMediaDraft: Identifiable, Sendable {
     }
 
     func validate() throws {
+        _ = try RouteAnnotations.document(annotationJSON)
         guard !data.isEmpty, data.count <= Self.maximumBytes,
               let type = UTType(contentType),
               kind == .photo ? type.conforms(to: .image) : type.conforms(to: .movie) else {

@@ -209,8 +209,13 @@ struct ClimbEditorView: View {
             for item in entry.media where !retained.contains(item.id) { store.context.delete(item) }
             entry.media = try attachments.map { draft in
                 try draft.validate()
-                if let item = existing[draft.id] { return item }
+                if let item = existing[draft.id] {
+                    item.annotationJSON = draft.annotationJSON
+                    item.updatedAt = .now
+                    return item
+                }
                 let item = RouteMedia(id: draft.id, kind: draft.kind, filename: draft.filename, contentType: draft.contentType, data: draft.data)
+                item.annotationJSON = draft.annotationJSON
                 store.context.insert(item)
                 return item
             }
