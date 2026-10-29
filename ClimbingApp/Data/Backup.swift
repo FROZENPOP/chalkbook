@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 
 struct ClimbingBackup: Codable {
     static let maximumBytes = 150_000_000
-    var version = 4
+    var version = 5
     var exportedAt = Date.now
     var defaultScale: GradeScale
     var sessions: [SessionRecord]
@@ -146,7 +146,7 @@ struct ClimbingBackup: Codable {
     }
 
     func validated() throws -> Self {
-        guard (1...4).contains(version) else { throw BackupError.invalid("This backup version is not supported.") }
+        guard (1...5).contains(version) else { throw BackupError.invalid("This backup version is not supported.") }
         guard sessions.filter({ !$0.isComplete }).count <= 1 else {
             throw BackupError.invalid("A backup can contain only one active session.")
         }

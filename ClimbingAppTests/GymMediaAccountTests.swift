@@ -80,7 +80,7 @@ final class GymMediaAccountTests: XCTestCase {
             store.context.insert(media); climb.media.append(media)
         })
         let backup = try ClimbingBackup.decode(ClimbingBackup(sessions: [session], defaultScale: .vScale, gyms: [gym]).encoded())
-        XCTAssertEqual(backup.version, 4)
+        XCTAssertEqual(backup.version, 5)
         XCTAssertTrue(store.restore(backup), store.errorMessage ?? "Restore failed")
         XCTAssertTrue(store.restore(backup), store.errorMessage ?? "Second restore failed")
         let restored = try XCTUnwrap(store.context.fetch(FetchDescriptor<ClimbEntry>()).first)

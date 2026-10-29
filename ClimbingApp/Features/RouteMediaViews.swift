@@ -89,7 +89,13 @@ struct RouteMediaEditor: View {
                 if (error as NSError).code != NSUserCancelledError { message = error.localizedDescription }
             }
         }
-        .sheet(item: $preview) { RouteMediaPreview(item: $0) }
+        .sheet(item: $preview) { item in
+            RouteMediaPreview(item: item) { json in
+                guard let index = attachments.firstIndex(where: { $0.id == item.id }) else { return false }
+                attachments[index].annotationJSON = json
+                return true
+            }
+        }
     }
 }
 
@@ -107,6 +113,9 @@ struct MediaLabel: View {
 
 struct RouteMediaPreview: View {
     let item: RouteMediaDraft
+    var saveAnnotations: ((String) -> Bool)? = nil
+    @State private var annotationJSON: String = ""
+    @State private var highlighting = false
     @Environment(\.dismiss) private var dismiss
     @State private var image: UIImage?
     @State private var player: AVPlayer?
@@ -116,9 +125,9 @@ struct RouteMediaPreview: View {
     var body: some View {
         NavigationStack {
             Group {
-                if let image {
-                    if let strokes=try? RouteAnnotations.decode(item.annotationJSON),!strokes.isEmpty { RouteMarkupImage(image:image,strokes:strokes) }
-                    else { Image(uiImage: image).resizable().scaledToFit().accessibilityLabel("Route photo") }
+                if image != nil {
+                    HighlightedRoutePhoto(data: item.data, annotationJSON: annotationJSON)
+                        .accessibilityIdentifier("routePhotoPreview")
                 } else if let player { VideoPlayer(player: player) }
                 else if let message { ContentUnavailableView("Can’t open media", systemImage: "photo.badge.exclamationmark", description: Text(message)) }
                 else { SwiftUI.ProgressView("Opening media…") }
@@ -126,9 +135,27 @@ struct RouteMediaPreview: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle(item.kind == .photo ? "Route photo" : "Route video")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .bottomBar) {
+                    if item.kind == .photo, saveAnnotations != nil {
+                        Button("Highlight holds", systemImage: "scope") { highlighting = true }
+                            .frame(minHeight: 44).disabled(image == nil).accessibilityIdentifier("highlightHolds")
+                    }
+                }
+            }
+            .sheet(isPresented: $highlighting) {
+                var draft = item
+                draft.annotationJSON = annotationJSON
+                return HoldHighlightView(item: draft) { json in
+                    guard saveAnnotations?(json) == true else { return false }
+                    annotationJSON = json
+                    return true
+                }
+            }
             .task {
                 do {
+                    annotationJSON = item.annotationJSON
                     try item.validate()
                     if item.kind == .photo {
                         let data = item.data
@@ -155,6 +182,6 @@ struct RouteMediaPreview: View {
                 player?.pause(); player = nil
                 if let temporaryURL { try? FileManager.default.removeItem(at: temporaryURL) }
             }
-        }
+        }.tint(.primary)
     }
 }

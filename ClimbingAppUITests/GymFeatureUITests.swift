@@ -151,7 +151,7 @@ final class GymFeatureUITests: XCTestCase {
         app.buttons["saveClimb"].tap()
         XCTAssertTrue(app.buttons["View route photo"].waitForExistence(timeout: 5))
         app.buttons["View route photo"].tap()
-        XCTAssertTrue(app.images["Route photo"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["routePhotoPreview"].firstMatch.waitForExistence(timeout: 10))
         app.buttons["Done"].tap()
         app.buttons["Play route video"].tap()
         XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5))

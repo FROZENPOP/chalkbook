@@ -193,7 +193,12 @@ struct ClimbCard: View {
             Button("New activity beyond recalled batches") { if let sent = pendingOutcome { performRecord(sent: sent) }; pendingOutcome = nil }
             Button("Review recalled activity first") { store.errorMessage = "Reduce or replace the recalled batch before logging its individual details."; pendingOutcome = nil }
         }
-        .sheet(item: $mediaPreview) { RouteMediaPreview(item: $0) }
+        .sheet(item: $mediaPreview) { item in
+            RouteMediaPreview(item: item) { json in
+                guard let media = climb.media.first(where: { $0.id == item.id }) else { return false }
+                return store.save { media.annotationJSON = json; media.updatedAt = .now }
+            }
+        }
         .sheet(item: $editing) { entry in
             ClimbEditorView(session: loggingSession ?? entry.session, climb: entry)
         }
