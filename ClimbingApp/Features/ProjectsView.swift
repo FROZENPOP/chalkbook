@@ -6,15 +6,29 @@ struct ProjectsView: View {
     @Query(sort: \ClimbEntry.createdAt, order: .reverse) private var climbs: [ClimbEntry]
     @State private var filter = "active"
     @State private var adding = false
-    private var projects: [ClimbEntry] { climbs.filter { !$0.projectRaw.isEmpty && (filter == "all" || $0.projectStatus == filter) } }
+    private var listState: ProjectListState { ProjectListState(climbs: climbs, filter: filter) }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Picker("Project status", selection: $filter) { Text("Active").tag("active"); Text("Sent").tag("sent"); Text("Archived").tag("archived"); Text("All").tag("all") }.pickerStyle(.menu)
-                if projects.isEmpty {
-                    EmptyState(title: "Remember your next move", symbol: "figure.climbing", message: "Save a climb as a project when adding or editing it. Its photos, notebook, and attempts stay together across sessions.")
+                Picker("Project status", selection: $filter) { Text("Active").tag("active"); Text("Sent").tag("sent"); Text("Archived").tag("archived"); Text("All").tag("all") }.pickerStyle(.menu).accessibilityIdentifier("projectStatusFilter")
+                if let action = listState.emptyAction {
+                    ContentUnavailableView {
+                        Label(action == .addProject ? "Save your first project" : "No projects in this filter", systemImage: "figure.climbing")
+                    } description: {
+                        Text(action == .addProject
+                             ? "A project is a climb you want to keep working on. Add one to keep its photos, notes, and attempts together across sessions."
+                             : "Your saved projects are still here. View all projects or choose another status above.")
+                    } actions: {
+                        Button {
+                            if action == .addProject { adding = true }
+                            else { filter = "all" }
+                        } label: {
+                            Label(action == .addProject ? "Add your first project" : "View all projects", systemImage: action == .addProject ? "plus" : "line.3.horizontal.decrease")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }.buttonStyle(.borderedProminent).accessibilityIdentifier("projectsEmptyAction")
+                    }.padding(.vertical, 24)
                 }
-                ForEach(projects) { climb in
+                ForEach(listState.projects) { climb in
                     NavigationLink { ProjectDetailView(climb: climb) } label: {
                         Surface {
                             VStack(alignment: .leading, spacing: 12) {
@@ -174,5 +188,22 @@ struct ExistingClimbPicker: View {
             .overlay { if climbs.isEmpty { ContentUnavailableView("No saved climbs", systemImage: "figure.climbing", description: Text("Create a climb first. Matching grades and colors never merge climbs.")) } }
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
         }
+    }
+}
+
+/// Distinguishes a new notebook from an empty filter so the suggested action never hides saved work.
+struct ProjectListState {
+    enum EmptyAction { case addProject, showAll }
+    let projects: [ClimbEntry]
+    private let hasSavedProjects: Bool
+
+    init(climbs: [ClimbEntry], filter: String) {
+        let saved = climbs.filter { !$0.projectRaw.isEmpty }
+        hasSavedProjects = !saved.isEmpty
+        projects = saved.filter { filter == "all" || $0.projectStatus == filter }
+    }
+    var emptyAction: EmptyAction? {
+        guard projects.isEmpty else { return nil }
+        return hasSavedProjects ? .showAll : .addProject
     }
 }
