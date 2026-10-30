@@ -49,7 +49,7 @@ def simulator(device, fresh_boot=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["check", "run", "test", "audit"])
+    parser.add_argument("action", choices=["check", "run", "build", "test", "audit"])
     parser.add_argument("--device", choices=DEVICE_TYPES, default="iphone16")
     args = parser.parse_args()
     run("xcodebuild", "-version")

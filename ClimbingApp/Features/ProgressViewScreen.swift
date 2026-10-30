@@ -62,7 +62,7 @@ struct ProgressViewScreen: View {
                     }
                     Surface {
                         VStack(alignment: .leading, spacing: 16) {
-                            Text("Sessions per week").font(.headline)
+                            Text("Sessions per week").font(.headline).id("progressWeeklyActivity")
                             Chart(weeks) { week in
                                 BarMark(x: .value("Week", SessionDay.date(for: week.day) ?? .now, unit: .weekOfYear), y: .value("Sessions", week.sessions))
                                     .foregroundStyle(ClimbTheme.forest).cornerRadius(5)

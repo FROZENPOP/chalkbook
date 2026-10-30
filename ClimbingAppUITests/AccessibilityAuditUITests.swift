@@ -33,15 +33,24 @@ import XCTest
         return app
     }
 
-    private func audit(_ app: XCUIApplication, _ screen: String) {
+    private func audit(_ app: XCUIApplication, _ screen: String, partitionProbes: Bool = false) {
         XCTContext.runActivity(named: "Audit \(screen)") { activity in
             let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = screen; shot.lifetime = .keepAlways; activity.add(shot)
             do {
                 // Static checks run before font probes alter layout. Forms rebuild their
                 // rows for size changes, so the two font checks can now share one probe.
                 let bars = nativeBars(app)
-                try performAudit(app, types: .all.subtracting([.textClipped, .dynamicType]), screen: screen, bars: bars)
-                try performAudit(app, types: [.textClipped, .dynamicType], screen: screen, bars: bars)
+                // XXXL on compact screens makes native OCR/contrast work expensive. Keep
+                // every category, but give contrast, OCR and each font probe their own call
+                // instead of sharing the native per-call time budget. Other screens retain
+                // the faster grouped probes. Unknown/new static categories remain included.
+                let probes: [XCUIAccessibilityAuditType] = partitionProbes
+                    ? [.contrast, .elementDetection, .all.subtracting([.contrast, .elementDetection, .textClipped, .dynamicType]), .textClipped, .dynamicType]
+                    : [.all.subtracting([.textClipped, .dynamicType]), [.textClipped, .dynamicType]]
+                for types in probes {
+                    print("AX-PROBE [\(screen)] types=\(types.rawValue)")
+                    try performAudit(app, types: types, screen: screen, bars: bars)
+                }
             } catch { XCTFail("Accessibility audit failed on \(screen): \(error)") }
         }
     }
@@ -160,9 +169,20 @@ import XCTest
     func testCoreScreensDarkAccessibilityXXXL() {
         for screen in ["home", "session", "feed", "progress"] {
             for scrolled in [false, true] {
-                let app = launch(screen, darkLarge: true)
-                if scrolled { app.swipeUp() }
-                audit(app, "\(screen) dark XXXL\(scrolled ? " scrolled" : "")"); app.terminate()
+                let anchor = ["home": "journalSessionActions", "session": "sessionClimbs", "progress": "progressWeeklyActivity"][screen]
+                let anchored = scrolled && anchor != nil
+                let app = launch(screen, darkLarge: true, extra: anchored ? ["--audit-scroll-anchor", anchor!] : [])
+                if scrolled && !anchored { app.swipeUp() }
+                if anchored {
+                    let heading = screen == "home" ? app.buttons["startSession"] : app.staticTexts[screen == "session" ? "Your climbs" : "Sessions per week"]
+                    XCTAssertTrue(heading.exists || heading.waitForExistence(timeout: 5))
+                    XCTAssertTrue(heading.isHittable, "Named scroll checkpoint must be visible")
+                    XCTAssertGreaterThanOrEqual(heading.frame.minY, app.navigationBars.firstMatch.frame.maxY - 1)
+                    if screen != "home" { XCTAssertLessThanOrEqual(heading.frame.minY, app.navigationBars.firstMatch.frame.maxY + 32) }
+                    XCTAssertLessThanOrEqual(heading.frame.maxY, app.tabBars.firstMatch.frame.minY + 1)
+                    print("AX-VIEWPORT \(screen): \(heading.frame)")
+                }
+                audit(app, "\(screen) dark XXXL\(scrolled ? " scrolled" : "")", partitionProbes: anchored); app.terminate()
             }
         }
     }

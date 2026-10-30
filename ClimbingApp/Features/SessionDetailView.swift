@@ -37,7 +37,7 @@ struct SessionDetailView: View {
                     }
                 }
                 HStack {
-                    Text("Your climbs").font(.title2.bold())
+                    Text("Your climbs").font(.title2.bold()).id("sessionClimbs")
                     Spacer()
                     if !session.isComplete {
                         Button { sheet = .addClimb } label: { Label("Add climb", systemImage: "plus") }

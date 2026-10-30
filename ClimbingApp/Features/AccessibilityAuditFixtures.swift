@@ -42,10 +42,21 @@ struct AccessibilityAuditDestination: View {
     private var modal: Bool { ["session-editor", "climb-editor", "share", "annotation", "highlight"].contains(AccessibilityAuditFixtures.screen) }
     private var arguments: [String] { ProcessInfo.processInfo.arguments }
     var body: some View {
-        Group {
-            if modal {
-                Color.clear.sheet(isPresented: $presenting) { destination.preferredColorScheme(arguments.contains("--audit-dark") ? .dark : .light) }
-            } else { destination }
+        ScrollViewReader { proxy in
+            Group {
+                if modal {
+                    Color.clear.sheet(isPresented: $presenting) { destination.preferredColorScheme(arguments.contains("--audit-dark") ? .dark : .light) }
+                } else { destination }
+            }
+            .task {
+                guard let index = arguments.firstIndex(of: "--audit-scroll-anchor"),
+                      arguments.indices.contains(index + 1) else { return }
+                let anchor = arguments[index + 1]
+                // Audit a named section after layout rather than an arbitrary physics
+                // swipe endpoint with oversized text partly behind native chrome.
+                await Task.yield()
+                proxy.scrollTo(anchor, anchor: anchor == "journalSessionActions" ? .bottom : .top)
+            }
         }
             .preferredColorScheme(arguments.contains("--audit-dark") ? .dark : .light)
             .transaction { if arguments.contains("--audit-reduce-motion") { $0.disablesAnimations = true } }

@@ -1,8 +1,18 @@
 """Audit boot isolation must retain existing devices/data and leave normal runs alone."""
+import contextlib
+import io
 import json
+from pathlib import Path
+import sys
+import tempfile
+import types
 import unittest
 from unittest.mock import patch
-import ios_dev
+# Support both direct execution and `python3 -m unittest scripts.test_ios_dev`.
+if __package__:
+    from . import ios_dev
+else:
+    import ios_dev
 
 
 class SimulatorBootTests(unittest.TestCase):
@@ -26,6 +36,21 @@ class SimulatorBootTests(unittest.TestCase):
         with patch.object(ios_dev, "run", side_effect=response) as run:
             self.assertEqual(ios_dev.simulator("se", fresh_boot=fresh_boot), "existing-se")
             return [entry.args for entry in run.call_args_list]
+
+    def test_cli_preserves_test_and_build_and_isolates_only_audit(self):
+        for action in ("test", "build", "audit"):
+            with self.subTest(action=action), tempfile.TemporaryDirectory() as folder:
+                with patch.object(sys, "argv", ["ios_dev.py", action]), \
+                     patch.object(ios_dev, "ROOT", Path(folder)), \
+                     patch.object(ios_dev, "run"), \
+                     patch.object(ios_dev, "simulator", return_value="existing-phone") as simulator, \
+                     patch.object(ios_dev.subprocess, "run", return_value=types.SimpleNamespace(returncode=0)) as process, \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    ios_dev.main()
+                simulator.assert_called_once_with("iphone16", fresh_boot=action == "audit")
+                command = process.call_args.args[0]
+                self.assertEqual(command[-1], "build" if action == "build" else "test")
+                self.assertEqual("-only-testing:ClimbingAppUITests/AccessibilityAuditUITests" in command, action == "audit")
 
     def test_audit_reboots_existing_compatible_device_without_erasing(self):
         calls = self.calls_for(True)
