@@ -78,11 +78,28 @@ final class ProjectNotebookUITests:XCTestCase {
         tap(app,"saveClimb");tap(app,"Notebook and complete history")
         for _ in 0..<5 { if app.buttons["View route photo"].firstMatch.isHittable { break }; app.swipeDown() }
         tap(app,"View route photo")
+        XCTAssertTrue(app.otherElements["routePhotoPreview"].exists || app.images["routePhotoPreview"].exists || app.descendants(matching:.any)["routePhotoPreview"].firstMatch.exists)
+        XCTAssertFalse(app.buttons["resetHoldHighlight"].exists) // Highlighting is optional after importing the photo.
         tap(app,"highlightHolds")
         let canvas = app.descendants(matching:.any)["holdHighlightCanvas"].firstMatch
         XCTAssertTrue(canvas.waitForExistence(timeout:10))
         canvas.coordinate(withNormalizedOffset:CGVector(dx:0.125,dy:0.4)).tap()
-        XCTAssertTrue(app.staticTexts["Hold color selected"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.staticTexts["1 hold selected"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.buttons["highlightMarker1"].exists)
+        tap(app,"includeMoreHolds")
+        for _ in 0..<8 { if canvas.isHittable { break }; app.swipeDown() }
+        canvas.coordinate(withNormalizedOffset:CGVector(dx:0.405,dy:0.412)).tap()
+        XCTAssertTrue(app.staticTexts["2 holds selected"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.buttons["highlightMarker2"].exists)
+        for _ in 0..<8 { if app.segmentedControls["highlightComparison"].isHittable { break }; app.swipeUp() }
+        // Segments select a temporary presentation, without changing the selection count.
+        app.segmentedControls["highlightComparison"].buttons["Original"].tap()
+        XCTAssertTrue(app.staticTexts["2 holds selected"].exists)
+        XCTAssertEqual(canvas.value as? String,"Original photo")
+        app.segmentedControls["highlightComparison"].buttons["Highlighted"].tap()
+        for _ in 0..<8 { if app.buttons["highlightMarker2"].isHittable { break }; app.swipeDown() }
+        app.buttons["highlightMarker2"].tap()
+        XCTAssertTrue(app.staticTexts["1 hold selected"].waitForExistence(timeout:5))
         let done = app.buttons["saveHoldHighlight"]
         let enabled = NSPredicate(format:"enabled == true")
         expectation(for:enabled,evaluatedWith:done);waitForExpectations(timeout:15)
@@ -92,16 +109,23 @@ final class ProjectNotebookUITests:XCTestCase {
         expectation(for:enabled,evaluatedWith:done);waitForExpectations(timeout:15)
         tap(app,"saveHoldHighlight")
         tap(app,"highlightHolds")
-        XCTAssertTrue(app.staticTexts["Hold color selected"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.staticTexts["1 hold selected"].waitForExistence(timeout:10))
+        for _ in 0..<8 { if app.switches["enableHoldHighlight"].isHittable { break }; app.swipeUp() }
+        app.switches["enableHoldHighlight"].tap()
+        tap(app,"saveHoldHighlight");tap(app,"highlightHolds")
+        for _ in 0..<8 { if app.switches["enableHoldHighlight"].isHittable { break }; app.swipeUp() }
+        XCTAssertEqual(app.switches["enableHoldHighlight"].value as? String,"0")
+        app.switches["enableHoldHighlight"].tap()
         tap(app,"resetHoldHighlight")
+        XCTAssertFalse(app.buttons["highlightMarker1"].exists)
         XCTAssertTrue(app.staticTexts["No color selected"].waitForExistence(timeout:5))
         app.navigationBars.buttons["Cancel"].tap()
         tap(app,"highlightHolds")
-        XCTAssertTrue(app.staticTexts["Hold color selected"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.staticTexts["1 hold selected"].waitForExistence(timeout:10))
         app.navigationBars.buttons["Cancel"].tap()
         app.terminate(); app.launchArguments=["--ui-testing", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL", "-UIUserInterfaceStyle", "Dark"]; app.launch()
         tap(app,"resumeSession"); tap(app,"View route photo"); tap(app,"highlightHolds")
-        XCTAssertTrue(app.staticTexts["Hold color selected"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.staticTexts["1 hold selected"].waitForExistence(timeout:10))
         tap(app,"resetHoldHighlight")
         expectation(for:enabled,evaluatedWith:app.buttons["saveHoldHighlight"]);waitForExpectations(timeout:15)
         tap(app,"saveHoldHighlight");tap(app,"highlightHolds")

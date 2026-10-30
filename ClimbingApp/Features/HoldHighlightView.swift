@@ -3,14 +3,19 @@ import SwiftUI
 struct HoldHighlightView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let item: RouteMediaDraft
     let save: (String) -> Bool
     @State private var selection: HoldHighlightSettings?
-    @State private var tolerance: Double = 0.22
+    @State private var tolerance: Double = 0.35
+    @State private var original: UIImage?
+    @State private var includeMore = false
+    @State private var showOriginal = false
     @State private var image: UIImage?
     @State private var processing = true
     @State private var message: String?
     @State private var retry = 0
+    @State private var loadRetry = 0
     @State private var renderSucceeded = false
     @State private var document: RouteAnnotationDocument?
 
@@ -21,51 +26,52 @@ struct HoldHighlightView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Tap one hold to highlight similar colors. Adjust tolerance to include more or fewer shades. Wall markings with the same color may also match.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    if let image {
-                        RouteMarkupImage(image: image, strokes: document?.strokes ?? [])
+                    Text("Tap a hold in your climb").font(.headline)
+                    if includeMore { Text("Tap another hold to include it.").font(.subheadline).foregroundStyle(.secondary) }
+                    if let displayed = showOriginal ? original : image {
+                        RouteMarkupImage(image: displayed, strokes: document?.strokes ?? [])
                             .overlay {
-                                GeometryReader { geometry in
-                                    if let selection {
-                                        Circle().stroke(.white, lineWidth: 3).background(Circle().stroke(.black, lineWidth: 6))
-                                            .frame(width: 20, height: 20)
-                                            .position(x: selection.x * geometry.size.width, y: selection.y * geometry.size.height)
-                                            .allowsHitTesting(false)
-                                    }
-                                    Color.clear.contentShape(Rectangle())
-                                        .onTapGesture { point in
-                                            guard let normalized = HoldHighlight.normalizedPoint(point, imageSize: image.size, containerSize: geometry.size) else { return }
-                                            selection = HoldHighlightSettings(x: normalized.x, y: normalized.y, tolerance: tolerance)
-                                        }
-                                }
+                                HighlightSelectionOverlay(points: selection?.selections ?? [], imageSize: displayed.size, canSelect: !showOriginal, choose: choose, remove: remove)
                             }
+                            .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: selection?.selections)
+                            .accessibilityElement(children: .contain)
                             .accessibilityLabel("Route photo. Tap a hold to select its color.")
                             .accessibilityIdentifier("holdHighlightCanvas")
-                            .accessibilityAction(named: "Select center hold") {
-                                selection = HoldHighlightSettings(x: 0.5, y: 0.5, tolerance: tolerance)
-                            }
-                            .accessibilityValue(selection == nil ? "Original photo" : "Hold color selected")
+                            .accessibilityAction(named: "Select center hold") { choose(RoutePoint(x: 0.5, y: 0.5)) }
+                            .accessibilityValue(showOriginal ? "Original photo" : "\(selection?.selections.count ?? 0) holds selected")
                     }
                     if processing { SwiftUI.ProgressView("Processing photo…").accessibilityIdentifier("highlightProcessing") }
                     if let message {
                         Text(message).foregroundStyle(.red).accessibilityIdentifier("highlightError")
-                        Button("Retry processing") { retry += 1 }.frame(minHeight: 44)
+                        Button("Retry processing") { if document == nil { loadRetry += 1 } else { retry += 1 } }.frame(minHeight: 44)
                     }
-                    Text(selection == nil ? "No color selected" : "Hold color selected").font(.headline).accessibilityIdentifier("highlightSelection")
-                    Text("Color tolerance").font(.headline)
+                    Text(selectionLabel)
+                        .font(.headline).accessibilityIdentifier("highlightSelection")
+                    Picker("Photo comparison", selection: $showOriginal) {
+                        Text("Highlighted").tag(false); Text("Original").tag(true)
+                    }.pickerStyle(.segmented).accessibilityIdentifier("highlightComparison")
+                        .accessibilityHint("Compare views without changing saved selections")
+                    Toggle("Show highlight", isOn: Binding(get: { selection?.isEnabled ?? false }, set: { selection?.isEnabled = $0 }))
+                        .disabled(selection == nil).accessibilityIdentifier("enableHoldHighlight")
+                    Button(includeMore ? "Tap another hold…" : "Include more holds", systemImage: "plus.circle") {
+                        includeMore.toggle(); showOriginal = false
+                    }.frame(minHeight: 44).disabled(selection == nil || (selection?.selections.count ?? 0) >= 64)
+                        .accessibilityIdentifier("includeMoreHolds").accessibilityValue(includeMore ? "Ready to add" : "Off")
+                        .accessibilityHint("Your next tap adds a selection instead of replacing it")
+                    Text("Color reach").font(.headline)
                     Slider(value: $tolerance, in: 0...1, step: 0.01)
                         .frame(minHeight: 44)
-                        .accessibilityLabel("Color tolerance")
+                        .accessibilityLabel("Color reach")
                         .accessibilityValue("\(Int(tolerance * 100)) percent")
+                        .accessibilityHint("Higher values include more shades of your selected holds")
                         .accessibilityIdentifier("highlightTolerance")
                         .disabled(selection == nil)
-                        .onChange(of: tolerance) { _, value in
-                            if selection != nil { selection?.tolerance = value }
-                        }
-                    Text("\(Int(tolerance * 100))% · Higher values include more colors.").font(.caption).foregroundStyle(.secondary)
-                    Button("Reset to original", systemImage: "arrow.counterclockwise") { selection = nil }
-                        .frame(minHeight: 44).disabled(selection == nil).accessibilityIdentifier("resetHoldHighlight")
+                        .onChange(of: tolerance) { _, value in selection?.tolerance = value }
+                    Text("\(Int(tolerance * 100))% · Include fewer or more shades.").font(.caption).foregroundStyle(.secondary)
+                    Button("Reset to original", systemImage: "arrow.counterclockwise") {
+                        selection = nil; includeMore = false; showOriginal = false
+                    }.frame(minHeight: 44).disabled(selection == nil).accessibilityIdentifier("resetHoldHighlight")
+                    Text("For a cleaner match, tap colored material away from chalk or glare.").font(.caption).foregroundStyle(.secondary)
                     Text("The original photo and private markup are preserved. Done saves this view; Cancel keeps your previous settings.").font(.caption).foregroundStyle(.secondary)
                 }.padding(20)
             }
@@ -85,13 +91,18 @@ struct HoldHighlightView: View {
                         .accessibilityIdentifier("saveHoldHighlight")
                 }
             }
-            .task {
+            .task(id: loadRetry) {
+                processing = true; message = nil
                 do {
                     let saved = try RouteAnnotations.document(item.annotationJSON)
-                    document = saved
-                    tolerance = saved.highlight?.tolerance ?? 0.22
+                    let decoded = try await HoldHighlight.process(data: item.data, settings: nil)
+                    try Task.checkCancellation()
+                    original = UIImage(cgImage: decoded); image = original
+                    tolerance = saved.highlight?.tolerance ?? 0.35
                     selection = saved.highlight
-                } catch { message = "The saved photo settings couldn’t be opened. They have been kept."; processing = false }
+                    document = saved
+                } catch is CancellationError { }
+                catch { message = "The photo or its saved settings couldn’t be opened. Your original and saved settings have been kept. \(error.localizedDescription)"; processing = false }
             }
             .task(id: request) {
                 guard document != nil else { return }
@@ -106,6 +117,56 @@ struct HoldHighlightView: View {
                 catch { message = error.localizedDescription; processing = false }
             }
         }.tint(.primary)
+            .sensoryFeedback(.selection, trigger: selection?.selections.count ?? 0)
+    }
+    private var selectionLabel: String {
+        guard let count = selection?.selections.count else { return "No color selected" }
+        return "\(count) hold\(count == 1 ? "" : "s") selected"
+    }
+    private func choose(_ point: RoutePoint) {
+        guard !showOriginal else { return }
+        if includeMore, var settings = selection {
+            guard settings.selections.count < 64 else { return }
+            settings.selections.append(point); settings.isEnabled = true; selection = settings
+        } else { selection = HoldHighlightSettings(x: point.x, y: point.y, tolerance: tolerance) }
+        includeMore = false
+    }
+    private func remove(_ index: Int) {
+        guard var settings = selection, settings.selections.indices.contains(index) else { return }
+        settings.selections.remove(at: index)
+        selection = settings.selections.isEmpty ? nil : settings
+    }
+
+}
+
+private struct HighlightSelectionOverlay: View {
+    let points: [RoutePoint]
+    let imageSize: CGSize
+    let canSelect: Bool
+    let choose: (RoutePoint) -> Void
+    let remove: (Int) -> Void
+    var body: some View {
+        GeometryReader { geometry in
+            Color.clear.contentShape(Rectangle()).onTapGesture { point in
+                guard canSelect, let normalized = HoldHighlight.normalizedPoint(point, imageSize: imageSize, containerSize: geometry.size) else { return }
+                choose(RoutePoint(x: normalized.x, y: normalized.y))
+            }
+            ForEach(points.indices, id: \.self) { index in
+                marker(index)
+                    .position(x: CGFloat(points[index].x) * geometry.size.width, y: CGFloat(points[index].y) * geometry.size.height)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+    }
+    private func marker(_ index: Int) -> some View {
+        Button { remove(index) } label: {
+            Text("\(index + 1)").font(.caption.bold()).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.5)
+                .frame(width: 26, height: 26).background(.black.opacity(0.8), in: Circle())
+                .overlay(Circle().stroke(.white, lineWidth: 2)).frame(width: 44, height: 44)
+        }.buttonStyle(.plain)
+            .accessibilityLabel("Remove selected hold \(index + 1)")
+            .accessibilityHint("Removes this selection from the highlight")
+            .accessibilityIdentifier("highlightMarker\(index + 1)")
     }
 }
 
