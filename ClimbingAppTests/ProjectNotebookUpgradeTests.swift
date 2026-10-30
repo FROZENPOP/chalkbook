@@ -61,7 +61,7 @@ import SwiftData
         climb.notebook=[note];climb.pinnedNoteID=note.id;climb.media=[media]
         container.mainContext.insert(climb);try container.mainContext.save()
         let backup=try ClimbingBackup(sessions:[],defaultScale:.vScale,climbs:[climb]).validated()
-        XCTAssertEqual(backup.version,5)
+        XCTAssertEqual(backup.version,6)
         XCTAssertTrue(store.restore(backup))
         let restored=try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<ClimbEntry>()).first)
         XCTAssertEqual(restored.pinnedNote?.text,"Left foot high")

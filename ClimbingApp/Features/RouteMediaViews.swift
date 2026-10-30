@@ -116,6 +116,7 @@ struct RouteMediaPreview: View {
     var saveAnnotations: ((String) -> Bool)? = nil
     @State private var annotationJSON: String = ""
     @State private var highlighting = false
+    @State private var showOriginal = false
     @Environment(\.dismiss) private var dismiss
     @State private var image: UIImage?
     @State private var player: AVPlayer?
@@ -126,8 +127,14 @@ struct RouteMediaPreview: View {
         NavigationStack {
             Group {
                 if image != nil {
-                    HighlightedRoutePhoto(data: item.data, annotationJSON: annotationJSON)
-                        .accessibilityIdentifier("routePhotoPreview")
+                    VStack(spacing:12) {
+                        if (try? RouteAnnotations.document(annotationJSON).highlight) != nil {
+                            Picker("Photo version",selection:$showOriginal) { Text("Highlighted").tag(false);Text("Original").tag(true) }
+                                .pickerStyle(.segmented).padding(.horizontal).accessibilityIdentifier("routePhotoComparison")
+                        }
+                        HighlightedRoutePhoto(data: item.data, annotationJSON: annotationJSON, showOriginal:showOriginal)
+                            .accessibilityIdentifier("routePhotoPreview")
+                    }
                 } else if let player { VideoPlayer(player: player) }
                 else if let message { ContentUnavailableView("Can’t open media", systemImage: "photo.badge.exclamationmark", description: Text(message)) }
                 else { SwiftUI.ProgressView("Opening media…") }
@@ -150,12 +157,14 @@ struct RouteMediaPreview: View {
                 return HoldHighlightView(item: draft) { json in
                     guard saveAnnotations?(json) == true else { return false }
                     annotationJSON = json
+                    showOriginal = (try? RouteAnnotations.document(json).highlight?.isEnabled) != true
                     return true
                 }
             }
             .task {
                 do {
                     annotationJSON = item.annotationJSON
+                    showOriginal = (try? RouteAnnotations.document(annotationJSON).highlight?.isEnabled) != true
                     try item.validate()
                     if item.kind == .photo {
                         let data = item.data

@@ -98,6 +98,8 @@ struct ReportClimberView: View {
 
 struct SharedSessionPreview: View {
     let entry: SharedSession
+    var routePhotos: [SharedRoutePhoto]? = nil
+    @State private var viewingPhotos = false
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(entry.session_day).font(.subheadline)
@@ -105,7 +107,15 @@ struct SharedSessionPreview: View {
             Text("\(entry.attempts.map(String.init) ?? "Unknown") attempts · \(entry.sends.map(String.init) ?? "Unknown") sends")
             Text(entry.duration_minutes.map { "\($0) minutes recorded" } ?? "Duration not recorded").font(.caption)
             Text(entry.completeness).font(.caption).foregroundStyle(.secondary)
-        }.accessibilityElement(children: .combine)
+            if (routePhotos?.count ?? entry.route_photo_count ?? 0) > 0 {
+                Button("View climb photos", systemImage:"photo.on.rectangle") { viewingPhotos = true }
+                    .frame(minHeight:44).accessibilityIdentifier("viewSharedRoutePhotos")
+                Text("Photos are never public; friends can view them when this entry is shared with them.").font(.caption).foregroundStyle(.secondary)
+            }
+        }.accessibilityElement(children: .contain)
+            .sheet(isPresented:$viewingPhotos) {
+                NavigationStack { SharedRoutePhotosView(entryID:entry.id,previewPhotos:routePhotos) }
+            }
     }
 }
 
