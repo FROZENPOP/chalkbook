@@ -1,4 +1,4 @@
--- Run only AFTER applying 20261030042746_suggested_friends, with a privileged SQL connection.
+-- Run only AFTER applying 20261030061722_suggested_friends, with a privileged SQL connection.
 -- Shared by the local PostgreSQL harness and the supervisor's hosted audit. All fixtures roll back.
 begin;
 create temp table suggestion_audit on commit drop as
