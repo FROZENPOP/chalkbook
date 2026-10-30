@@ -77,6 +77,9 @@ struct HoldHighlightView: View {
             }
             .background(ClimbTheme.background)
             .navigationTitle(typeSize.isAccessibilitySize ? "Highlight" : "Highlight holds").navigationBarTitleDisplayMode(.inline)
+            // Photos can scroll beneath the native title; keep its contrast independent of them.
+            .toolbarBackground(ClimbTheme.background, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel", systemImage: "xmark") { dismiss() }.accessibleToolbarAction() }
                 ToolbarItem(placement: .confirmationAction) {
