@@ -174,6 +174,7 @@ private struct HighlightSelectionOverlay: View {
 struct HighlightedRoutePhoto: View {
     let data: Data
     let annotationJSON: String
+    var showOriginal = false
     @State private var image: UIImage?
     @State private var message: String?
     var body: some View {
@@ -181,9 +182,10 @@ struct HighlightedRoutePhoto: View {
             if let image { RouteMarkupImage(image: image, strokes: (try? RouteAnnotations.decode(annotationJSON)) ?? []) }
             else if let message { Text(message).foregroundStyle(.secondary) }
             else { SwiftUI.ProgressView("Opening photo…") }
-        }.task(id: annotationJSON) {
+        }.task(id: "\(showOriginal):\(annotationJSON)") {
             do {
-                let settings = try RouteAnnotations.document(annotationJSON).highlight
+                var settings = showOriginal ? nil : try RouteAnnotations.document(annotationJSON).highlight
+                settings?.isEnabled = true
                 let result = try await HoldHighlight.process(data: data, settings: settings)
                 try Task.checkCancellation()
                 image = UIImage(cgImage: result); message = nil

@@ -45,6 +45,8 @@ enum HoldHighlight {
         var saturation: Double
         var brightness: Double
 
+        var isNeutral: Bool { saturation < 0.18 || brightness < 0.12 }
+
         init(red: Double, green: Double, blue: Double) {
             let high = max(red, green, blue), low = min(red, green, blue), delta = high - low
             brightness = high
@@ -57,15 +59,37 @@ enum HoldHighlight {
         }
     }
 
+    /// Lift worn pigment without changing its hue. Neutrals keep their original tones.
+    /// The remaining source contribution preserves texture instead of painting a flat color.
+    static func emphasized(_ color: Color) -> (red: Double, green: Double, blue: Double) {
+        // Keep very dark or weakly colored camera noise from becoming neon speckles.
+        let strength = color.isNeutral ? 0 : 0.55 * min(1, max(0, (color.brightness - 0.12) / 0.18)) * min(1, max(0, (color.saturation - 0.18) / 0.3))
+        let saturation = color.saturation + (1 - color.saturation) * strength
+        let brightness = color.brightness + (1 - color.brightness) * strength
+        let sector = color.hue * 6, chroma = brightness * saturation
+        let secondary = chroma * (1 - abs(sector.truncatingRemainder(dividingBy: 2) - 1))
+        let offset = brightness - chroma
+        let rgb: (Double, Double, Double)
+        switch Int(sector) % 6 {
+        case 0: rgb = (chroma, secondary, 0)
+        case 1: rgb = (secondary, chroma, 0)
+        case 2: rgb = (0, chroma, secondary)
+        case 3: rgb = (0, secondary, chroma)
+        case 4: rgb = (secondary, 0, chroma)
+        default: rgb = (chroma, 0, secondary)
+        }
+        return (rgb.0 + offset, rgb.1 + offset, rgb.2 + offset)
+    }
+
     /// Neutral holds use brightness and saturation; hue has no meaning for white/gray/black.
     static func distance(_ color: Color, from reference: Color) -> Double {
         let saturation = abs(color.saturation - reference.saturation)
         let brightness = abs(color.brightness - reference.brightness)
-        if reference.saturation < 0.18 || reference.brightness < 0.12 {
+        if reference.isNeutral {
             return min(1, sqrt(0.65 * brightness * brightness + 0.35 * saturation * saturation))
         }
         let hue = min(abs(color.hue - reference.hue), 1 - abs(color.hue - reference.hue)) * 2
-        return min(1, sqrt(0.7 * hue * hue + 0.2 * saturation * saturation + 0.1 * brightness * brightness))
+        return min(1, sqrt(0.8 * hue * hue + 0.18 * saturation * saturation + 0.02 * brightness * brightness))
     }
 
     /// Input coordinates use the displayed, orientation-normalized image, with a top-left origin.
@@ -176,14 +200,14 @@ enum HoldHighlight {
             let sample = HoldHighlightSettings(x: point.x, y: point.y, tolerance: settings.tolerance)
             let reference = try reference(in: pixels, settings: sample)
             let seed = min(pixels.height - 1, Int(point.y * Double(pixels.height))) * pixels.width + min(pixels.width - 1, Int(point.x * Double(pixels.width)))
-            let neutral = reference.saturation < 0.18 || reference.brightness < 0.12
+            let neutral = reference.isNeutral
             let threshold = 0.055 + settings.tolerance * (neutral ? 0.22 : 0.32)
             var candidates = [Float](repeating: 0, count: count)
             for i in 0..<count {
                 if i % pixels.width == 0 { try Task.checkCancellation() }
                 let color = colors[i]
                 guard pixels.bytes[i * 4 + 3] > 0 else { continue }
-                if !neutral && color.saturation < max(0.18, reference.saturation * 0.48) { continue }
+                if !neutral && color.saturation < max(0.22, reference.saturation * 0.62) { continue }
                 if neutral && color.saturation > max(0.22, reference.saturation + 0.14) { continue }
                 let d = distance(color, from: reference)
                 // A soft color ramp, followed by spatial feathering, avoids binary cutouts.
@@ -215,12 +239,14 @@ enum HoldHighlight {
             var visited = [Bool](repeating: false, count: count)
             for start in 0..<count where candidates[start] > 0.05 && !visited[start] {
                 var region = [start], head = 0, touchesEdge = false, includesSeed = false
+                var minX = pixels.width, minY = pixels.height, maxX = 0, maxY = 0
                 visited[start] = true
                 while head < region.count {
                     let i = region[head]; head += 1
                     includesSeed = includesSeed || i == seed
                     if head % 4096 == 0 { try Task.checkCancellation() }
                     let x = i % pixels.width, y = i / pixels.width
+                    minX = min(minX,x); maxX = max(maxX,x); minY = min(minY,y); maxY = max(maxY,y)
                     touchesEdge = touchesEdge || x == 0 || y == 0 || x == pixels.width - 1 || y == pixels.height - 1
                     for neighbor in [x > 0 ? i - 1 : -1, x + 1 < pixels.width ? i + 1 : -1,
                                      y > 0 ? i - pixels.width : -1, y + 1 < pixels.height ? i + pixels.width : -1] {
@@ -232,6 +258,8 @@ enum HoldHighlight {
                 let fraction = Double(region.count) / Double(count)
                 // Tiny/synthetic images have insufficient spatial evidence: retain the color result.
                 let hasSpatialEvidence = count >= 4096
+                let boxArea = (maxX - minX + 1) * (maxY - minY + 1)
+                if hasSpatialEvidence && !includesSeed && boxArea > 64 && Double(region.count) / Double(boxArea) < 0.22 { continue }
                 let largest = includesSeed ? 0.30 : (neutral ? 0.035 : 0.10)
                 if hasSpatialEvidence && (region.count < 5 || fraction > largest || (touchesEdge && !includesSeed && fraction > 0.0025)) { continue }
                 for i in region { union[i] = max(union[i], candidates[i]) }
@@ -261,6 +289,9 @@ enum HoldHighlight {
         guard quality == .preview || Double(image.width) * Double(image.height) <= 40_000_000 else { throw Failure.imageUnavailable }
         let working = try pixels(image)
         let mask = settings.isEnabled ? try mask(in: working, settings: settings) : Mask(width: working.width, height: working.height, alpha: [Float](repeating: 1, count: working.width * working.height))
+        let enhancePigment = try settings.isEnabled && (settings.selections.contains { point in
+            try !reference(in:working,settings:.init(x:point.x,y:point.y,tolerance:settings.tolerance)).isNeutral
+        })
         var output = try pixels(image, maximumDimension: quality == .preview ? 1024 : max(image.width, image.height))
         for y in 0..<output.height {
             try Task.checkCancellation()
@@ -273,11 +304,14 @@ enum HoldHighlight {
                 let b = mask.alpha[y1 * mask.width + x0] * (1 - fx) + mask.alpha[y1 * mask.width + x1] * fx
                 let alpha = Double(a * (1 - fy) + b * fy), i = (y * output.width + x) * 4
                 let gray = 0.2126 * Double(output.bytes[i]) + 0.7152 * Double(output.bytes[i + 1]) + 0.0722 * Double(output.bytes[i + 2])
+                let color = output.color(x: x, y: y)
+                let vivid = enhancePigment ? emphasized(color) : (red: Double(output.bytes[i]) / 255, green: Double(output.bytes[i + 1]) / 255, blue: Double(output.bytes[i + 2]) / 255)
                 for c in 0..<3 {
                     let original = Double(output.bytes[i + c])
                     // 58% luminance and 15% residual color retain wall context without crushed blacks.
                     let background = (gray * 0.85 + original * 0.15) * 0.58
-                    output.bytes[i + c] = UInt8(min(255, max(0, (original * alpha + background * (1 - alpha)).rounded())))
+                    let foreground = enhancePigment ? (c == 0 ? vivid.red : c == 1 ? vivid.green : vivid.blue) * Double(output.bytes[i + 3]) : original
+                    output.bytes[i + c] = UInt8(min(255, max(0, (foreground * alpha + background * (1 - alpha)).rounded())))
                 }
             }
         }

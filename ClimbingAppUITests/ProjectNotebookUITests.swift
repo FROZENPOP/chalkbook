@@ -59,6 +59,21 @@ final class ProjectNotebookUITests:XCTestCase {
         XCTAssertTrue(app.buttons["Undo stroke"].waitForExistence(timeout:5));XCTAssertTrue(app.buttons["Undo stroke"].isEnabled)
         let shot=XCTAttachment(screenshot:app.screenshot());shot.name="Restored private route markup";shot.lifetime = .keepAlways;add(shot)
     }
+    @MainActor func testSharedPhotoPairKeepsOriginalAndHighlightedAvailable() throws {
+        let app=XCUIApplication();app.launchArguments=["--ui-testing","--reset-test-data","--test-shared-route-photo"]
+        let bundle=Bundle(for:Self.self)
+        let url=try XCTUnwrap(bundle.url(forResource:"route-photo",withExtension:"png") ?? bundle.url(forResource:"route-photo",withExtension:"png",subdirectory:"Fixtures"))
+        app.launchEnvironment["CLIMB_TEST_PHOTO"]=try Data(contentsOf:url).base64EncodedString()
+        app.launch();app.tabBars.buttons["Friends"].tap()
+        XCTAssertTrue(app.images["sharedRoutePhoto"].waitForExistence(timeout:15))
+        XCTAssertEqual(app.images["sharedRoutePhoto"].label,"Highlighted climb photo")
+        app.segmentedControls["sharedPhotoComparison"].buttons["Original"].tap()
+        XCTAssertEqual(app.images["sharedRoutePhoto"].label,"Original climb photo")
+        let original = XCTAttachment(screenshot:app.screenshot()); original.name = "Shared original photo"; original.lifetime = .keepAlways; add(original)
+        app.segmentedControls["sharedPhotoComparison"].buttons["Highlighted"].tap()
+        XCTAssertEqual(app.images["sharedRoutePhoto"].label,"Highlighted climb photo")
+        let highlighted = XCTAttachment(screenshot:app.screenshot()); highlighted.name = "Shared highlighted photo"; highlighted.lifetime = .keepAlways; add(highlighted)
+    }
     @MainActor func testHoldHighlightSaveResetCancelAndRelaunch() throws {
         let app=XCUIApplication();app.launchArguments=["--ui-testing","--reset-test-data"]
         let bundle=Bundle(for:Self.self)
@@ -108,6 +123,9 @@ final class ProjectNotebookUITests:XCTestCase {
         app.sliders["highlightTolerance"].adjust(toNormalizedSliderPosition: 0.35)
         expectation(for:enabled,evaluatedWith:done);waitForExpectations(timeout:15)
         tap(app,"saveHoldHighlight")
+        let comparison=app.segmentedControls["routePhotoComparison"]
+        XCTAssertTrue(comparison.waitForExistence(timeout:10))
+        comparison.buttons["Original"].tap(); comparison.buttons["Highlighted"].tap()
         tap(app,"highlightHolds")
         XCTAssertTrue(app.staticTexts["1 hold selected"].waitForExistence(timeout:10))
         for _ in 0..<8 { if app.switches["enableHoldHighlight"].isHittable { break }; app.swipeUp() }

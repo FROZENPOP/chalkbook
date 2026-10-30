@@ -122,6 +122,39 @@ final class HoldHighlightTests: XCTestCase {
         do { _ = try await work.value; XCTFail("Cancelled work must not publish a preview") }
         catch { XCTAssertTrue(error is CancellationError) }
     }
+    func testWornYellowIsIncludedAndRenderedBrighterWithFullerColor() throws {
+        let photo = image(width:200,height:100) { x,y in
+            if (20..<70).contains(x) && (25..<65).contains(y) { return x < 45 ? [230,205,45,255] : [92,82,18,255] }
+            return [150,150,150,255]
+        }
+        let settings = HoldHighlightSettings(x:0.15,y:0.4,tolerance:0.35)
+        let pixels = try HoldHighlight.pixels(photo)
+        let mask = try HoldHighlight.mask(in:pixels,settings:settings)
+        XCTAssertGreaterThan(mask.alpha[40*200+55],0.85)
+        let rendered = try HoldHighlight.pixels(HoldHighlight.render(photo,settings:settings))
+        let original = pixels.color(x:55,y:40), boosted = rendered.color(x:55,y:40)
+        XCTAssertGreaterThan(boosted.brightness,original.brightness+0.25)
+        XCTAssertGreaterThan(boosted.saturation,original.saturation)
+        XCTAssertEqual(boosted.hue,original.hue,accuracy:0.015)
+        XCTAssertEqual(try HoldHighlight.pixels(photo).bytes,pixels.bytes)
+        let off = HoldHighlightSettings(selections:settings.selections,isEnabled:false)
+        XCTAssertEqual(try HoldHighlight.pixels(HoldHighlight.render(photo,settings:off)).bytes,pixels.bytes)
+        let bright = rendered.color(x:30,y:40)
+        XCTAssertGreaterThan(bright.brightness,pixels.color(x:30,y:40).brightness)
+        XCTAssertGreaterThan(bright.brightness,boosted.brightness) // Keep shading rather than flat paint.
+    }
+    func testNeutralAndTransparentPixelsAreNotArtificiallyColored() throws {
+        for value in [0.0,0.15,0.6,1.0] {
+            let color = HoldHighlight.Color(red:value,green:value,blue:value)
+            let output = HoldHighlight.emphasized(color)
+            XCTAssertEqual(output.red,value,accuracy:0.001)
+            XCTAssertEqual(output.green,value,accuracy:0.001)
+            XCTAssertEqual(output.blue,value,accuracy:0.001)
+        }
+        let transparent = image(width:1,height:1) { _,_ in [60,50,10,128] }
+        let off = HoldHighlightSettings(selections:[.init(x:0,y:0)],isEnabled:false)
+        XCTAssertEqual(try HoldHighlight.pixels(HoldHighlight.render(transparent,settings:off)).bytes,try HoldHighlight.pixels(transparent).bytes)
+    }
     func testAspectFitIgnoresLetterboxingAndOutOfBounds() {
         let size = CGSize(width: 200, height: 100), container = CGSize(width: 300, height: 300)
         XCTAssertNil(HoldHighlight.normalizedPoint(CGPoint(x: 150,y: 40), imageSize: size, containerSize: container))
