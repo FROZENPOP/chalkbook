@@ -54,7 +54,7 @@ struct SharedRoutePhotoPairView: View {
                 Image(uiImage:image).resizable().scaledToFit()
                     .accessibilityLabel(showOriginal || highlighted == nil ? "Original climb photo" : "Highlighted climb photo")
                     .accessibilityIdentifier("sharedRoutePhoto")
-            } else if failed { Text("This shared photo couldn’t be opened.").foregroundStyle(.secondary) }
+            } else if failed { Text("This shared photo couldn’t be opened.").foregroundStyle(ClimbTheme.secondaryText) }
             else { SwiftUI.ProgressView("Opening photo…") }
         }.task(id:photo.id) {
             let result = await Task.detached(priority:.userInitiated) { () -> (UIImage?,UIImage?) in

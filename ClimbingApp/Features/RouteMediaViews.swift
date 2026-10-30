@@ -34,7 +34,7 @@ struct RouteMediaEditor: View {
                     .disabled(isLoading).accessibilityIdentifier("addRouteMediaFromFiles")
             }
             if isLoading { SwiftUI.ProgressView("Adding media…") }
-            if let message { Text(message).font(.caption).foregroundStyle(.red).accessibilityIdentifier("mediaError") }
+            if let message { Text(message).font(.caption).foregroundStyle(ClimbTheme.error).accessibilityIdentifier("mediaError") }
         }
         .buttonStyle(.borderless)
         .onChange(of: selection) { _, items in

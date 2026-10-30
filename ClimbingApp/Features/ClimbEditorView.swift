@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct ClimbEditorView: View {
+    @Environment(\.dynamicTypeSize) private var textSize
     @Environment(ClimbingStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @AppStorage("defaultGradeScale") private var defaultScale = GradeScale.vScale.rawValue
@@ -36,11 +37,11 @@ struct ClimbEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Where are you climbing?") { GymSelectionRow(selectedID: $selectedGymID) }
-                Section("Climb") {
-                    TextField("Name or wall (optional)", text: $label).accessibilityIdentifier("climbName")
-                    TextField("Hold color (optional)", text: $color)
-                    if !colorGuide.isEmpty { Text(colorGuide).font(.caption).foregroundStyle(.secondary) }
+                Section(header: Text("Where are you climbing?").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) { GymSelectionRow(selectedID: $selectedGymID) }
+                Section(header: Text("Climb").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
+                    TextField("Name or wall (optional)", text: $label, axis: .vertical).lineLimit(1...3).accessibilityIdentifier("climbName").frame(minHeight: 44)
+                    TextField("Hold color (optional)", text: $color, axis: .vertical).lineLimit(1...3).frame(minHeight: 44)
+                    if !colorGuide.isEmpty { Text(colorGuide).font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
                     Toggle("Save as a project", isOn: $isProject)
                     Picker("Describe difficulty", selection: $gradeKind) { ForEach(GradeKind.allCases) { Text($0.title).tag($0) } }
                     if gradeKind != .unknown && gradeKind != .color {
@@ -69,15 +70,15 @@ struct ClimbEditorView: View {
                     }
                 }
                 if gradeKind == .range || gradeKind == .colorRange {
-                    Section("Upper end of range") {
+                    Section(header: Text("Upper end of range").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         if scale == .custom { TextField("Upper grade", text: $gradeUpper) }
                         else { Picker("Upper grade", selection: $gradeUpper) { ForEach(scale.grades, id: \.self) { Text($0).tag($0) } } }
                     }
                 }
                 Section {
                     RouteMediaEditor(attachments: $attachments, isLoading: $mediaLoading)
-                } header: { Text("Route photos & videos (optional)") } footer: {
-                    Text("Add up to 3 photos or short clips, 25 MB each. Media is saved with this climb on your iPhone.")
+                } header: { Text("Route photos & videos (optional)").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true) } footer: {
+                    Text("Add up to 3 photos or short clips, 25 MB each. Media is saved with this climb on your iPhone.").font(.caption).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true)
                 }
                 Section {
                     Picker("Before the first journal attempt", selection: $prior) {
@@ -87,7 +88,7 @@ struct ClimbEditorView: View {
                         Toggle("I reviewed the missing history; this journal is complete", isOn: $confirmHistory)
                         Text("Removed records leave history unknown until you explicitly confirm completeness.").font(.caption)
                     }
-                } footer: { Text("A first-try send counts as a flash only if you’ve never tried this climb before.") }
+                } footer: { Text("A first-try send counts as a flash only if you’ve never tried this climb before.").font(.caption).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true) }
                 Section {
                     DisclosureGroup("Style (optional)") {
                     ForEach(ClimbStyle.allCases) { style in
@@ -97,7 +98,7 @@ struct ClimbEditorView: View {
                     }
                 }
                 }
-                Section("Notes") {
+                Section(header: Text("Notes").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     TextField("Beta, a tricky move, or a small win…", text: $notes, axis: .vertical).lineLimit(2...5)
                 }
                 if let climb, !climb.attempts.isEmpty {
@@ -110,11 +111,12 @@ struct ClimbEditorView: View {
                     Section { Button("Delete climb", role: .destructive) { confirmDelete = true } }
                 }
             }
+            .id(textSize)
             .navigationTitle(climb == nil ? "Add climb" : "Edit climb")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Save", action: submit).disabled(mediaLoading || !validDescriptor).fontWeight(.semibold).accessibilityIdentifier("saveClimb") }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel", systemImage: "xmark") { dismiss() }.accessibleToolbarAction() }
+                ToolbarItem(placement: .confirmationAction) { Button("Save", systemImage: "checkmark", action: submit).disabled(mediaLoading || !validDescriptor).fontWeight(.semibold).accessibleToolbarAction().accessibilityIdentifier("saveClimb") }
             }
             .onChange(of: scale) { _, newScale in
                 guard newScale != appliedScale else { return }; appliedScale = newScale

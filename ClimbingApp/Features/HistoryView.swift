@@ -14,6 +14,16 @@ struct HistoryView: View {
 
     var body: some View {
         List {
+            HStack {
+                Image(systemName: "magnifyingglass").foregroundStyle(ClimbTheme.secondaryText).accessibilityHidden(true)
+                TextField("Gym or date", text: $search, axis: .vertical).lineLimit(1...3)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .accessibilityLabel("Search history by gym or date").accessibilityIdentifier("historySearch")
+                if !search.isEmpty {
+                    Button { search = "" } label: { Image(systemName: "xmark.circle.fill").frame(width: 44, height: 44) }
+                        .accessibilityLabel("Clear history search").accessibilityIdentifier("clearHistorySearch")
+                }
+            }.frame(minHeight: 44)
             if !sessions.isEmpty {
                 Section { Toggle("Completed sessions only", isOn: $completedOnly) }
             }
@@ -27,6 +37,5 @@ struct HistoryView: View {
             }
         }
         .navigationTitle("History")
-        .searchable(text: $search, prompt: "Gym or date (YYYY-MM-DD)")
     }
 }

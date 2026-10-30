@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct SessionEditorView: View {
+    @Environment(\.dynamicTypeSize) private var textSize
     @Environment(ClimbingStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \SavedGym.name) private var gyms: [SavedGym]
@@ -21,15 +22,15 @@ struct SessionEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Session") {
+                Section(header: Text("Session").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     GymSelectionRow(selectedID: $selectedGymID)
                     if selectedGymID == nil {
-                        TextField("Other location (optional)", text: $location).textInputAutocapitalization(.words)
-                            .accessibilityIdentifier("sessionLocation")
+                        TextField("Other location (optional)", text: $location, axis: .vertical).lineLimit(1...3).textInputAutocapitalization(.words)
+                            .accessibilityIdentifier("sessionLocation").frame(minHeight: 44)
                     }
                     if session == nil { DatePicker("Date", selection: $date, in: ...Date.now, displayedComponents: .date) }
                 }
-                Section("Time (optional for a recap)") {
+                Section(header: Text("Time (optional for a recap)").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     if session != nil {
                         DatePicker("Started", selection: $startTime, in: ...Date.now, displayedComponents: [.date, .hourAndMinute])
                         if session?.isComplete == true { DatePicker("Ended", selection: $endTime, in: ...Date.now, displayedComponents: [.date, .hourAndMinute]) }
@@ -37,20 +38,21 @@ struct SessionEditorView: View {
                     Toggle("Duration is known", isOn: $durationKnown)
                     if isRecap { TextField("Minutes", text: $minutes).keyboardType(.numberPad) }
                 }
-                Section("Notes") {
+                Section(header: Text("Notes").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     TextField("How are you feeling?", text: $notes, axis: .vertical).lineLimit(3...6)
                 }
                 if session == nil {
-                    Section { Text("Everything saves on your device. You can resume this session anytime.").foregroundStyle(.secondary) }
+                    Section { Text("Everything saves on your device. You can resume this session anytime.").foregroundStyle(ClimbTheme.secondaryText) }
                 }
             }
+            .id(textSize)
             .navigationTitle(session == nil ? (isRecap ? "Past session recap" : "New session") : "Edit session")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel", systemImage: "xmark") { dismiss() }.accessibleToolbarAction() }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(session == nil ? (isRecap ? "Create recap" : "Start") : "Save", action: submit).fontWeight(.semibold)
-                        .accessibilityIdentifier("saveSession")
+                    Button(session == nil ? (isRecap ? "Create recap" : "Start") : "Save", systemImage: session == nil ? "play.fill" : "checkmark", action: submit).fontWeight(.semibold)
+                        .accessibleToolbarAction().accessibilityIdentifier("saveSession")
                 }
             }
             .onAppear {

@@ -35,7 +35,7 @@ struct ProjectsView: View {
                                 if let photo = climb.media.first(where: { $0.kind == .photo }) { RouteThumbnail(data: photo.data,annotationJSON:photo.annotationJSON) }
                                 Text(climb.title).font(.title3.bold())
                                 Text("\(climb.descriptor.label) · \(climb.gymName)").font(.subheadline)
-                                Text("\(climb.attempts.count) recorded attempts · \(climb.projectStatus.capitalized)").font(.caption).foregroundStyle(.secondary)
+                                Text("\(climb.attempts.count) recorded attempts · \(climb.projectStatus.capitalized)").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                             }
                         }
                     }.buttonStyle(.plain)
@@ -86,7 +86,7 @@ struct ProjectDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
                 if let photo = climb.media.first(where: { $0.kind == .photo }) { RouteThumbnail(data: photo.data,annotationJSON:photo.annotationJSON) }
                 Text(climb.descriptor.label).font(.title.bold())
-                Text(climb.gymName).foregroundStyle(.secondary)
+                Text(climb.gymName).foregroundStyle(ClimbTheme.secondaryText)
                 Text(climb.isSent ? "Completion observed in recorded attempts" : (climb.prior == .sent ? "Historical completion declared before the journal" : "No recorded completion"))
                 if !climb.notes.isEmpty { Surface { Text(climb.notes) } }
                 ForEach(climb.media) { media in
@@ -103,11 +103,11 @@ struct ProjectDetailView: View {
                     Button("Archive") { _ = store.setProject(climb, status: "archived") }
                     Button("Remove project status") { _ = store.setProject(climb, status: "") }
                 }
-                Text("Removing status keeps the climb, notebook, and history. A recorded or declared completion appears in Sent; repeating it keeps this same climb.").font(.caption).foregroundStyle(.secondary)
+                Text("Removing status keeps the climb, notebook, and history. A recorded or declared completion appears in Sent; repeating it keeps this same climb.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                 HStack { Text("Private notebook").font(.title2.bold()); Spacer(); Button("Add note") { notebookEditor=NotebookDestination(note:nil) }.frame(minHeight: 44) }
                 ForEach(climb.notebook.sorted { $0.createdAt > $1.createdAt }) { note in
                     Button { notebookEditor=NotebookDestination(note:note) } label: {
-                        Surface { VStack(alignment: .leading) { if climb.pinnedNoteID == note.id { Label("Pinned next move",systemImage:"pin.fill").font(.caption.bold()) };Text(note.text); Text(note.updatedAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(.secondary) } }
+                        Surface { VStack(alignment: .leading) { if climb.pinnedNoteID == note.id { Label("Pinned next move",systemImage:"pin.fill").font(.caption.bold()) };Text(note.text); Text(note.updatedAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(ClimbTheme.secondaryText) } }
                     }.buttonStyle(.plain).accessibilityIdentifier("editNotebookNote")
                 }
                 if let firstSend = climb.orderedAttempts.firstIndex(where: \.sent) {
