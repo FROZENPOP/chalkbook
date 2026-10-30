@@ -40,6 +40,21 @@ struct SocialProfileEditor: View {
                     Toggle("Private account", isOn: $isPrivate)
                     Text("A private account limits Public entries to approved friends. Private entries are always yours alone. Friendship always requires acceptance.").font(.caption)
                 }
+                if social.me != nil {
+                    Section("Friend discovery") {
+                        if social.suggestions.discoveryEnabled != nil {
+                            Toggle("Let friends of friends find me",isOn:Binding(get:{ social.suggestions.discoveryEnabled ?? true },set:{ value in
+                                Task { await social.suggestions.setDiscovery(value,service:SocialSuggestionService(store:social,auth:auth)) }
+                            })).disabled(social.suggestions.savingSetting)
+                        }
+                        Text("Your profile may be suggested to climbers with mutual friends. Turn off to stop appearing in suggestions. Changes save immediately.").font(.caption)
+                        if social.suggestions.savingSetting { SwiftUI.ProgressView("Saving discovery setting…") }
+                        if let error=social.suggestions.settingError {
+                            Text(error).foregroundStyle(.red)
+                            Button("Retry discovery setting") { Task { await social.suggestions.loadDiscovery(SocialSuggestionService(store:social,auth:auth)) } }
+                        }
+                    }
+                }
                 if let message = social.errorMessage { Text(message).foregroundStyle(.red) }
                 Button("Save social profile") {
                     Task { if await social.saveProfile(auth, username: username, name: name, isPrivate: isPrivate,bio:bio,photo:photo) { dismiss() } }
@@ -54,7 +69,10 @@ struct SocialProfileEditor: View {
             }.navigationTitle(social.me == nil ? "Join Friends" : "Social profile")
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
                 .onAppear { if !initialized { username = social.me?.username ?? ""; name = social.me?.display_name ?? profiles.profile?.name ?? ""; isPrivate = social.me?.is_private ?? true;initialized=true } }
-                .task { if !ready { await loadDetails() } }
+                .task {
+                    if !ready { await loadDetails() }
+                    if social.me != nil { await social.suggestions.loadDiscovery(SocialSuggestionService(store:social,auth:auth)) }
+                }
                 .onChange(of:selection) { _,value in if value != nil { importing=true } }
                 .task(id:selection) {
                     guard let selection else { return }
