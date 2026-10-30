@@ -39,6 +39,15 @@ struct FriendsView: View {
                     }
                 } else {
                     header
+                    if !requests.isEmpty {
+                        Button { section = .requests } label: {
+                            Label("\(requests.count) pending \(requests.count == 1 ? "request" : "requests")",systemImage:"person.crop.circle.badge.clock")
+                        }.frame(minHeight:44).accessibilityLabel("View \(requests.count) pending friend requests")
+                    }
+                    if let viewer=social.userID {
+                        SuggestedFriendsSection(state:social.suggestions,service:SocialSuggestionService(store:social,auth:auth),
+                            excluded:Set(social.friendships.map { $0.other(than:viewer) }),blocked:Set(social.blocks.map(\.id)),viewer:viewer)
+                    }
                     Picker("Friends section", selection: $section) {
                         ForEach(FriendsSection.allCases, id: \.self) { item in
                             Text(item == .requests && !requests.isEmpty ? "Requests (\(requests.count))" : item.rawValue).tag(item)
@@ -135,7 +144,13 @@ struct FriendsView: View {
     }
 
     private func person(_ id: UUID) -> SocialProfile? { social.people.first { $0.id == id } }
-    private func refresh() async { if social.configuration != nil && auth.account != nil { await social.refresh(auth) } }
+    private func refresh() async {
+        guard social.configuration != nil, auth.account != nil else { social.suggestions.reset(); return }
+        await social.refresh(auth)
+        guard social.errorMessage == nil, let viewer=social.userID, social.me != nil else { social.suggestions.reset(); return }
+        await social.suggestions.load(SocialSuggestionService(store:social,auth:auth),owner:viewer,
+            excluding:Set(social.friendships.map { $0.other(than:viewer) } + social.blocks.map(\.id)))
+    }
 }
 
 struct FriendInitials: View {

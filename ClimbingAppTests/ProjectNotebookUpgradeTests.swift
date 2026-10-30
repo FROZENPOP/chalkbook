@@ -3,6 +3,32 @@ import SwiftData
 @testable import ClimbingApp
 
 @MainActor final class ProjectNotebookUpgradeTests:XCTestCase {
+    func testEmptyProjectsOffersCreationEvenWithOrdinaryClimbs() {
+        XCTAssertEqual(ProjectListState(climbs: [], filter: "active").emptyAction, .addProject)
+        let ordinary = ClimbEntry(prior: .sent)
+        XCTAssertEqual(ProjectListState(climbs: [ordinary], filter: "sent").emptyAction, .addProject)
+        XCTAssertTrue(ProjectListState(climbs: [ordinary], filter: "all").projects.isEmpty)
+    }
+
+    func testEmptyFilterOffersAllAndRetainsSavedProjects() {
+        let active = ClimbEntry(), archived = ClimbEntry(), ordinary = ClimbEntry()
+        active.projectRaw = "active"; archived.projectRaw = "archived"
+        let climbs = [active, archived, ordinary]
+        XCTAssertEqual(ProjectListState(climbs: climbs, filter: "sent").emptyAction, .showAll)
+        let all = ProjectListState(climbs: climbs, filter: "all")
+        XCTAssertNil(all.emptyAction)
+        XCTAssertEqual(Set(all.projects.map(\.id)), Set([active.id, archived.id]))
+        XCTAssertEqual(active.projectRaw, "active"); XCTAssertEqual(archived.projectRaw, "archived")
+    }
+
+    func testHistoricallySentProjectUsesEffectiveStatusForEmptyState() {
+        let sent = ClimbEntry(prior: .sent); sent.projectRaw = "active"
+        XCTAssertEqual(ProjectListState(climbs: [sent], filter: "active").emptyAction, .showAll)
+        let matching = ProjectListState(climbs: [sent], filter: "sent")
+        XCTAssertNil(matching.emptyAction)
+        XCTAssertEqual(matching.projects.map(\.id), [sent.id])
+    }
+
     func testV5DiskMigrationPreservesPhotoAndNotebookWithEmptyNewFields() throws {
         let root=FileManager.default.temporaryDirectory.appending(path:UUID().uuidString)
         try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true)
@@ -35,7 +61,7 @@ import SwiftData
         climb.notebook=[note];climb.pinnedNoteID=note.id;climb.media=[media]
         container.mainContext.insert(climb);try container.mainContext.save()
         let backup=try ClimbingBackup(sessions:[],defaultScale:.vScale,climbs:[climb]).validated()
-        XCTAssertEqual(backup.version,5)
+        XCTAssertEqual(backup.version,6)
         XCTAssertTrue(store.restore(backup))
         let restored=try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<ClimbEntry>()).first)
         XCTAssertEqual(restored.pinnedNote?.text,"Left foot high")

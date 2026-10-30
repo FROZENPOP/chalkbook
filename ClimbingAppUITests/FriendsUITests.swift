@@ -30,6 +30,35 @@ final class FriendsUITests: XCTestCase {
         XCTAssertFalse(app.buttons["retryFriendsFeed"].exists)
         let shot=XCTAttachment(screenshot:app.screenshot());shot.name="Empty feed at accessibility text size";shot.lifetime = .keepAlways;add(shot)
     }
+    @MainActor func testSuggestedFriendsAddDismissAndInlineRetryAtLargeText() {
+        continueAfterFailure=false
+        let app=XCUIApplication()
+        app.launchArguments=["--ui-testing","--reset-test-data","--test-friend-suggestions","--test-suggestion-error","-UIPreferredContentSizeCategoryName","UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch();XCTAssertTrue(app.tabBars.buttons["Friends"].waitForExistence(timeout:15));app.tabBars.buttons["Friends"].tap()
+        let addButton=app.buttons["suggestionAdd-00000000-0000-0000-0000-000000000003"]
+        func reveal(_ element:XCUIElement) {
+            for _ in 0..<12 { if element.isHittable { return };app.swipeUp() }
+        }
+        reveal(addButton);XCTAssertTrue(addButton.waitForExistence(timeout:10),app.debugDescription);addButton.tap()
+        let retry=app.buttons["Retry for Alex Boulder"]
+        XCTAssertTrue(retry.waitForExistence(timeout:10));reveal(retry);retry.tap()
+        let sent=NSPredicate(format:"label == %@","Request sent to Alex Boulder")
+        expectation(for:sent,evaluatedWith:addButton);waitForExpectations(timeout:10)
+        XCTAssertFalse(addButton.isEnabled)
+        XCTAssertGreaterThanOrEqual(addButton.frame.height,44)
+        XCTAssertLessThan(addButton.frame.height,140,"Sent must stay readable rather than wrapping letter by letter")
+        let dismiss=app.buttons["suggestionDismiss-00000000-0000-0000-0000-000000000004"]
+        reveal(dismiss);dismiss.tap()
+        let removed=NSPredicate(format:"exists == false")
+        expectation(for:removed,evaluatedWith:dismiss);waitForExpectations(timeout:10)
+        let shot=XCTAttachment(screenshot:app.screenshot());shot.name="Suggested friends at large text";shot.lifetime = .keepAlways;add(shot)
+    }
+    @MainActor func testEmptySuggestionsHaveNoSection() {
+        let app=XCUIApplication();app.launchArguments=["--ui-testing","--reset-test-data","--test-friend-suggestions","--test-empty-suggestions"]
+        app.launch();XCTAssertTrue(app.tabBars.buttons["Friends"].waitForExistence(timeout:15));app.tabBars.buttons["Friends"].tap()
+        XCTAssertTrue(app.staticTexts["Activity"].waitForExistence(timeout:10))
+        XCTAssertFalse(app.staticTexts["Suggested friends"].exists)
+    }
 
     @MainActor func testSearchInputClearAndRetryAtLargeText() {
         continueAfterFailure = false

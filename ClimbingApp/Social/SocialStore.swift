@@ -13,6 +13,8 @@ final class SocialStore {
     var entries: [SharedSession] { feed.entries }
     private(set) var blocks: [ClimberBlock] = []
     private(set) var busy = false
+    let suggestions = FriendSuggestions()
+    private(set) var mediaRevision = 0
     var errorMessage: String?
     let configuration: SupabaseConfiguration?
     private var accessToken: String?
@@ -67,7 +69,7 @@ final class SocialStore {
     @discardableResult
     func perform(_ auth: AccountSession, operation: () async throws -> Void) async -> Bool {
         guard !busy else { return false }
-        busy = true; defer { busy = false }
+        busy = true; defer { busy = false; mediaRevision += 1 }
         do {
             try await authorize(auth)
             try await operation()
@@ -95,6 +97,9 @@ final class SocialStore {
             let batch = ids[start..<min(start + 50, ids.count)].map(\.uuidString).joined(separator: ",")
             let rows = try JSONDecoder().decode([SocialProfile].self, from: await request("/rest/v1/climber_profiles?id=in.(\(batch))&select=*"))
             profiles += rows.filter { row in !profiles.contains { $0.id == row.id } }
+        }
+        if Set(friendships.filter { $0.status == "accepted" }.map(\.id)) != Set(links.filter { $0.status == "accepted" }.map(\.id)) || Set(blocks.map(\.id)) != Set(blocked.map(\.id)) {
+            suggestions.reset() // Mutual-name evidence may have changed; discard stale recommendations.
         }
         peopleRecords = profiles; friendships = links; me = own.first; blocks = blocked
         // First and subsequent pages use the same RLS-protected reader. No offset or privileged RPC.
@@ -127,18 +132,32 @@ final class SocialStore {
         }
     }
 
-    func action(_ auth: AccountSession, target: UUID, action: String) async {
+    @discardableResult
+    func action(_ auth: AccountSession, target: UUID, action: String) async -> Bool {
         await perform(auth) {
             _ = try await self.request("/rest/v1/rpc/friend_action", method: "POST", values: ["target": target.uuidString, "action": action])
             try await self.reload()
         }
     }
 
-    func publish(_ auth: AccountSession, entry: SharedSession) async -> Bool {
+    func publish(_ auth: AccountSession, entry: SharedSession, photos: [SharedRoutePhoto]? = nil) async -> Bool {
         await perform(auth) {
-            _ = try await self.request("/rest/v1/rpc/save_shared_session", method: "POST", values: entry.rpcValues)
+            var values = entry.rpcValues
+            if let photos {
+                guard photos.count <= 3 else { throw SocialError.server }
+                values["photos"] = try photos.map { try $0.validated().rpcValues }
+            }
+            _ = try await self.request(photos == nil ? "/rest/v1/rpc/save_shared_session" : "/rest/v1/rpc/save_shared_session_with_photos", method: "POST", values: values)
             try await self.reload()
         }
+    }
+
+    func routePhotos(_ auth: AccountSession, entryID: UUID) async throws -> [SharedRoutePhoto] {
+        try await authorize(auth)
+        let data = try await request("/rest/v1/shared_route_photos?entry_id=eq.\(entryID.uuidString)&select=id,entry_id,original_base64,highlighted_base64&order=position&limit=3")
+        try Task.checkCancellation()
+        let photos = try JSONDecoder().decode([SharedRoutePhoto].self, from:data)
+        return try photos.map { try $0.validated() }
     }
 
     func removeShare(_ auth: AccountSession, sessionID: UUID) async -> Bool {
@@ -150,7 +169,8 @@ final class SocialStore {
 
     @discardableResult
     func safetyAction(_ auth: AccountSession, target: UUID, block: Bool, reason: String = "") async -> Bool {
-        await perform(auth) {
+        if block { suggestions.reset() }
+        return await perform(auth) {
             _ = try await self.request("/rest/v1/rpc/\(block ? "block_climber" : "report_climber")", method: "POST", values: block ? ["target": target.uuidString] : ["target": target.uuidString, "reason": reason])
             try await self.reload()
         }
@@ -164,9 +184,10 @@ final class SocialStore {
     }
 
     func deleteProfile(_ auth: AccountSession) async -> Bool {
-        await perform(auth) {
+        suggestions.reset()
+        return await perform(auth) {
             _ = try await self.request("/rest/v1/rpc/delete_social_profile", method: "POST", values: [:])
-            self.me = nil; self.feed.reset(); self.friendships = []; self.peopleRecords = []; self.blocks = []
+            self.suggestions.reset(); self.me = nil; self.feed.reset(); self.friendships = []; self.peopleRecords = []; self.blocks = []
         }
     }
 

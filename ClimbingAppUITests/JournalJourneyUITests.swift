@@ -19,6 +19,30 @@ final class JournalJourneyUITests: XCTestCase {
     @MainActor private func start(_ app: XCUIApplication) {
         tap(app,"startSession"); tap(app,"saveSession"); tap(app,"resumeSession")
     }
+    @MainActor func testProjectsEmptyStateCreatesAndRecoversFilteredProjectAtLargeText() {
+        let app = launch(largeText: true)
+        app.tabBars.buttons["Projects"].tap()
+        XCTAssertTrue(app.staticTexts["Save your first project"].waitForExistence(timeout: 5))
+        tap(app, "projectsEmptyAction")
+        XCTAssertTrue(app.navigationBars["Add climb"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons["Cancel"].tap()
+        XCTAssertTrue(app.staticTexts["Save your first project"].waitForExistence(timeout: 5))
+        tap(app, "projectsEmptyAction")
+        XCTAssertTrue(app.navigationBars["Add climb"].waitForExistence(timeout: 5))
+        tap(app, "saveClimb")
+        XCTAssertTrue(app.staticTexts["Boulder"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["projectsEmptyAction"].exists)
+        app.buttons["projectStatusFilter"].tap(); app.buttons["Sent"].tap()
+        XCTAssertTrue(app.staticTexts["No projects in this filter"].waitForExistence(timeout: 5))
+        tap(app, "projectsEmptyAction")
+        XCTAssertTrue(app.staticTexts["Boulder"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["projectsEmptyAction"].exists)
+        app.terminate(); app.launchArguments = ["--ui-testing"]; app.launch()
+        app.tabBars.buttons["Projects"].tap()
+        XCTAssertTrue(app.staticTexts["Boulder"].waitForExistence(timeout: 5))
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "Project created from empty state"; shot.lifetime = .keepAlways; add(shot)
+    }
+
     @MainActor func testUnnamedClimbDefaultsToUnknownDifficulty() {
         let app = launch()
         start(app); tap(app,"addClimb")

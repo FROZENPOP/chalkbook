@@ -155,6 +155,10 @@ struct AppRoot: View {
         // Isolated Debug social UI fixtures for accessibility tests; never contact live accounts.
         if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-friend-feed") {
             FriendsFeedFixtureView()
+        } else if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-friend-suggestions") {
+            SuggestedFriendsFixtureView()
+        } else if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-shared-route-photo") {
+            SharedRoutePhotoFixtureView()
         } else if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-friend-search") {
             AddFriendsView()
         } else { FriendsView() }
