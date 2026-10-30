@@ -16,7 +16,7 @@ struct FriendsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            LazyVStack(alignment: .leading, spacing: 24) {
                 if social.configuration == nil {
                     EmptyState(title: "Friends is coming next", symbol: "person.2", message: "Supabase setup is pending. Your journal stays private and works offline.")
                 } else if auth.account == nil {
@@ -107,13 +107,7 @@ struct FriendsView: View {
     @ViewBuilder private var sectionContent: some View {
         switch section {
         case .activity:
-            let shared = social.entries.filter { $0.owner_id != social.userID }
-            if shared.isEmpty {
-                FriendsEmptyCard(symbol: "figure.climbing", title: "A little encouragement goes a long way.", message: "Shared sessions from your friends will appear here. Find a climbing buddy to get started.") {
-                    Button("Add friends", systemImage: "person.badge.plus") { finding = true }.buttonStyle(.borderedProminent)
-                }
-            }
-            ForEach(shared) { entry in
+            FriendsFeedContent(feed:social.feed,refreshing:social.busy,next:{ await social.loadNextFeed(auth) },findFriends:{ finding=true }) { entry in
                 Surface {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack(spacing: 12) {
@@ -127,7 +121,6 @@ struct FriendsView: View {
                     }
                 }
             }
-            if !shared.isEmpty { Text("Only sessions shared with you appear here, not anyone’s complete journal.").font(.caption).foregroundStyle(.secondary) }
         case .friends:
             if friends.isEmpty {
                 FriendsEmptyCard(symbol: "person.2", title: "Your next climbing buddy is out there.", message: "Search their username and send a request. Once they accept, you’re friends.") {

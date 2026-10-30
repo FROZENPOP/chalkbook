@@ -146,7 +146,7 @@ struct FriendProgressView: View {
     var body: some View {
         List {
             Section("Shared progress") {
-                Text("\(entries.count) shared sessions in the current feed (up to 200 entries). This is not their complete climbing history.")
+                Text("\(entries.count) shared sessions in the currently loaded feed pages. This is not their complete climbing history.")
                 Text("\(entries.compactMap(\.attempts).reduce(0,+)) attempts across \(entries.filter { $0.attempts != nil }.count) entries with attempt totals")
                 Text("\(entries.compactMap(\.sends).reduce(0,+)) sends across \(entries.filter { $0.sends != nil }.count) entries with send totals")
                 Text("Missing values are excluded. No grades or flash rates are inferred.").font(.caption).foregroundStyle(.secondary)
