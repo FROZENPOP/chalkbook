@@ -118,17 +118,9 @@ struct SessionDetailView: View {
         .sheet(isPresented: $sharing) { ShareSessionView(session: session) }
         .confirmationDialog("Delete this session and its recorded activity?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete session", role: .destructive) {
-                Task {
-                    // Remove any published snapshot first. On network failure retain the local session for retry.
-                    if social.configuration != nil && auth.account != nil {
-                        guard await social.removeShare(auth, sessionID: session.id) else {
-                            store.errorMessage = social.errorMessage; return
-                        }
-                    }
-                    if store.delete(session) { dismiss() }
-                }
+                if social.deleteSession(session, store: store, auth: auth) { dismiss() }
             }
-        } message: { Text("Its attempts, recalled entries, and any shared recap will be removed. Removing a shared recap needs a connection. Climbs, projects, notebooks, media, and other sessions stay in your journal.") }
+        } message: { Text("Its attempts, recalled entries, and any shared recap will be removed. Shared recap removal is queued safely on this device. Friends may still see it until it syncs. Climbs, projects, notebooks, media, and other sessions stay in your journal.") }
     }
 }
 

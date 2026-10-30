@@ -17,6 +17,9 @@ struct FriendsView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
+                if social.configuration != nil, auth.account != nil {
+                    RemovalStatusView(outbox: social.removals) { await social.retryRemovals(auth, force: true) }
+                }
                 if social.configuration == nil {
                     EmptyState(title: "Friends is coming next", symbol: "person.2", message: "Supabase setup is pending. Your journal stays private and works offline.")
                 } else if auth.account == nil {

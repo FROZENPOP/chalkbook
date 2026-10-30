@@ -63,7 +63,7 @@ struct SocialProfileEditor: View {
                 if social.me != nil {
                     Section {
                         Button("Delete social profile", role: .destructive) { confirmDelete = true }.disabled(social.busy)
-                        Text("Removes your friend connections, requests and shared entries. Your private local journal and Google account are preserved.").font(.caption)
+                        Text("Removes your friend connections, requests and shared entries. If offline, removal waits to sync and friends may still see them until then. Your private local journal and Google account are preserved.").font(.caption)
                     }
                 }
             }.navigationTitle(social.me == nil ? "Join Friends" : "Social profile")

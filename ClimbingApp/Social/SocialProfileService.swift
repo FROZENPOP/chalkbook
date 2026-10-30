@@ -7,7 +7,7 @@ extension SocialStore {
         guard let profile=profiles.first else { throw SocialError.server }
         let details=try await profileDetails(auth,id:id)
         let entries=try JSONDecoder().decode([SharedSession].self,from:await request("/rest/v1/shared_sessions?owner_id=eq.\(id.uuidString)&select=*&order=session_day.desc&limit=200"))
-        return SocialProfilePage(profile:profile,details:details,entries:entries)
+        return SocialProfilePage(profile:profile,details:details,entries:entries.filter { !removals.hides($0) })
     }
 
     func profileDetails(_ auth:AccountSession,id:UUID) async throws -> SocialProfileDetails? {

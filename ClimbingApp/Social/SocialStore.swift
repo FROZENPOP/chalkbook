@@ -9,7 +9,8 @@ final class SocialStore {
     private var peopleRecords: [SocialProfile] = []
     var people: [SocialProfile] { peopleRecords + feed.profiles.filter { profile in !peopleRecords.contains { $0.id == profile.id } } }
     private(set) var friendships: [Friendship] = []
-    let feed = FriendsFeed()
+    let feed: FriendsFeed
+    let removals: RemovalOutbox
     var entries: [SharedSession] { feed.entries }
     private(set) var blocks: [ClimberBlock] = []
     private(set) var busy = false
@@ -20,9 +21,18 @@ final class SocialStore {
     private var accessToken: String?
     private var expiresAt = Date.distantPast
     private let network: URLSession
+    private let accountKey: String
+    private let identityToken: (AccountSession) async throws -> String
+    private weak var authorizedSession: AccountSession?
+    private var retryScheduled = false
 
-    init(configuration: SupabaseConfiguration? = .load(), network: URLSession = URLSession(configuration: .ephemeral)) {
-        self.configuration = configuration; self.network = network
+    init(configuration: SupabaseConfiguration? = .load(), network: URLSession = URLSession(configuration: .ephemeral),
+         accountKey: String = "guest", removals: RemovalOutbox? = nil,
+         identityToken: @escaping (AccountSession) async throws -> String = { try await $0.googleIdentityTokenForFriends() }) {
+        self.configuration = configuration; self.network = network; self.accountKey = accountKey; self.identityToken = identityToken
+        let outbox = removals ?? RemovalOutbox(accountKey: accountKey)
+        self.removals = outbox
+        self.feed = FriendsFeed(isHidden: { outbox.hides($0) })
     }
 
     private struct TokenResponse: Decodable {
@@ -41,7 +51,7 @@ final class SocialStore {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.cachePolicy = .reloadIgnoringLocalCacheData
         if authenticated {
-            guard let accessToken else { throw SocialError.signIn }
+            guard let accessToken, authorizedSession?.account?.storageKey == accountKey else { throw SocialError.signIn }
             request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         }
         if let values { request.httpBody = try JSONSerialization.data(withJSONObject: values) }
@@ -49,27 +59,34 @@ final class SocialStore {
         guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
             let code = (try? JSONSerialization.jsonObject(with:data) as? [String:Any])?["code"] as? String
             if ["PGRST202","PGRST205","42P01"].contains(code ?? "") { throw SocialError.migrationNeeded }
-            throw SocialError.server
+            throw RemovalHTTPError(status: (response as? HTTPURLResponse)?.statusCode ?? 0,
+                                   missingContent: (response as? HTTPURLResponse)?.statusCode == 410 ||
+                                   ((response as? HTTPURLResponse)?.statusCode == 404 && code == "PGRST116"))
         }
+        if authenticated { scheduleRemovals() }
         return data
     }
 
     func authorize(_ auth: AccountSession) async throws {
         guard configuration != nil else { throw SocialError.setup }
-        guard auth.account != nil else { throw SocialError.signIn }
-        if accessToken != nil && expiresAt > .now { return }
-        let token = try await auth.googleIdentityTokenForFriends()
+        guard let current = auth.account, current.storageKey == accountKey else { throw SocialError.signIn }
+        authorizedSession = auth
+        if accessToken != nil && expiresAt > .now { scheduleRemovals(); return }
+        let token = try await identityToken(auth)
         let data = try await request("/auth/v1/token?grant_type=id_token", method: "POST", values: ["provider": "google", "id_token": token], authenticated: false)
         let session = try JSONDecoder().decode(TokenResponse.self, from: data)
+        guard auth.account == current else { throw SocialError.signIn }
+        try removals.bind(owner: session.user.id, accountKey: current.storageKey)
         // Tokens stay in memory. Google’s existing Keychain session supplies a fresh verified identity after relaunch.
         accessToken = session.access_token; userID = session.user.id
         expiresAt = .now.addingTimeInterval(TimeInterval(max(0, session.expires_in - 60)))
+        scheduleRemovals()
     }
 
     @discardableResult
     func perform(_ auth: AccountSession, operation: () async throws -> Void) async -> Bool {
         guard !busy else { return false }
-        busy = true; defer { busy = false; mediaRevision += 1 }
+        busy = true; defer { busy = false; mediaRevision += 1; scheduleRemovals(auth) }
         do {
             try await authorize(auth)
             try await operation()
@@ -101,7 +118,7 @@ final class SocialStore {
         if Set(friendships.filter { $0.status == "accepted" }.map(\.id)) != Set(links.filter { $0.status == "accepted" }.map(\.id)) || Set(blocks.map(\.id)) != Set(blocked.map(\.id)) {
             suggestions.reset() // Mutual-name evidence may have changed; discard stale recommendations.
         }
-        peopleRecords = profiles; friendships = links; me = own.first; blocks = blocked
+        peopleRecords = profiles; friendships = removals.removingProfile ? [] : links; me = removals.removingProfile ? nil : own.first; blocks = blocked
         // First and subsequent pages use the same RLS-protected reader. No offset or privileged RPC.
         await feed.loadNext(SocialFeedReader(store:self))
     }
@@ -121,6 +138,7 @@ final class SocialStore {
     }
 
     func saveProfile(_ auth: AccountSession, username: String, name: String, isPrivate: Bool, bio: String = "", photo: Data? = nil) async -> Bool {
+        guard !removals.removingProfile else { errorMessage = "Your profile removal is waiting to sync. Retry removals before creating another profile."; return false }
         let username = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard username.range(of: "^[a-z0-9_]{3,24}$", options: .regularExpression) != nil, (1...60).contains(name.count),bio.count<=240,(photo?.count ?? 0)<=65_536 else {
@@ -141,7 +159,12 @@ final class SocialStore {
     }
 
     func publish(_ auth: AccountSession, entry: SharedSession, photos: [SharedRoutePhoto]? = nil) async -> Bool {
-        await perform(auth) {
+        guard !removals.contains(sessionID: entry.source_session_id) else {
+            errorMessage = "This entry is waiting to be removed. Retry removals before publishing it again."
+            return false
+        }
+        return await perform(auth) {
+            guard !self.removals.contains(sessionID: entry.source_session_id) else { throw SocialError.server }
             var values = entry.rpcValues
             if let photos {
                 guard photos.count <= 3 else { throw SocialError.server }
@@ -160,10 +183,73 @@ final class SocialStore {
         return try photos.map { try $0.validated() }
     }
 
+    /// A true result means the intent is safely saved locally, not that friends have lost access yet.
     func removeShare(_ auth: AccountSession, sessionID: UUID) async -> Bool {
-        await perform(auth) {
-            _ = try await self.request("/rest/v1/rpc/remove_shared_session", method: "POST", values: ["source_id": sessionID.uuidString])
-            self.feed.remove { $0.owner_id == self.userID && $0.source_session_id == sessionID }
+        guard queueRemoval(auth, contentID: sessionID, kind: .sessionSnapshot) else { return false }
+        scheduleRemovals(auth)
+        return true
+    }
+
+    func deleteSession(_ session: ClimbingSession, store: ClimbingStore, auth: AccountSession) -> Bool {
+        if configuration != nil, auth.account != nil {
+            guard queueRemoval(auth, contentID: session.id, kind: .sessionSnapshot) else {
+                store.errorMessage = errorMessage; return false
+            }
+        }
+        let deleted = store.delete(session)
+        if deleted { scheduleRemovals(auth) }
+        return deleted
+    }
+
+    private func queueRemoval(_ auth: AccountSession, contentID: UUID, kind: PendingRemoval.Kind) -> Bool {
+        guard configuration != nil, auth.account?.storageKey == accountKey, removals.accountKey == accountKey, accountKey != "guest" else {
+            errorMessage = SocialError.signIn.localizedDescription; return false
+        }
+        do {
+            if removals.storageError != nil { removals.reload() }
+            try removals.enqueue(contentID: contentID, kind: kind)
+            feed.remove { removals.hides($0) }; mediaRevision += 1; errorMessage = nil
+            return true
+        } catch {
+            errorMessage = removals.storageError ?? "The removal couldn’t be saved. Your local data was kept."
+            return false
+        }
+    }
+
+    /// Called by app launch/foreground, verified sign-in, and successful authenticated requests.
+    private func scheduleRemovals(_ auth: AccountSession? = nil) {
+        guard !retryScheduled, !removals.entries.isEmpty, let auth = auth ?? authorizedSession,
+              auth.account?.storageKey == accountKey else { return }
+        retryScheduled = true
+        Task { [weak self, weak auth] in
+            guard let self else { return }
+            defer { self.retryScheduled = false }
+            if let auth { await self.retryRemovals(auth) }
+        }
+    }
+
+    func retryRemovals(_ auth: AccountSession, force: Bool = false) async {
+        // A pending publish/profile save finishes before the removal RPC, so late saves cannot resurrect content.
+        guard !busy, configuration != nil, auth.account?.storageKey == accountKey, !removals.draining else { return }
+        if force {
+            removals.reload()
+            // A previous 401 may have left an expired/revoked token cached in this process.
+            accessToken = nil; expiresAt = .distantPast
+        }
+        guard !removals.entries.isEmpty, removals.storageError == nil, removals.hasDue(force: force) else { return }
+        do {
+            try await authorize(auth)
+            await removals.retry(owner: userID, accountKey: auth.account?.storageKey, force: force) { removal in
+                // Check identity again immediately before each request; never reuse another account's token.
+                guard auth.account?.storageKey == self.accountKey, self.userID == removal.ownerID else { throw SocialError.signIn }
+                let path = removal.kind == .socialProfile ? "delete_social_profile" : "remove_shared_session"
+                _ = try await self.request("/rest/v1/rpc/\(path)", method: "POST",
+                    values: removal.kind == .socialProfile ? [:] : ["source_id": removal.contentID.uuidString])
+            }
+            mediaRevision += 1
+        } catch {
+            // Authorization/network failures also get durable backoff, even before an RPC could start.
+            removals.connectionFailed(accountKey: auth.account?.storageKey, error: error)
         }
     }
 
@@ -184,14 +270,14 @@ final class SocialStore {
     }
 
     func deleteProfile(_ auth: AccountSession) async -> Bool {
-        suggestions.reset()
-        return await perform(auth) {
-            _ = try await self.request("/rest/v1/rpc/delete_social_profile", method: "POST", values: [:])
-            self.suggestions.reset(); self.me = nil; self.feed.reset(); self.friendships = []; self.peopleRecords = []; self.blocks = []
-        }
+        guard queueRemoval(auth, contentID: removals.ownerID ?? UUID(), kind: .socialProfile) else { return false }
+        suggestions.reset(); me = nil; feed.reset(); friendships = []; peopleRecords = []; blocks = []
+        scheduleRemovals(auth)
+        return true
     }
 
     func sharedEntry(_ auth: AccountSession, session: ClimbingSession) async -> SharedSession? {
+        guard !removals.contains(sessionID: session.id) else { return nil }
         var result: SharedSession?
         let success = await perform(auth) {
             let rows = try JSONDecoder().decode([SharedSession].self, from: await self.request("/rest/v1/shared_sessions?owner_id=eq.\(self.userID!.uuidString)&source_session_id=eq.\(session.id.uuidString)&select=*"))

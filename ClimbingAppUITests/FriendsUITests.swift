@@ -1,6 +1,21 @@
 import XCTest
 
 final class FriendsUITests: XCTestCase {
+    @MainActor func testPendingRemovalIndicatorAndManualRetryAtLargeText() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-test-data", "--test-removal-outbox", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch(); XCTAssertTrue(app.tabBars.buttons["Friends"].waitForExistence(timeout: 15)); app.tabBars.buttons["Friends"].tap()
+        XCTAssertTrue(app.staticTexts["1 removal waiting to sync"].waitForExistence(timeout: 10))
+        let retry = app.buttons["retryRemovals"]
+        for _ in 0..<8 { if retry.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(retry.isHittable, app.debugDescription); XCTAssertGreaterThanOrEqual(retry.frame.height, 44)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "Pending removal at large text"; shot.lifetime = .keepAlways; add(shot)
+        retry.tap()
+        XCTAssertTrue(app.staticTexts["removalsSynced"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["retryRemovals"].exists)
+    }
+
     @MainActor func testFeedAutomaticallyPagesAndRetriesWithoutLosingFirstPage() {
         continueAfterFailure=false
         let app=XCUIApplication();app.launchArguments=["--ui-testing","--reset-test-data","--test-friend-feed","--test-feed-error"]
