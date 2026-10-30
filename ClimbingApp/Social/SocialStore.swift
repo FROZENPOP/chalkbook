@@ -12,6 +12,7 @@ final class SocialStore {
     private(set) var blocks: [ClimberBlock] = []
     private(set) var busy = false
     let suggestions = FriendSuggestions()
+    private(set) var mediaRevision = 0
     var errorMessage: String?
     let configuration: SupabaseConfiguration?
     private var accessToken: String?
@@ -66,7 +67,7 @@ final class SocialStore {
     @discardableResult
     func perform(_ auth: AccountSession, operation: () async throws -> Void) async -> Bool {
         guard !busy else { return false }
-        busy = true; defer { busy = false }
+        busy = true; defer { busy = false; mediaRevision += 1 }
         do {
             try await authorize(auth)
             try await operation()
@@ -130,11 +131,24 @@ final class SocialStore {
         }
     }
 
-    func publish(_ auth: AccountSession, entry: SharedSession) async -> Bool {
+    func publish(_ auth: AccountSession, entry: SharedSession, photos: [SharedRoutePhoto]? = nil) async -> Bool {
         await perform(auth) {
-            _ = try await self.request("/rest/v1/rpc/save_shared_session", method: "POST", values: entry.rpcValues)
+            var values = entry.rpcValues
+            if let photos {
+                guard photos.count <= 3 else { throw SocialError.server }
+                values["photos"] = try photos.map { try $0.validated().rpcValues }
+            }
+            _ = try await self.request(photos == nil ? "/rest/v1/rpc/save_shared_session" : "/rest/v1/rpc/save_shared_session_with_photos", method: "POST", values: values)
             try await self.reload()
         }
+    }
+
+    func routePhotos(_ auth: AccountSession, entryID: UUID) async throws -> [SharedRoutePhoto] {
+        try await authorize(auth)
+        let data = try await request("/rest/v1/shared_route_photos?entry_id=eq.\(entryID.uuidString)&select=id,entry_id,original_base64,highlighted_base64&order=position&limit=3")
+        try Task.checkCancellation()
+        let photos = try JSONDecoder().decode([SharedRoutePhoto].self, from:data)
+        return try photos.map { try $0.validated() }
     }
 
     func removeShare(_ auth: AccountSession, sessionID: UUID) async -> Bool {

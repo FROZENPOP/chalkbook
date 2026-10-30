@@ -1,12 +1,11 @@
 import Foundation
 
-struct RoutePoint: Codable, Equatable, Sendable { var x: Double; var y: Double }
 struct RouteStroke: Codable, Equatable, Sendable {
     var color: String
     var points: [RoutePoint]
 }
 struct RouteAnnotationDocument: Codable, Equatable, Sendable {
-    var version = 1
+    var version = 2
     var strokes: [RouteStroke]
     var highlight: HoldHighlightSettings?
 }
@@ -21,13 +20,15 @@ enum RouteAnnotations {
             return RouteAnnotationDocument(strokes: legacy, highlight: nil)
         }
         let value = try JSONDecoder().decode(RouteAnnotationDocument.self, from: data)
-        guard value.version == 1, value.highlight?.isValid != false else { throw BackupError.invalid("Invalid hold highlight settings.") }
+        guard (1...2).contains(value.version), value.highlight?.isValid != false else { throw BackupError.invalid("Invalid hold highlight settings.") }
         try validate(value.strokes)
         return value
     }
 
     static func encode(_ document: RouteAnnotationDocument) throws -> String {
-        let json = String(decoding: try JSONEncoder().encode(document), as: UTF8.self)
+        var current = document
+        current.version = 2
+        let json = String(decoding: try JSONEncoder().encode(current), as: UTF8.self)
         _ = try self.document(json)
         return json
     }

@@ -152,9 +152,11 @@ struct AppRoot: View {
 
     @ViewBuilder private var friendsRoot: some View {
         #if DEBUG
-        // Debug-only social UI fixtures for accessibility tests; never contact live accounts.
+        // Debug-only social UI fixtures; never contact live accounts.
         if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-friend-suggestions") {
             SuggestedFriendsFixtureView()
+        } else if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-shared-route-photo") {
+            SharedRoutePhotoFixtureView()
         } else if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-friend-search") {
             AddFriendsView()
         } else { FriendsView() }

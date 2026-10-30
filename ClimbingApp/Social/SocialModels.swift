@@ -66,6 +66,7 @@ struct SharedSession: Codable, Identifiable {
     var sends: Int?
     var duration_minutes: Int?
     var completeness: String
+    var route_photo_count: Int? = nil
 
     // Explicit allowlist: no local notes, gym, route media, exact times, or Health values.
     @MainActor
