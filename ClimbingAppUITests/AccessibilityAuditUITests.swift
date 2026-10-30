@@ -104,6 +104,38 @@ import XCTest
         return false
     }
 
+    func testJournalHeaderReflowsAtAccessibilityXXXL() {
+        let app = launch("home", darkLarge: true)
+        let brand = app.descendants(matching: .any)["journalBrand"].firstMatch
+        let date = app.staticTexts["journalDate"]
+        XCTAssertTrue(brand.exists)
+        XCTAssertTrue(date.exists)
+        XCTAssertGreaterThanOrEqual(date.frame.minY, brand.frame.maxY, "The date must sit below the brand at accessibility sizes, including SE width")
+        XCTAssertGreaterThanOrEqual(brand.frame.minX, app.frame.minX)
+        XCTAssertLessThanOrEqual(brand.frame.maxX, app.frame.maxX)
+        XCTAssertLessThanOrEqual(date.frame.maxX, app.frame.maxX)
+        app.terminate()
+    }
+
+    func testFeedEndWrapsAtAccessibilityXXXL() {
+        let regular = launch("feed")
+        audit(regular, "Feed footer regular text")
+        regular.terminate()
+        let app = launch("feed", darkLarge: true)
+        let end = app.descendants(matching: .any)["friendsFeedEnd"].firstMatch
+        let tabs = app.tabBars.firstMatch
+        for _ in 0..<12 {
+            if end.exists && end.frame.maxY <= tabs.frame.minY { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(end.exists)
+        XCTAssertGreaterThan(end.frame.height, 44, "The large-text footer must grow rather than compress its wrapped label")
+        XCTAssertGreaterThanOrEqual(end.frame.minX, app.frame.minX)
+        XCTAssertLessThanOrEqual(end.frame.maxX, app.frame.maxX)
+        XCTAssertLessThanOrEqual(end.frame.maxY, tabs.frame.minY, "The footer must be fully revealable above the tab bar on SE")
+        app.terminate()
+    }
+
     func testJournalBaselineAudit() {
         let app = launch("home"); audit(app, "Journal light"); app.terminate()
     }

@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct HomeView: View {
+    @Environment(\.dynamicTypeSize) private var textSize
     @Environment(ProfileStore.self) private var profiles
     @Query(sort: \ClimbingSession.day, order: .reverse) private var sessions: [ClimbingSession]
     @State private var pastRecap = false
@@ -11,11 +12,14 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                HStack {
+                let header = textSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout())
+                header {
                     Label("CLIMB LOG", systemImage: "figure.climbing")
                         .font(.caption.weight(.bold)).tracking(2).foregroundStyle(ClimbTheme.forest)
-                    Spacer()
+                        .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("journalBrand")
+                    if !textSize.isAccessibilitySize { Spacer() }
                     Text(Date.now, format: .dateTime.month(.abbreviated).day()).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
+                        .accessibilityIdentifier("journalDate")
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     Text(active == nil ? "Your next move." : "Keep climbing.")

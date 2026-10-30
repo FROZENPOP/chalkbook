@@ -19,7 +19,7 @@ def run(*args, capture=False):
                           stdout=subprocess.PIPE if capture else None).stdout
 
 
-def simulator(device):
+def simulator(device, fresh_boot=False):
     name, device_type = DEVICE_TYPES[device]
     runtimes = json.loads(run("xcrun", "simctl", "list", "runtimes", "--json", capture=True))["runtimes"]
     compatible = [runtime for runtime in runtimes if runtime["isAvailable"] and
@@ -34,6 +34,11 @@ def simulator(device):
         booted = existing["state"] == "Booted"
     else:
         identifier = run("xcrun", "simctl", "create", name, device_type, runtime["identifier"], capture=True).strip()
+        booted = False
+    # iOS accessibility probes can leave testmanagerd busy after a completed run.
+    # Isolate audit invocations with a clean boot, retaining all simulator data.
+    if booted and fresh_boot:
+        run("xcrun", "simctl", "shutdown", identifier)
         booted = False
     print(f"Using {name} / {runtime['name']} / {identifier}", flush=True)
     if not booted:
@@ -56,7 +61,7 @@ def main():
         run("xcrun", "simctl", "list", "runtimes")
         print("Requirements checked. Apple frameworks are bundled; pinned Google Sign-In dependencies resolved.")
         return
-    identifier = simulator(args.device)
+    identifier = simulator(args.device, fresh_boot=args.action == "audit")
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     build_dir = ROOT / "build"
     build_dir.mkdir(exist_ok=True)
