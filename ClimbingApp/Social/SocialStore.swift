@@ -6,9 +6,11 @@ import Observation
 final class SocialStore {
     private(set) var userID: UUID?
     private(set) var me: SocialProfile?
-    private(set) var people: [SocialProfile] = []
+    private var peopleRecords: [SocialProfile] = []
+    var people: [SocialProfile] { peopleRecords + feed.profiles.filter { profile in !peopleRecords.contains { $0.id == profile.id } } }
     private(set) var friendships: [Friendship] = []
-    private(set) var entries: [SharedSession] = []
+    let feed = FriendsFeed()
+    var entries: [SharedSession] { feed.entries }
     private(set) var blocks: [ClimberBlock] = []
     private(set) var busy = false
     var errorMessage: String?
@@ -73,20 +75,20 @@ final class SocialStore {
             return true
         } catch {
             accessToken = nil; expiresAt = .distantPast
-            entries = [] // Do not keep showing possibly revoked entries after a failed refresh.
+            feed.reset() // Do not keep showing possibly revoked entries after a failed refresh.
             errorMessage = (error as? SocialError)?.localizedDescription ?? SocialError.server.localizedDescription
             return false
         }
     }
 
     private func reload() async throws {
-        // Load into temporary values first so a failed refresh doesn't present partial results as current.
+        // Invalidate pending pages before refreshing relationships/visibility.
+        feed.reset()
         let links = try JSONDecoder().decode([Friendship].self, from: await request("/rest/v1/friendships?select=*"))
-        let shared = try JSONDecoder().decode([SharedSession].self, from: await request("/rest/v1/shared_sessions?select=*&order=session_day.desc&limit=200"))
         // Always retrieve own profile even if it falls outside the discovery page.
         let own = try JSONDecoder().decode([SocialProfile].self, from: await request("/rest/v1/climber_profiles?id=eq.\(userID!.uuidString)&select=*"))
         let blocked = try JSONDecoder().decode([ClimberBlock].self, from: await request("/rest/v1/climber_blocks?select=target_id"))
-        let ids = Set(links.flatMap { [$0.requester, $0.recipient] } + shared.map(\.owner_id)).sorted { $0.uuidString < $1.uuidString }
+        let ids = Set(links.flatMap { [$0.requester, $0.recipient] }).sorted { $0.uuidString < $1.uuidString }
         var profiles = own
         // Fetch people actually referenced in the feed/requests. Discovery uses a separate server search.
         for start in stride(from: 0, to: ids.count, by: 50) {
@@ -94,10 +96,17 @@ final class SocialStore {
             let rows = try JSONDecoder().decode([SocialProfile].self, from: await request("/rest/v1/climber_profiles?id=in.(\(batch))&select=*"))
             profiles += rows.filter { row in !profiles.contains { $0.id == row.id } }
         }
-        people = profiles; friendships = links; entries = shared; me = own.first; blocks = blocked
+        peopleRecords = profiles; friendships = links; me = own.first; blocks = blocked
+        // First and subsequent pages use the same RLS-protected reader. No offset or privileged RPC.
+        await feed.loadNext(SocialFeedReader(store:self))
     }
 
     func refresh(_ auth: AccountSession) async { await perform(auth) { try await self.reload() } }
+
+    func loadNextFeed(_ auth: AccountSession) async {
+        guard !busy, configuration != nil, auth.account != nil else { return }
+        await feed.loadNext(SocialFeedReader(store:self,auth:auth))
+    }
 
     func searchProfiles(_ auth: AccountSession, query: FriendSearchQuery) async throws -> [SocialProfile] {
         try await authorize(auth)
@@ -135,7 +144,7 @@ final class SocialStore {
     func removeShare(_ auth: AccountSession, sessionID: UUID) async -> Bool {
         await perform(auth) {
             _ = try await self.request("/rest/v1/rpc/remove_shared_session", method: "POST", values: ["source_id": sessionID.uuidString])
-            self.entries.removeAll { $0.owner_id == self.userID && $0.source_session_id == sessionID }
+            self.feed.remove { $0.owner_id == self.userID && $0.source_session_id == sessionID }
         }
     }
 
@@ -157,7 +166,7 @@ final class SocialStore {
     func deleteProfile(_ auth: AccountSession) async -> Bool {
         await perform(auth) {
             _ = try await self.request("/rest/v1/rpc/delete_social_profile", method: "POST", values: [:])
-            self.me = nil; self.entries = []; self.friendships = []; self.people = []; self.blocks = []
+            self.me = nil; self.feed.reset(); self.friendships = []; self.peopleRecords = []; self.blocks = []
         }
     }
 

@@ -152,8 +152,10 @@ struct AppRoot: View {
 
     @ViewBuilder private var friendsRoot: some View {
         #if DEBUG
-        // Isolated real search UI for keyboard/accessibility tests; never loads live accounts or fixture people.
-        if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-friend-search") {
+        // Isolated Debug social UI fixtures for accessibility tests; never contact live accounts.
+        if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-friend-feed") {
+            FriendsFeedFixtureView()
+        } else if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-friend-search") {
             AddFriendsView()
         } else { FriendsView() }
         #else

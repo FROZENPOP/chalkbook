@@ -1,6 +1,36 @@
 import XCTest
 
 final class FriendsUITests: XCTestCase {
+    @MainActor func testFeedAutomaticallyPagesAndRetriesWithoutLosingFirstPage() {
+        continueAfterFailure=false
+        let app=XCUIApplication();app.launchArguments=["--ui-testing","--reset-test-data","--test-friend-feed","--test-feed-error"]
+        app.launch();XCTAssertTrue(app.tabBars.buttons["Friends"].waitForExistence(timeout:15));app.tabBars.buttons["Friends"].tap()
+        XCTAssertTrue(app.staticTexts["Fixture recap 1"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.staticTexts["Page requests: 1"].exists,"Only the first page should load before scrolling")
+        let retry=app.buttons["retryFriendsFeed"]
+        for _ in 0..<25 { if retry.isHittable { break };app.swipeUp() }
+        XCTAssertTrue(retry.waitForExistence(timeout:10));XCTAssertTrue(retry.isHittable)
+        XCTAssertFalse(app.staticTexts["Fixture recap 23"].exists)
+        let errorShot=XCTAttachment(screenshot:app.screenshot());errorShot.name="Feed page error retains loaded activity";errorShot.lifetime = .keepAlways;add(errorShot)
+        retry.tap()
+        let end=app.descendants(matching:.any)["friendsFeedEnd"].firstMatch
+        for _ in 0..<10 { if end.isHittable { break };app.swipeUp() }
+        XCTAssertTrue(end.waitForExistence(timeout:10));XCTAssertTrue(end.isHittable)
+        XCTAssertTrue(app.staticTexts["Fixture recap 23"].exists)
+        let endShot=XCTAttachment(screenshot:app.screenshot());endShot.name="End of friends feed";endShot.lifetime = .keepAlways;add(endShot)
+        for _ in 0..<25 { if app.staticTexts["Fixture recap 1"].isHittable { break };app.swipeDown() }
+        XCTAssertTrue(app.staticTexts["Fixture recap 1"].exists,"Failed page must not remove the first page")
+        let shot=XCTAttachment(screenshot:app.screenshot());shot.name="Paged friends feed";shot.lifetime = .keepAlways;add(shot)
+    }
+    @MainActor func testEmptyFeedKeepsExistingEmptyStateAtLargeText() {
+        let app=XCUIApplication();app.launchArguments=["--ui-testing","--reset-test-data","--test-friend-feed","--test-empty-feed","-UIPreferredContentSizeCategoryName","UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch();XCTAssertTrue(app.tabBars.buttons["Friends"].waitForExistence(timeout:15));app.tabBars.buttons["Friends"].tap()
+        XCTAssertTrue(app.staticTexts["A little encouragement goes a long way."].waitForExistence(timeout:10))
+        XCTAssertFalse(app.descendants(matching:.any)["friendsFeedEnd"].firstMatch.exists)
+        XCTAssertFalse(app.buttons["retryFriendsFeed"].exists)
+        let shot=XCTAttachment(screenshot:app.screenshot());shot.name="Empty feed at accessibility text size";shot.lifetime = .keepAlways;add(shot)
+    }
+
     @MainActor func testSearchInputClearAndRetryAtLargeText() {
         continueAfterFailure = false
         let app = XCUIApplication()
