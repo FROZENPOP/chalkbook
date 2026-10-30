@@ -89,7 +89,7 @@ enum HoldHighlight {
             return min(1, sqrt(0.65 * brightness * brightness + 0.35 * saturation * saturation))
         }
         let hue = min(abs(color.hue - reference.hue), 1 - abs(color.hue - reference.hue)) * 2
-        return min(1, sqrt(0.8 * hue * hue + 0.18 * saturation * saturation + 0.02 * brightness * brightness))
+        return min(1, sqrt(0.955 * hue * hue + 0.04 * saturation * saturation + 0.005 * brightness * brightness))
     }
 
     /// Input coordinates use the displayed, orientation-normalized image, with a top-left origin.
@@ -207,7 +207,11 @@ enum HoldHighlight {
                 if i % pixels.width == 0 { try Task.checkCancellation() }
                 let color = colors[i]
                 guard pixels.bytes[i * 4 + 3] > 0 else { continue }
-                if !neutral && color.saturation < max(0.22, reference.saturation * 0.62) { continue }
+                // Warm, highly saturated pigment must not recolor lower-chroma skin.
+                // Cool pigment can lose much more saturation under chalk and directional light.
+                let warmPigment = (reference.hue < 0.18 || reference.hue > 0.94) && reference.saturation > 0.75
+                let minimumSaturation = warmPigment ? reference.saturation * 0.82 : max(0.16, reference.saturation * 0.30)
+                if !neutral && color.saturation < minimumSaturation { continue }
                 if neutral && color.saturation > max(0.22, reference.saturation + 0.14) { continue }
                 let d = distance(color, from: reference)
                 // A soft color ramp, followed by spatial feathering, avoids binary cutouts.
@@ -261,7 +265,7 @@ enum HoldHighlight {
                 let boxArea = (maxX - minX + 1) * (maxY - minY + 1)
                 if hasSpatialEvidence && !includesSeed && boxArea > 64 && Double(region.count) / Double(boxArea) < 0.22 { continue }
                 let largest = includesSeed ? 0.30 : (neutral ? 0.035 : 0.10)
-                if hasSpatialEvidence && (region.count < 5 || fraction > largest || (touchesEdge && !includesSeed && fraction > 0.0025)) { continue }
+                if hasSpatialEvidence && (region.count < 5 || fraction > largest || (touchesEdge && !includesSeed && fraction > 0.0025 && (neutral || Double(region.count) / Double(boxArea) < 0.35))) { continue }
                 for i in region { union[i] = max(union[i], candidates[i]) }
             }
         }
@@ -289,6 +293,10 @@ enum HoldHighlight {
         guard quality == .preview || Double(image.width) * Double(image.height) <= 40_000_000 else { throw Failure.imageUnavailable }
         let working = try pixels(image)
         let mask = settings.isEnabled ? try mask(in: working, settings: settings) : Mask(width: working.width, height: working.height, alpha: [Float](repeating: 1, count: working.width * working.height))
+        let darkSelection = try settings.isEnabled && settings.selections.contains { point in
+            let color = try reference(in: working, settings: .init(x: point.x, y: point.y, tolerance: settings.tolerance))
+            return (color.isNeutral && color.brightness < 0.45) || color.brightness < 0.16
+        }
         let enhancePigment = try settings.isEnabled && (settings.selections.contains { point in
             try !reference(in:working,settings:.init(x:point.x,y:point.y,tolerance:settings.tolerance)).isNeutral
         })
@@ -309,7 +317,11 @@ enum HoldHighlight {
                 for c in 0..<3 {
                     let original = Double(output.bytes[i + c])
                     // 58% luminance and 15% residual color retain wall context without crushed blacks.
-                    let background = (gray * 0.85 + original * 0.15) * 0.58
+                    // Dark holds need a pale context rather than disappearing into a dim wall.
+                    // Alpha-scaled lift preserves premultiplied transparency and original hold detail.
+                    let background = darkSelection
+                        ? gray * 0.35 + Double(output.bytes[i + 3]) * 0.55
+                        : (gray * 0.85 + original * 0.15) * 0.58
                     let foreground = enhancePigment ? (c == 0 ? vivid.red : c == 1 ? vivid.green : vivid.blue) * Double(output.bytes[i + 3]) : original
                     output.bytes[i + c] = UInt8(min(255, max(0, (foreground * alpha + background * (1 - alpha)).rounded())))
                 }

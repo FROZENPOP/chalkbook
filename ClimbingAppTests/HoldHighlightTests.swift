@@ -18,6 +18,55 @@ final class HoldHighlightTests: XCTestCase {
             return [160, 160, 160, 255]
         }
     }
+    func testShadedSingleHueHoldIncludesBothHalvesWithoutWall() throws {
+        let photo = image(width: 200, height: 100) { x, y in
+            guard (20..<80).contains(x) && (20..<70).contains(y) else { return [170,170,170,255] }
+            return x < 50 ? [70,180,115,255] : [12,42,24,255]
+        }
+        let pixels = try HoldHighlight.pixels(photo)
+        for x in [0.18, 0.32] {
+            let mask = try HoldHighlight.mask(in: pixels, settings: .init(x:x,y:0.4,tolerance:0.35))
+            XCTAssertGreaterThan(mask.alpha[40*200+35],0.9)
+            XCTAssertGreaterThan(mask.alpha[40*200+65],0.9)
+            XCTAssertLessThan(mask.alpha[40*200+120],0.05)
+        }
+    }
+    func testOrangePigmentRejectsAdjacentLowerChromaSkin() throws {
+        let photo = image(width: 200, height: 100) { x, y in
+            guard (20..<90).contains(x) && (20..<70).contains(y) else { return [220,220,220,255] }
+            return x < 55 ? [210,95,18,255] : [190,130,70,255]
+        }
+        let pixels = try HoldHighlight.pixels(photo)
+        for tolerance in [0.35, 1.0] {
+            let mask = try HoldHighlight.mask(in: pixels, settings:.init(x:0.18,y:0.4,tolerance:tolerance))
+            XCTAssertGreaterThan(mask.alpha[40*200+35],0.9)
+            XCTAssertLessThan(mask.alpha[40*200+75],0.05)
+        }
+    }
+    func testDarkHoldsRemainDistinctAgainstLightenedWallAndResetIsExact() throws {
+        for pigment: [UInt8] in [[12,12,12,255], [72,72,72,255], [8,12,34,255], [30,8,34,255]] {
+            let photo = image(width:200,height:100) { x,y in
+                (20..<60).contains(x) && (20..<60).contains(y) ? pigment : [180,180,180,255]
+            }
+            let original = try HoldHighlight.pixels(photo).bytes
+            let settings = HoldHighlightSettings(x:0.2,y:0.4,tolerance:0.35)
+            let rendered = try HoldHighlight.pixels(HoldHighlight.render(photo,settings:settings))
+            let wall = rendered.color(x:100,y:40), hold = rendered.color(x:40,y:40)
+            XCTAssertGreaterThan(wall.brightness-hold.brightness,0.45)
+            XCTAssertEqual(try HoldHighlight.pixels(photo).bytes,original)
+            var reset = settings; reset.isEnabled = false
+            XCTAssertEqual(try HoldHighlight.pixels(HoldHighlight.render(photo,settings:reset)).bytes,original)
+        }
+    }
+    func testCompactMatchingHoldAtPhotoEdgeIsNotDiscarded() throws {
+        let photo = image(width:200,height:100) { x,y in
+            if ((20..<45).contains(x) || x > 180) && (20..<60).contains(y) { return [200,60,40,255] }
+            return [160,160,160,255]
+        }
+        let mask = try HoldHighlight.mask(in:HoldHighlight.pixels(photo),settings:.init(x:0.16,y:0.4,tolerance:0.35))
+        XCTAssertGreaterThan(mask.alpha[40*200+190],0.9)
+        XCTAssertLessThan(mask.alpha[40*200+100],0.05)
+    }
     func testSampleMedianRejectsChalkOutlier() throws {
         let photo = image { x, y in x == 5 && y == 5 ? [255,255,255,255] : [255,0,0,255] }
         let reference = try HoldHighlight.reference(in: HoldHighlight.pixels(photo), settings: .init(x: 0.17, y: 0.25, tolerance: 0.2))
