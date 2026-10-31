@@ -32,7 +32,10 @@ struct FriendsFeedPage {
 
 @MainActor @Observable final class FriendsFeed {
     static let pageSize = 20
-    private(set) var entries: [SharedSession] = []
+    private var records: [SharedSession] = []
+    private let isHidden: (SharedSession) -> Bool
+    var entries: [SharedSession] { records.filter { !isHidden($0) } }
+    init(isHidden: @escaping (SharedSession) -> Bool = { _ in false }) { self.isHidden = isHidden }
     private(set) var profiles: [SocialProfile] = []
     private(set) var cursor: FriendsFeedCursor?
     private(set) var loading = false
@@ -42,7 +45,7 @@ struct FriendsFeedPage {
     private var generation = UUID()
 
     func reset() {
-        generation = UUID(); entries = []; profiles = []; cursor = nil
+        generation = UUID(); records = []; profiles = []; cursor = nil
         loading = false; hasLoaded = false; hasMore = true; errorMessage = nil
     }
     func refresh(_ reader: any FriendsFeedReading) async {
@@ -56,14 +59,14 @@ struct FriendsFeedPage {
         do {
             let page = try await reader.page(after:cursor,limit:Self.pageSize)
             guard generation == token else { return }
-            var merged = Dictionary(entries.map { ($0.id,$0) },uniquingKeysWith:{ _,new in new })
+            var merged = Dictionary(records.map { ($0.id,$0) },uniquingKeysWith:{ _,new in new })
             for entry in page.entries { merged[entry.id] = entry }
-            entries = merged.values.sorted {
+            records = merged.values.sorted {
                 $0.session_day == $1.session_day ? $0.id.uuidString > $1.id.uuidString : $0.session_day > $1.session_day
             }
             // Advance from the raw response, not the de-duplicated cache or locally removed rows.
             if let last = page.entries.last { cursor = .init(day:last.session_day,id:last.id) }
-            let owners = Set(entries.map(\.owner_id))
+            let owners = Set(records.map(\.owner_id))
             var people = Dictionary(profiles.map { ($0.id,$0) },uniquingKeysWith:{ _,new in new })
             for profile in page.profiles where owners.contains(profile.id) { people[profile.id] = profile }
             profiles = people.values.filter { owners.contains($0.id) }.sorted { $0.id.uuidString < $1.id.uuidString }
@@ -75,8 +78,8 @@ struct FriendsFeedPage {
         }
     }
     func remove(where predicate: (SharedSession) -> Bool) {
-        entries.removeAll(where:predicate)
-        let owners = Set(entries.map(\.owner_id)); profiles.removeAll { !owners.contains($0.id) }
+        records.removeAll(where:predicate)
+        let owners = Set(records.map(\.owner_id)); profiles.removeAll { !owners.contains($0.id) }
     }
 }
 

@@ -118,10 +118,14 @@ struct AppRoot: View {
     @Environment(FriendInviteRouter.self) private var invitations
     @State private var store: ClimbingStore
     @State private var profiles: ProfileStore
-    @State private var social = SocialStore()
+    @State private var social: SocialStore
+    @Environment(\.scenePhase) private var scenePhase
     @State private var setupProfile = false
 
     init(container: ModelContainer, profileKey: String = "guest", profileDirectory: URL? = nil) {
+        let testing = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+        let outbox = RemovalOutbox(accountKey: profileKey, directory: testing ? URL.applicationSupportDirectory.appending(path: "UITestRemovalOutboxes") : nil)
+        _social = State(initialValue: SocialStore(accountKey: profileKey, removals: outbox))
         _store = State(initialValue: ClimbingStore(context: container.mainContext))
         _profiles = State(initialValue: ProfileStore(key: profileKey, directory: profileDirectory))
     }
@@ -147,7 +151,13 @@ struct AppRoot: View {
         .environment(store)
         .environment(profiles)
         .environment(social)
-        .task { setupProfile = invitations.target == nil && auth.account != nil && profiles.profile == nil && profiles.errorMessage == nil }
+        .task {
+            setupProfile = invitations.target == nil && auth.account != nil && profiles.profile == nil && profiles.errorMessage == nil
+            await social.retryRemovals(auth)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await social.retryRemovals(auth) } }
+        }
         .sheet(isPresented: $setupProfile) {
             ProfileEditorView(setup: true).environment(profiles)
         }
@@ -164,7 +174,9 @@ struct AppRoot: View {
     @ViewBuilder private var friendsRoot: some View {
         #if DEBUG
         // Isolated Debug social UI fixtures for accessibility tests; never contact live accounts.
-        if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-friend-feed") {
+        if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-removal-outbox") {
+            RemovalOutboxFixtureView()
+        } else if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-friend-feed") {
             FriendsFeedFixtureView()
         } else if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-friend-suggestions") {
             SuggestedFriendsFixtureView()

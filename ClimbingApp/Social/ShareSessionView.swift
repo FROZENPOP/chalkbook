@@ -66,14 +66,20 @@ struct ShareSessionView: View {
                     Section {
                         Button("Save reviewed entry") { Task { if let preview, await social.publish(auth, entry: preview, photos:reviewedPhotos) { dismiss() } } }
                             .disabled(social.busy || preparingPhoto || !photosLoaded || draft.caption.count > 1000)
-                        Button(role: .destructive) { Task { if await social.removeShare(auth, sessionID: session.id) { dismiss() } } } label: {
-                            Label("Remove shared entry", systemImage: "trash").foregroundStyle(ClimbTheme.error)
-                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
-                        }.buttonStyle(.plain).disabled(social.busy)
                         Text("Saving replaces this entry’s shared snapshot. Later journal edits do not silently change published content. Visibility changes require a connection and a confirmed save.").font(.caption)
                     }
                 } else {
                     Text(social.configuration == nil ? "Friends is waiting for Supabase setup. This session is private on this device." : "Connect and set up your social profile in Friends before sharing.")
+                }
+                if social.configuration != nil, auth.account != nil {
+                    Section {
+                        RemovalStatusView(outbox: social.removals) { await social.retryRemovals(auth, force: true) }
+                        Button(role: .destructive) { Task { if await social.removeShare(auth, sessionID: session.id) { dismiss() } } } label: {
+                            Label("Remove shared entry", systemImage: "trash").foregroundStyle(ClimbTheme.error)
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                        Text("Removal works offline. Friends may still see the entry and its photos until it syncs.").font(.caption)
+                    }
                 }
                 if social.busy { SwiftUI.ProgressView("Loading…") }
                 if let message = social.errorMessage { Text(message).foregroundStyle(ClimbTheme.error); Button("Retry loading") { Task { await load() } } }
