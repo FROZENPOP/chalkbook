@@ -4,6 +4,9 @@ struct SocialClimberProfileView: View {
     @Environment(SocialStore.self) private var social
     @Environment(AccountSession.self) private var auth
     let climberID:UUID
+    #if DEBUG
+    var auditPage: SocialProfilePage? = nil
+    #endif
     @State private var page:SocialProfilePage?
     @State private var error:String?
     @State private var editing=false
@@ -15,23 +18,23 @@ struct SocialClimberProfileView: View {
                         VStack(alignment:.leading,spacing:14) {
                             ProfileAvatar(photo:page.details?.photo)
                             Text(page.profile.display_name).font(.title.bold())
-                            Text("@\(page.profile.username)").foregroundStyle(.secondary)
+                            Text("@\(page.profile.username)").foregroundStyle(ClimbTheme.secondaryText)
                             if let bio=page.details?.bio,!bio.isEmpty { Text(bio) }
                             Label(page.profile.is_private ? "Private account" : "Public account",systemImage:page.profile.is_private ? "lock" : "globe").font(.caption)
-                            if page.profile.is_private && page.details == nil { Text("Their bio and photo are visible to friends.").font(.subheadline).foregroundStyle(.secondary) }
+                            if page.profile.is_private && page.details == nil { Text("Their bio and photo are visible to friends.").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText) }
                         }
                     }
                     if page.profile.id == social.userID { Button("Edit your social profile") { editing=true } }
                     else if social.me == nil { Button("Set up Friends to send a request") { editing=true } }
                     else { FriendPersonRow(person:page.profile,personID:page.profile.id,showsProfileLink:false) }
                     Text("Shared sessions").font(.title2.bold())
-                    Text("Only sessions this person has made visible to you appear here. Their private journal is never shown.").font(.caption).foregroundStyle(.secondary)
-                    if page.entries.isEmpty { Text("No sessions shared with you yet.").foregroundStyle(.secondary) }
+                    Text("Only sessions this person has made visible to you appear here. Their private journal is never shown.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
+                    if page.entries.isEmpty { Text("No sessions shared with you yet.").foregroundStyle(ClimbTheme.secondaryText) }
                     ForEach(page.entries) { entry in
                         Surface { VStack(alignment:.leading,spacing:16) { SharedSessionPreview(entry:entry);SessionReactionBar(entry:entry) } }
                     }
                 } else if error == nil { SwiftUI.ProgressView("Opening profile…") }
-                if let error { Text(error).foregroundStyle(.red);Button("Try again") { Task { await load() } } }
+                if let error { Text(error).foregroundStyle(ClimbTheme.error);Button("Try again") { Task { await load() } } }
             }.padding(20)
         }.background(ClimbTheme.background).navigationTitle("Climber profile").navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented:$editing,onDismiss:{ Task { await load() } }) { SocialProfileEditor() }
@@ -39,6 +42,9 @@ struct SocialClimberProfileView: View {
             .onChange(of:social.friendships.map(\.id).joined()+social.friendships.map(\.status).joined()+social.blocks.map { $0.id.uuidString }.joined()) { _,_ in Task { await load() } }
     }
     private func load() async {
+        #if DEBUG
+        if AccessibilityAuditFixtures.enabled, let auditPage { page = auditPage; return }
+        #endif
         do { if social.userID == nil { await social.refresh(auth) };page=try await social.profilePage(auth,id:climberID);error=nil }
         catch { page=nil;self.error=error.localizedDescription }
     }
@@ -57,8 +63,8 @@ struct SessionReactionBar: View {
         VStack(alignment:.leading,spacing:8) {
             if loaded { reactionButtons }
             else if error == nil { SwiftUI.ProgressView("Loading reactions…") }
-            if social.me == nil { Text("Set up Friends to react.").font(.caption).foregroundStyle(.secondary) }
-            if let error { Text(error).font(.caption).foregroundStyle(.red);Button("Retry reactions") { Task { await load() } }.frame(minHeight:44) }
+            if social.me == nil { Text("Set up Friends to react.").font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
+            if let error { Text(error).font(.caption).foregroundStyle(ClimbTheme.error);Button("Retry reactions") { Task { await load() } }.frame(minHeight:44) }
         }.task(id:entry.id) { await load() }
     }
     private var reactionButtons: some View {

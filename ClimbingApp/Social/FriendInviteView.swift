@@ -16,7 +16,7 @@ struct FriendInviteView: View {
                         .accessibilityLabel("Friend invitation QR code for \(profile.display_name)")
                 }
                 Text(link.scheme != "https" ? "Scan with the iPhone camera. Climb Log must already be installed. You can also share your username." : "Scan this code or share your invite link to open your profile. Sending a request still needs your friend’s approval.")
-                    .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .font(.subheadline).foregroundStyle(ClimbTheme.secondaryText).multilineTextAlignment(.center)
                 ShareLink(item:link) { Label("Share invite link",systemImage:"square.and.arrow.up").frame(minHeight:44) }.buttonStyle(.borderedProminent)
                 ShareLink(item:"Add me on Climb Log: @\(profile.username)") { Label("Share username",systemImage:"at").frame(minHeight:44) }.buttonStyle(.bordered)
             }.padding(24)

@@ -15,20 +15,20 @@ struct HomeView: View {
                     Label("CLIMB LOG", systemImage: "figure.climbing")
                         .font(.caption.weight(.bold)).tracking(2).foregroundStyle(ClimbTheme.forest)
                     Spacer()
-                    Text(Date.now, format: .dateTime.month(.abbreviated).day()).font(.caption).foregroundStyle(.secondary)
+                    Text(Date.now, format: .dateTime.month(.abbreviated).day()).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     Text(active == nil ? "Your next move." : "Keep climbing.")
                         .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    Text("Small attempts. Real progress.").font(.subheadline).foregroundStyle(.secondary)
+                    Text("Small attempts. Real progress.").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                 }
                 Surface {
                     VStack(alignment: .leading, spacing: 18) {
-                        Image(systemName: "mountain.2.fill").font(.system(size: 44)).foregroundStyle(ClimbTheme.forest)
+                        Image(systemName: "mountain.2.fill").accessibilityHidden(true).font(.system(size: 44)).foregroundStyle(ClimbTheme.forest)
                         Text(active == nil ? "A good session starts here." : "You have a session in progress.")
                             .font(.title2.weight(.semibold))
                         Text(active?.title ?? "Log your climbs, celebrate your sends, and keep track of what’s next.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ClimbTheme.secondaryText)
                         if let active {
                             NavigationLink { SessionDetailView(session: active) } label: {
                                 Label("Resume session", systemImage: "arrow.right").frame(maxWidth: .infinity).padding(.vertical, 6)
@@ -56,7 +56,7 @@ struct HomeView: View {
                     }
                 } else {
                     Label("Your log grows one session at a time.", systemImage: "leaf")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                        .font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                 }
             }
             .padding(20)

@@ -5,6 +5,16 @@ private enum FriendsSection: String, CaseIterable {
 }
 
 struct FriendsView: View {
+    #if DEBUG
+    var auditProfile: SocialProfile? = nil
+    #endif
+    private var auditConnected: Bool {
+        #if DEBUG
+        return AccessibilityAuditFixtures.enabled && auditProfile != nil
+        #else
+        return false
+        #endif
+    }
     @Environment(AccountSession.self) private var auth
     @Environment(SocialStore.self) private var social
     @State private var login = false
@@ -17,22 +27,22 @@ struct FriendsView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
-                if social.configuration == nil {
+                if social.configuration == nil && !auditConnected {
                     EmptyState(title: "Friends is coming next", symbol: "person.2", message: "Supabase setup is pending. Your journal stays private and works offline.")
-                } else if auth.account == nil {
+                } else if auth.account == nil && !auditConnected {
                     Surface {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Climbing is better together.").font(.title2.bold())
-                            Text("Connect with your people and share the sessions you choose.").foregroundStyle(.secondary)
+                            Text("Connect with your people and share the sessions you choose.").foregroundStyle(ClimbTheme.secondaryText)
                             Button("Sign in to find friends") { login = true }.buttonStyle(.borderedProminent).frame(minHeight: 44)
                         }
                     }
-                } else if social.me == nil {
+                } else if social.me == nil && !auditConnected {
                     Surface {
                         VStack(alignment: .leading, spacing: 16) {
                             Image(systemName: "person.2.fill").font(.largeTitle).foregroundStyle(ClimbTheme.forest)
                             Text("Find your climbing people.").font(.title2.bold())
-                            Text("Choose a username so friends can find you. You decide which sessions to share.").foregroundStyle(.secondary)
+                            Text("Choose a username so friends can find you. You decide which sessions to share.").foregroundStyle(ClimbTheme.secondaryText)
                             Button("Set up Friends") { profile = true }.buttonStyle(.borderedProminent).disabled(social.userID == nil || social.busy)
                             if !social.busy { Button("Connect / Retry") { Task { await social.refresh(auth) } } }
                         }
@@ -59,7 +69,7 @@ struct FriendsView: View {
                     Surface {
                         VStack(alignment: .leading, spacing: 12) {
                             Label("Couldn’t connect", systemImage: "wifi.exclamationmark").font(.headline)
-                            Text(message).font(.subheadline).foregroundStyle(.secondary)
+                            Text(message).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                             Button("Try again") { Task { await social.refresh(auth) } }.frame(minHeight: 44)
                         }
                     }
@@ -70,7 +80,7 @@ struct FriendsView: View {
         .background(ClimbTheme.background)
         .navigationTitle("Friends")
         .toolbar {
-            if social.me != nil {
+            if social.me != nil || auditConnected {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { profile = true } label: { Image(systemName: "person.crop.circle").frame(width: 44, height: 44) }.accessibilityLabel("Social profile and privacy")
                 }
@@ -88,14 +98,14 @@ struct FriendsView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Your climbing circle").font(.title2.bold())
                 Spacer()
-                Text("\(friends.count) \(friends.count == 1 ? "friend" : "friends")").font(.subheadline).foregroundStyle(.secondary)
+                Text("\(friends.count) \(friends.count == 1 ? "friend" : "friends")").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
             }
             Button { finding = true } label: {
                 HStack(spacing: 14) {
                     Image(systemName: "magnifyingglass").font(.title3)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Add friends").font(.headline)
-                        Text("Name, username or QR code").font(.subheadline).foregroundStyle(.secondary)
+                        Text("Name, username or QR code").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                     }
                     Spacer()
                     Image(systemName: "plus.circle.fill").font(.title2)
@@ -114,7 +124,7 @@ struct FriendsView: View {
                             SocialAvatar(id:entry.owner_id,name:person(entry.owner_id)?.display_name ?? "Climber")
                             Text(person(entry.owner_id)?.display_name ?? "Climber").font(.headline)
                             Spacer()
-                            Image(systemName: entry.visibility == .public ? "globe" : "person.2").foregroundStyle(.secondary).accessibilityLabel(entry.visibility.title)
+                            Image(systemName: entry.visibility == .public ? "globe" : "person.2").foregroundStyle(ClimbTheme.secondaryText).accessibilityLabel(entry.visibility.title)
                         }
                         SharedSessionPreview(entry: entry)
                         SessionReactionBar(entry:entry)
@@ -145,6 +155,9 @@ struct FriendsView: View {
 
     private func person(_ id: UUID) -> SocialProfile? { social.people.first { $0.id == id } }
     private func refresh() async {
+        #if DEBUG
+        if auditConnected { await social.feed.refresh(AccessibilityAuditEmptyFeed()); return }
+        #endif
         guard social.configuration != nil, auth.account != nil else { social.suggestions.reset(); return }
         await social.refresh(auth)
         guard social.errorMessage == nil, let viewer=social.userID, social.me != nil else { social.suggestions.reset(); return }
@@ -154,11 +167,12 @@ struct FriendsView: View {
 }
 
 struct FriendInitials: View {
+    @ScaledMetric(relativeTo: .headline) private var size = 48.0
     let name: String
     private var initials: String { name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased() }
     var body: some View {
         Text(initials.isEmpty ? "?" : initials).font(.system(.headline, design: .rounded, weight: .bold))
-            .foregroundStyle(ClimbTheme.forest).frame(width: 48, height: 48)
+            .foregroundStyle(ClimbTheme.forest).frame(width: size, height: size)
             .background(ClimbTheme.forest.opacity(0.1), in: Circle()).accessibilityHidden(true)
     }
 }
@@ -173,9 +187,15 @@ struct FriendsEmptyCard<Actions: View>: View {
             VStack(alignment: .leading, spacing: 16) {
                 Image(systemName: symbol).font(.largeTitle).foregroundStyle(ClimbTheme.forest)
                 Text(title).font(.title3.bold())
-                Text(message).font(.subheadline).foregroundStyle(.secondary)
+                Text(message).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                 actions.frame(minHeight: 44)
             }.padding(.vertical, 8)
         }
     }
 }
+
+#if DEBUG
+@MainActor private struct AccessibilityAuditEmptyFeed: FriendsFeedReading {
+    func page(after: FriendsFeedCursor?, limit: Int) async throws -> FriendsFeedPage { .init(entries: []) }
+}
+#endif

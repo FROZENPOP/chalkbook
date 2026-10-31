@@ -27,7 +27,7 @@ struct HoldHighlightView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Tap a hold in your climb").font(.headline)
-                    if includeMore { Text("Tap another hold to include it.").font(.subheadline).foregroundStyle(.secondary) }
+                    if includeMore { Text("Tap another hold to include it.").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText) }
                     if let displayed = showOriginal ? original : image {
                         RouteMarkupImage(image: displayed, strokes: document?.strokes ?? [])
                             .overlay {
@@ -42,7 +42,7 @@ struct HoldHighlightView: View {
                     }
                     if processing { SwiftUI.ProgressView("Processing photo…").accessibilityIdentifier("highlightProcessing") }
                     if let message {
-                        Text(message).foregroundStyle(.red).accessibilityIdentifier("highlightError")
+                        Text(message).foregroundStyle(ClimbTheme.error).accessibilityIdentifier("highlightError")
                         Button("Retry processing") { if document == nil { loadRetry += 1 } else { retry += 1 } }.frame(minHeight: 44)
                     }
                     Text(selectionLabel)
@@ -67,20 +67,23 @@ struct HoldHighlightView: View {
                         .accessibilityIdentifier("highlightTolerance")
                         .disabled(selection == nil)
                         .onChange(of: tolerance) { _, value in selection?.tolerance = value }
-                    Text("\(Int(tolerance * 100))% · Include fewer or more shades.").font(.caption).foregroundStyle(.secondary)
+                    Text("\(Int(tolerance * 100))% · Include fewer or more shades.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                     Button("Reset to original", systemImage: "arrow.counterclockwise") {
                         selection = nil; includeMore = false; showOriginal = false
                     }.frame(minHeight: 44).disabled(selection == nil).accessibilityIdentifier("resetHoldHighlight")
-                    Text("For a cleaner match, tap colored material away from chalk or glare.").font(.caption).foregroundStyle(.secondary)
-                    Text("The original photo and private markup are preserved. Done saves this view; Cancel keeps your previous settings.").font(.caption).foregroundStyle(.secondary)
+                    Text("For a cleaner match, tap colored material away from chalk or glare.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
+                    Text("The original photo and private markup are preserved. Done saves this view; Cancel keeps your previous settings.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                 }.padding(20)
             }
             .background(ClimbTheme.background)
             .navigationTitle(typeSize.isAccessibilitySize ? "Highlight" : "Highlight holds").navigationBarTitleDisplayMode(.inline)
+            // Photos can scroll beneath the native title; keep its contrast independent of them.
+            .toolbarBackground(ClimbTheme.background, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel", systemImage: "xmark") { dismiss() }.accessibleToolbarAction() }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button("Done", systemImage: "checkmark") {
                         guard var document else { return }
                         document.highlight = selection
                         do {
@@ -88,7 +91,7 @@ struct HoldHighlightView: View {
                             else { message = "Your highlight couldn’t be saved. Try Done again. Your selection is still here." }
                         } catch { message = error.localizedDescription }
                     }.disabled(processing || image == nil || document == nil || !renderSucceeded)
-                        .accessibilityIdentifier("saveHoldHighlight")
+                        .accessibleToolbarAction().accessibilityIdentifier("saveHoldHighlight")
                 }
             }
             .task(id: loadRetry) {
@@ -140,6 +143,7 @@ struct HoldHighlightView: View {
 }
 
 private struct HighlightSelectionOverlay: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let points: [RoutePoint]
     let imageSize: CGSize
     let canSelect: Bool
@@ -154,7 +158,7 @@ private struct HighlightSelectionOverlay: View {
             ForEach(points.indices, id: \.self) { index in
                 marker(index)
                     .position(x: CGFloat(points[index].x) * geometry.size.width, y: CGFloat(points[index].y) * geometry.size.height)
-                    .transition(.scale.combined(with: .opacity))
+                    .transition(reduceMotion ? .identity : .scale.combined(with: .opacity))
             }
         }
     }
@@ -180,7 +184,7 @@ struct HighlightedRoutePhoto: View {
     var body: some View {
         Group {
             if let image { RouteMarkupImage(image: image, strokes: (try? RouteAnnotations.decode(annotationJSON)) ?? []) }
-            else if let message { Text(message).foregroundStyle(.secondary) }
+            else if let message { Text(message).foregroundStyle(ClimbTheme.secondaryText) }
             else { SwiftUI.ProgressView("Opening photo…") }
         }.task(id: "\(showOriginal):\(annotationJSON)") {
             do {

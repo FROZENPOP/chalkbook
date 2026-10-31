@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check, run, or test Climb Log on a standard iPhone simulator (no packages needed)."""
+"""Check, run, test, or accessibility-audit Climb Log on a standard iPhone simulator."""
 import argparse
 import json
 from pathlib import Path
@@ -44,7 +44,7 @@ def simulator(device):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["check", "run", "test"])
+    parser.add_argument("action", choices=["check", "run", "test", "audit"])
     parser.add_argument("--device", choices=DEVICE_TYPES, default="iphone16")
     args = parser.parse_args()
     run("xcodebuild", "-version")
@@ -69,7 +69,9 @@ def main():
     command = base + ["-destination", f"platform=iOS Simulator,id={identifier}",
                       "-derivedDataPath", str(derived_data), "-clonedSourcePackagesDirPath", str(packages),
                       "CODE_SIGNING_ALLOWED=YES", "CODE_SIGN_IDENTITY=-"]
-    if args.action == "test":
+    if args.action in ("test", "audit"):
+        if args.action == "audit":
+            command += ["-only-testing:ClimbingAppUITests/AccessibilityAuditUITests"]
         command += ["-parallel-testing-enabled", "NO", "-resultBundlePath",
                     str(build_dir / f"{args.device}-{stamp}.xcresult"), "test"]
     else:

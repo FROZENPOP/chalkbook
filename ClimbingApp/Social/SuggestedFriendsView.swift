@@ -21,10 +21,10 @@ struct SuggestedFriendsSection: View {
                     Surface {
                         VStack(alignment:.leading,spacing:12) {
                             HStack(alignment:.top,spacing:12) {
-                                FriendInitials(name:person.display_name).dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                                FriendInitials(name:person.display_name)
                                 VStack(alignment:.leading,spacing:4) {
                                     Text(person.display_name).font(.headline)
-                                    Text(person.mutualSummary).font(.subheadline).foregroundStyle(.secondary)
+                                    Text(person.mutualSummary).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                                 }.frame(maxWidth:.infinity,alignment:.leading)
                             }.accessibilityElement(children:.combine)
                                 .accessibilityLabel("\(person.display_name), \(person.mutualSummary)")
@@ -40,7 +40,7 @@ struct SuggestedFriendsSection: View {
                                 if state.working.contains(person.id) { SwiftUI.ProgressView().accessibilityLabel("Saving friend suggestion") }
                             }.disabled(state.working.contains(person.id) || state.sent.contains(person.id))
                             if let message=state.rowErrors[person.id] {
-                                Text(message).font(.subheadline).foregroundStyle(.red)
+                                Text(message).font(.subheadline).foregroundStyle(ClimbTheme.error)
                                 Button("Retry") { Task { await state.act(person.id,dismiss:state.retryDismiss.contains(person.id),service:service) } }
                                     .frame(minHeight:44).disabled(state.working.contains(person.id))
                                     .accessibilityLabel("Retry for \(person.display_name)")
@@ -56,7 +56,7 @@ struct SuggestedFriendsSection: View {
         }
         if let error=state.errorMessage {
             VStack(alignment:.leading,spacing:8) {
-                Text(error).font(.subheadline).foregroundStyle(.secondary)
+                Text(error).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                 Button("Retry friend suggestions") { Task { await state.load(service,owner:viewer,excluding:excluded.union(blocked)) } }.frame(minHeight:44)
             }
         }

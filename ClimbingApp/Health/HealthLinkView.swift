@@ -24,7 +24,7 @@ struct HealthLinkView: View {
                     Text("Health measurements stay outside journal backups. No workout writing or export is performed.").font(.caption)
                 }
                 if let link {
-                    Section("Linked workout") {
+                    Section(header: Text("Linked workout").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         if let linkedWorkout { workoutRow(linkedWorkout) }
                         else { Text("Unavailable or no accessible data found. Your manual journal is intact. Refresh or unlink to try again.") }
                         Text("Source: \(link.sourceName)").font(.caption)
@@ -37,9 +37,9 @@ struct HealthLinkView: View {
                     Button("Refresh nearby workouts") { Task { await load(request: true) } }.disabled(loading || !reader.available)
                 }
                 if loading { SwiftUI.ProgressView("Looking for accessible climbing workouts…") }
-                if let message { Text(message).foregroundStyle(.secondary) }
+                if let message { Text(message).foregroundStyle(ClimbTheme.secondaryText) }
                 if loaded && candidates.isEmpty { Text("No accessible data found. Data may arrive later from a watch or another app; refresh again after it syncs. Read access decisions are private to Apple Health.") }
-                Section("Nearby climbing workouts — choose one") {
+                Section(header: Text("Nearby climbing workouts — choose one").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     ForEach(candidates) { workout in
                         Button { selected = workout } label: {
                             VStack(alignment: .leading, spacing: 8) {

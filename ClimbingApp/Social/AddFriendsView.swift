@@ -15,17 +15,22 @@ struct AddFriendsView: View {
                 if !focused && query.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Find your people.").font(.system(.largeTitle, design: .rounded, weight: .bold))
-                        Text("Cheer on their sends. Share yours.").font(.subheadline).foregroundStyle(.secondary)
+                        Text("Cheer on their sends. Share yours.").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                     }
                 }
                 HStack(spacing: 12) {
                     Image(systemName: "magnifyingglass").foregroundStyle(ClimbTheme.forest).accessibilityHidden(true)
-                    TextField("Name or @username", text: $query)
+                    TextField("Name or @username", text: $query, axis: .vertical).lineLimit(1...3)
                         .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.asciiCapable)
-                        .submitLabel(.search).focused($focused).accessibilityIdentifier("friendSearchField")
+                        .accessibilityLabel("Search by name or username").submitLabel(.search).focused($focused).accessibilityIdentifier("friendSearchField")
                         .onSubmit { focused = false }
+                        .onChange(of: query) { _, value in
+                            if value.contains(where: \.isNewline) {
+                                query = value.filter { !$0.isNewline }; focused = false
+                            }
+                        }
                     if !query.isEmpty {
-                        Button { query = ""; focused = true } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary).frame(width: 44, height: 44) }
+                        Button { query = ""; focused = true } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(ClimbTheme.secondaryText).frame(width: 44, height: 44) }
                             .accessibilityLabel("Clear search").accessibilityIdentifier("clearFriendSearch")
                     }
                 }
@@ -44,7 +49,7 @@ struct AddFriendsView: View {
                                 Spacer()
                 NavigationLink { FriendInviteView(profile:me) } label: { Image(systemName:"qrcode").frame(width:44,height:44) }.accessibilityLabel("Your friend QR code and invite link")
                             }
-                            Text("Share your username with a climbing buddy.").font(.caption).foregroundStyle(.secondary)
+                            Text("Share your username with a climbing buddy.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                         }
                     }
                 }
@@ -52,7 +57,7 @@ struct AddFriendsView: View {
         }
         .background(ClimbTheme.background).scrollDismissesKeyboard(.interactively)
         .navigationTitle("Add friends").navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done", systemImage: "checkmark") { dismiss() }.accessibleToolbarAction() } }
         .task(id: "\(query)|\(retry)") { await search.search(query) { try await social.searchProfiles(auth, query: $0) } }
     }
 
@@ -60,7 +65,7 @@ struct AddFriendsView: View {
         switch search.state {
         case .idle:
             Label(query.isEmpty ? "Search a name or username to find a friend." : "Type at least two characters of their name or username.", systemImage: "at")
-                .font(.subheadline).foregroundStyle(.secondary)
+                .font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
         case .loading:
             SwiftUI.ProgressView("Finding climbers…").frame(maxWidth: .infinity, minHeight: 100)
         case .failed:
@@ -71,9 +76,9 @@ struct AddFriendsView: View {
             if search.results.isEmpty {
                 FriendsEmptyCard(symbol: "magnifyingglass", title: "No climbers found.", message: "Check their name or username. Your friend may still need to set up their profile.") { EmptyView() }
             } else {
-                Text("CLIMBERS").font(.caption.weight(.semibold)).tracking(1.4).foregroundStyle(.secondary)
+                Text("CLIMBERS").font(.caption.weight(.semibold)).tracking(1.4).foregroundStyle(ClimbTheme.secondaryText)
                 ForEach(search.results.filter { person in !social.blocks.contains { $0.target_id == person.id } }) { person in FriendPersonRow(person: person, personID: person.id) }
-                if search.results.count == 30 { Text("Showing the first 30 matches. Type more of their username to narrow it down.").font(.caption).foregroundStyle(.secondary) }
+                if search.results.count == 30 { Text("Showing the first 30 matches. Type more of their username to narrow it down.").font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
             }
         }
     }
@@ -97,7 +102,7 @@ struct FriendPersonRow: View {
                     SocialAvatar(id:personID,name:person?.display_name ?? "Climber")
                     VStack(alignment: .leading, spacing: 4) {
                         Text(person?.display_name ?? "Climber").font(.headline)
-                        if let person { Text("@\(person.username)").font(.subheadline).foregroundStyle(.secondary) }
+                        if let person { Text("@\(person.username)").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText) }
                     }
                     Spacer(minLength: 0)
                     if showsProfileLink { NavigationLink { SocialClimberProfileView(climberID:personID) } label: { Image(systemName:"person.crop.circle").frame(width:44,height:44) }.accessibilityLabel("View profile") }
@@ -119,14 +124,14 @@ struct FriendPersonRow: View {
                             Button("Accept") { act("accept") }.buttonStyle(.borderedProminent).frame(minHeight: 44)
                             Button("Decline") { act("decline") }.buttonStyle(.bordered).frame(minHeight: 44)
                         } else {
-                            Label("Request sent", systemImage: "clock").font(.subheadline).foregroundStyle(.secondary)
+                            Label("Request sent", systemImage: "clock").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                         }
                     } else {
                         Button { act("request") } label: { Label("Add friend", systemImage: "plus").frame(minHeight: 44) }.buttonStyle(.borderedProminent)
                     }
                     if working { SwiftUI.ProgressView().accessibilityLabel("Updating request") }
                 }.disabled(social.busy || working)
-                if failed { Text("Couldn’t update this request. Please try again.").font(.caption).foregroundStyle(.red) }
+                if failed { Text("Couldn’t update this request. Please try again.").font(.caption).foregroundStyle(ClimbTheme.error) }
             }
         }
     }
