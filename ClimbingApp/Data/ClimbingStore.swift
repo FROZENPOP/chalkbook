@@ -24,10 +24,18 @@ final class ClimbingStore {
             errorMessage = nil
             return true
         } catch {
+            let changed = context.changedModelsArray
             context.rollback()
+            // iOS 26 and earlier keep rejected values cached on live models after rollback; refetching restores them.
+            for model in changed { refetch(model) }
             errorMessage = "Your change could not be saved. Please try again. \(error.localizedDescription)"
             return false
         }
+    }
+
+    private func refetch<Model: PersistentModel>(_ model: Model) {
+        let id = model.persistentModelID
+        _ = try? context.fetch(FetchDescriptor<Model>(predicate: #Predicate { $0.persistentModelID == id }))
     }
 
     func start(date: Date, location: String, notes: String, gym: SavedGym? = nil) -> ClimbingSession? {
