@@ -40,8 +40,8 @@ import XCTest
                 return [SocialProfile(id: UUID(), username: "older", display_name: "Old fixture", is_private: true)]
             }
         }
-        await Task.yield()
-        try? await Task.sleep(for: .milliseconds(10))
+        // The older search must claim its revision first; a fixed sleep can lose that race on slow CI machines.
+        while search.state != .loading { await Task.yield() }
         await search.search("newer", delay: .zero) { _ in [SocialProfile(id: UUID(), username: "newer", display_name: "New fixture", is_private: true)] }
         await older.value
         XCTAssertEqual(search.results.map(\.username), ["newer"])
