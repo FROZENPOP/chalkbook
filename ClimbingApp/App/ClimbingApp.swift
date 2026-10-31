@@ -101,6 +101,9 @@ private struct WorkspaceRoot: View {
                     try store.mainContext.save()
                 }
                 #endif
+                #if DEBUG
+                if AccessibilityAuditFixtures.enabled { try AccessibilityAuditFixtures.seed(store.mainContext) }
+                #endif
                 container = store
             } else {
                 container = try Persistence.container(accountKey: accountKey)
@@ -128,15 +131,23 @@ struct AppRoot: View {
     }
 
     var body: some View {
-        TabView {
-            NavigationStack { HomeView() }.tabItem { Label("Journal", systemImage: "book") }
-            NavigationStack { ProjectsView() }.tabItem { Label("Projects", systemImage: "figure.climbing") }
-            NavigationStack { ProgressViewScreen() }.tabItem { Label("Progress", systemImage: "chart.bar.xaxis") }
-            NavigationStack { friendsRoot }.tabItem { Label("Friends", systemImage: "person.2") }
+        VStack(spacing: 0) {
+            SaveErrorBanner()
+            TabView {
+                NavigationStack {
+                    #if DEBUG
+                    if AccessibilityAuditFixtures.enabled { AccessibilityAuditDestination() } else { HomeView() }
+                    #else
+                    HomeView()
+                    #endif
+                }.tabItem { Label("Journal", systemImage: "book") }
+                NavigationStack { ProjectsView() }.tabItem { Label("Projects", systemImage: "figure.climbing") }
+                NavigationStack { ProgressViewScreen() }.tabItem { Label("Progress", systemImage: "chart.bar.xaxis") }
+                NavigationStack { friendsRoot }.tabItem { Label("Friends", systemImage: "person.2") }
+            }
         }
         .id(store.dataRevision)
         .tint(ClimbTheme.forest)
-        .safeAreaInset(edge: .top) { SaveErrorBanner() }
         .environment(store)
         .environment(profiles)
         .environment(social)

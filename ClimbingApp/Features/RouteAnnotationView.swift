@@ -43,7 +43,7 @@ struct RouteAnnotationView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment:.leading,spacing:16) {
-                    Text("Circle a hold or draw a path with your finger. Markup stays private and the original photo is preserved.").font(.subheadline).foregroundStyle(.secondary)
+                    Text("Circle a hold or draw a path with your finger. Markup stays private and the original photo is preserved.").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                     Picker("Pen color",selection:$color) { Text("Orange").tag("orange");Text("Blue").tag("blue");Text("White").tag("white") }.pickerStyle(.segmented)
                     if let image {
                         RouteMarkupImage(image:image,strokes:strokes + (current.isEmpty ? [] : [RouteStroke(color:color,points:current)]))
@@ -60,23 +60,25 @@ struct RouteAnnotationView: View {
                             }.clipShape(RoundedRectangle(cornerRadius:12)).accessibilityIdentifier("routeMarkupCanvas")
                     } else { Text("Route photo unavailable.") }
                     HStack {
-                        Button("Undo stroke",systemImage:"arrow.uturn.backward") { _ = strokes.popLast() }.disabled(strokes.isEmpty)
+                        Button("Undo stroke",systemImage:"arrow.uturn.backward") { _ = strokes.popLast() }.frame(minHeight: 44).disabled(strokes.isEmpty)
                         Spacer()
-                        Button("Clear markup",role:.destructive) { strokes=[] }.disabled(strokes.isEmpty)
+                        Button(role: .destructive) { strokes=[] } label: {
+                            Text("Clear markup").foregroundStyle(ClimbTheme.error).frame(minHeight: 44).contentShape(Rectangle())
+                        }.buttonStyle(.plain).disabled(strokes.isEmpty)
                     }.frame(minHeight:44)
-                    if failed { Text("This markup couldn’t be opened. Its saved data has been kept.").foregroundStyle(.red) }
+                    if failed { Text("This markup couldn’t be opened. Its saved data has been kept.").foregroundStyle(ClimbTheme.error) }
                 }.padding(20)
-            }.background(ClimbTheme.background).navigationTitle("Private route markup").navigationBarTitleDisplayMode(.inline)
+            }.background(ClimbTheme.background).navigationTitle("Route markup").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement:.cancellationAction) { Button("Cancel") { dismiss() } }
-                    ToolbarItem(placement:.confirmationAction) { Button("Save") {
+                    ToolbarItem(placement:.cancellationAction) { Button("Cancel", systemImage: "xmark") { dismiss() }.accessibleToolbarAction() }
+                    ToolbarItem(placement:.confirmationAction) { Button("Save", systemImage: "checkmark") {
                         do {
                             var document = try RouteAnnotations.document(media.annotationJSON)
                             document.strokes = strokes
                             let json = try RouteAnnotations.encode(document)
                             if store.save({ media.annotationJSON=json;media.updatedAt = .now }) { dismiss() }
                         } catch { store.errorMessage=error.localizedDescription }
-                    }.disabled(image == nil || failed).accessibilityIdentifier("saveRouteMarkup") }
+                    }.disabled(image == nil || failed).accessibleToolbarAction().accessibilityIdentifier("saveRouteMarkup") }
                 }
                 .task {
                     do {
@@ -99,7 +101,7 @@ struct ProjectNotebookSummary: View {
                 .padding(14).frame(maxWidth:.infinity,alignment:.leading).background(ClimbTheme.forest.opacity(0.08),in:RoundedRectangle(cornerRadius:14))
         }
         ForEach(climb.recentNotebook,id:\.id) { note in
-            VStack(alignment:.leading,spacing:4) { Text(note.text).font(.subheadline).lineLimit(3);Text(note.updatedAt,format:.dateTime.month().day()).font(.caption).foregroundStyle(.secondary) }
+            VStack(alignment:.leading,spacing:4) { Text(note.text).font(.subheadline).lineLimit(3);Text(note.updatedAt,format:.dateTime.month().day()).font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
         }
     }
 }

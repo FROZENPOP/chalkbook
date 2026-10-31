@@ -1,10 +1,14 @@
 import SwiftUI
 
 struct ShareSessionView: View {
+    @Environment(\.dynamicTypeSize) private var textSize
     @Environment(SocialStore.self) private var social
     @Environment(AccountSession.self) private var auth
     @Environment(\.dismiss) private var dismiss
     let session: ClimbingSession
+    #if DEBUG
+    var auditEntry: SharedSession? = nil
+    #endif
     @State private var draft: SharedSession?
     @State private var includeAttempts = true
     @State private var includeSends = true
@@ -19,13 +23,13 @@ struct ShareSessionView: View {
         NavigationStack {
             Form {
                 if let draft {
-                    Section("Audience") {
+                    Section(header: Text("Audience").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         Picker("Visibility", selection: Binding(get: { draft.visibility }, set: { self.draft?.visibility = $0 })) {
                             ForEach(EntryVisibility.allCases) { Text($0.title).tag($0) }
                         }
                         Text(social.me?.is_private == true ? "Your account is private: Public entries can only be seen by friends. Private entries remain yours alone." : "Public entries are visible to signed-in climbers. Friends entries require mutual acceptance. Private entries are yours alone.").font(.caption)
                     }
-                    Section("Choose what to share") {
+                    Section(header: Text("Choose what to share").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         TextField("Separate public caption", text: Binding(get: { draft.caption }, set: { self.draft?.caption = $0 }), axis: .vertical)
                         Toggle("Attempts", isOn: $includeAttempts)
                         Toggle("Sends", isOn: $includeSends)
@@ -36,7 +40,7 @@ struct ShareSessionView: View {
                             self.draft = value
                         }
                     }
-                    Section("Climb photos (optional)") {
+                    Section(header: Text("Climb photos (optional)").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         Text("Choose up to three photos. When shared with friends, they can switch between the original and highlighted versions. Photos are never public.").font(.caption)
                         ForEach(Array(availablePhotos.enumerated()), id: \.element.id) { index, media in
                             HStack(spacing:12) {
@@ -53,9 +57,9 @@ struct ShareSessionView: View {
                             Button("Remove this shared photo",role:.destructive) { reviewedPhotos.removeAll { $0.id == photo.id } }
                                 .frame(minHeight:44)
                         }
-                        if let photoError { Text(photoError).foregroundStyle(.red); if !photosLoaded { Button("Retry photos") { Task { await load() } } } }
+                        if let photoError { Text(photoError).foregroundStyle(ClimbTheme.error); if !photosLoaded { Button("Retry photos") { Task { await load() } } } }
                     }
-                    Section("Exact preview") {
+                    Section(header: Text("Exact preview").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         if let preview { SharedSessionPreview(entry: preview,routePhotos:reviewedPhotos) }
                         Text("Only this date, caption, selected summary values and the photo versions shown above are sent. Notes, gym details, videos, private markup and Health data stay private. Your original files remain on this device.").font(.caption)
                     }
@@ -70,17 +74,19 @@ struct ShareSessionView: View {
                 if social.configuration != nil, auth.account != nil {
                     Section {
                         RemovalStatusView(outbox: social.removals) { await social.retryRemovals(auth, force: true) }
-                        Button("Remove shared entry", role: .destructive) {
-                            Task { if await social.removeShare(auth, sessionID: session.id) { dismiss() } }
-                        }.frame(minHeight: 44)
+                        Button(role: .destructive) { Task { if await social.removeShare(auth, sessionID: session.id) { dismiss() } } } label: {
+                            Label("Remove shared entry", systemImage: "trash").foregroundStyle(ClimbTheme.error)
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
+                        }.buttonStyle(.plain)
                         Text("Removal works offline. Friends may still see the entry and its photos until it syncs.").font(.caption)
                     }
                 }
                 if social.busy { SwiftUI.ProgressView("Loading…") }
-                if let message = social.errorMessage { Text(message).foregroundStyle(.red); Button("Retry loading") { Task { await load() } } }
+                if let message = social.errorMessage { Text(message).foregroundStyle(ClimbTheme.error); Button("Retry loading") { Task { await load() } } }
             }
+            .id(textSize)
             .navigationTitle("Share session")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() }.accessibleToolbarAction() } }
             .task { await load() }
             .onDisappear { preparation?.cancel() }
         }
@@ -96,6 +102,9 @@ struct ShareSessionView: View {
     }
 
     private func load() async {
+        #if DEBUG
+        if AccessibilityAuditFixtures.enabled, let auditEntry { draft = auditEntry; photosLoaded = true; return }
+        #endif
         guard social.configuration != nil, auth.account != nil else { return }
         await social.refresh(auth)
         guard social.errorMessage == nil, social.me != nil, social.userID != nil else { return }

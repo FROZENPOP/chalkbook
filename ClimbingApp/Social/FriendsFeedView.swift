@@ -2,13 +2,16 @@ import SwiftUI
 import Observation
 
 struct FriendsFeedContent<Row: View>: View {
+    @Environment(\.dynamicTypeSize) private var textSize
     let feed: FriendsFeed
     let refreshing: Bool
     let next: () async -> Void
     let findFriends: () -> Void
     @ViewBuilder var row: (SharedSession) -> Row
     var body: some View {
-        LazyVStack(alignment:.leading,spacing:24) {
+        // The containing screen supplies the lazy stack. Nesting another lazy stack caches
+        // stale row heights when Dynamic Type changes and can clip the recap's text.
+        Group {
             if feed.entries.isEmpty && feed.hasLoaded && !feed.loading && feed.errorMessage == nil && !refreshing {
                 FriendsEmptyCard(symbol:"figure.climbing",title:"A little encouragement goes a long way.",message:"Shared sessions from your friends will appear here. Find a climbing buddy to get started.") {
                     Button("Add friends",systemImage:"person.badge.plus",action:findFriends).buttonStyle(.borderedProminent)
@@ -22,7 +25,7 @@ struct FriendsFeedContent<Row: View>: View {
                 }
             }
             if !feed.entries.isEmpty {
-                Text("Only sessions shared with you appear here, not anyone’s complete journal.").font(.caption).foregroundStyle(.secondary)
+                Text("Only sessions shared with you appear here, not anyone’s complete journal.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
             }
             if feed.loading {
                 SwiftUI.ProgressView(feed.entries.isEmpty ? "Loading activity…" : "Loading more activity…")
@@ -30,13 +33,17 @@ struct FriendsFeedContent<Row: View>: View {
                     .accessibilityLabel("Loading friends feed").accessibilityIdentifier("friendsFeedLoading")
             } else if let error=feed.errorMessage {
                 VStack(alignment:.leading,spacing:8) {
-                    Text(error).font(.subheadline).foregroundStyle(.secondary)
+                    Text(error).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                     Button("Retry loading activity") { Task { await next() } }.buttonStyle(.bordered).tint(Color.primary).frame(minHeight:44)
                         .accessibilityLabel("Retry loading friends feed").accessibilityIdentifier("retryFriendsFeed")
                 }
             } else if feed.hasLoaded && !feed.hasMore && !feed.entries.isEmpty {
-                Label("You’re all caught up",systemImage:"checkmark.circle").font(.subheadline).foregroundStyle(.secondary)
+                Label("You’re all caught up",systemImage:"checkmark.circle").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth:.infinity,minHeight:44).accessibilityElement(children:.combine).accessibilityLabel("End of friends feed").accessibilityIdentifier("friendsFeedEnd")
+                    // Refresh this stateless lazy row when text size changes so its measured
+                    // height and font update together, without rebuilding feed entries.
+                    .id(textSize)
             } else if feed.hasLoaded && feed.hasMore {
                 // Accessible/manual fallback; scrolling near the end also loads automatically.
                 Button("Load more activity") { Task { await next() } }.buttonStyle(.bordered).tint(Color.primary).frame(minHeight:44)
@@ -55,7 +62,7 @@ struct FriendsFeedContent<Row: View>: View {
         requests += 1
         if ProcessInfo.processInfo.arguments.contains("--test-empty-feed") { return .init(entries:[]) }
         if after != nil && ProcessInfo.processInfo.arguments.contains("--test-feed-error") && !failed { failed=true;throw SocialError.server }
-        let rows=(1...23).map { number in
+        let rows=(1...(AccessibilityAuditFixtures.enabled ? 1 : 23)).map { number in
             var entry=SharedSession(session:ClimbingSession(),owner:owner)
             entry.id=UUID(uuidString:String(format:"00000000-0000-0000-0000-%012d",1000-number))!
             entry.session_day="2026-10-30";entry.caption="Fixture recap \(number)";entry.attempts=number;entry.sends=1

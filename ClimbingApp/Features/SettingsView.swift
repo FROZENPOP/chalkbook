@@ -3,6 +3,7 @@ import SwiftData
 import UniformTypeIdentifiers
 
 struct SettingsView: View {
+    @Environment(\.dynamicTypeSize) private var textSize
     @Environment(AccountSession.self) private var auth
     @AppStorage("healthEnabled") private var healthEnabled = false
     @State private var showLogin = false
@@ -23,7 +24,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             AccountSection(openPortal: { showLogin = true }, editProfile: { editProfile = true })
-            Section("My gyms") {
+            Section(header: Text("My gyms").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                 NavigationLink { GymsView() } label: {
                     Label("Saved gyms (\(gyms.count))", systemImage: "building.2")
                 }.accessibilityIdentifier("savedGyms")
@@ -31,7 +32,7 @@ struct SettingsView: View {
                     LabeledContent("Default gym", value: gym.name)
                 }
             }
-            Section("Apple Health") {
+            Section(header: Text("Apple Health").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                 Toggle("Health workout linking", isOn: Binding(get: { healthEnabled }, set: { value in
                     if value { healthEnabled = true }
                     else if store.save({
@@ -40,7 +41,7 @@ struct SettingsView: View {
                 }))
                 Text("Read access is requested only from a session’s Link Apple Health workout action. Turning this off removes local links. Measurements are never included in journal backups, and no workouts are exported.").font(.caption)
             }
-            Section("Climbing") {
+            Section(header: Text("Climbing").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                 Picker("Default grade scale", selection: $defaultScale) {
                     ForEach(GradeScale.allCases.filter { $0 != .custom }) { Text($0.rawValue).tag($0.rawValue) }
                 }
@@ -49,14 +50,14 @@ struct SettingsView: View {
             Section {
                 Button("Export backup", systemImage: "square.and.arrow.up", action: export)
                 Button("Restore backup", systemImage: "square.and.arrow.down") { importing = true }
-            } header: { Text("Your data") } footer: {
-                Text("Your log stays on this device and works offline. Export backups to Files regularly; deleting the app can delete its local data.")
+            } header: { Text("Your data").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true) } footer: {
+                Text("Your log stays on this device and works offline. Export backups to Files regularly; deleting the app can delete its local data.").font(.caption).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true)
             }
             if let pendingBackup {
-                Section("Backup ready to restore") {
+                Section(header: Text("Backup ready to restore").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     Text("\(pendingBackup.sessions.count) sessions · \(pendingBackup.climbCount) climbs")
                     Text("Exported \(pendingBackup.exportedAt.formatted(date: .abbreviated, time: .shortened))")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                     Button("Back up current log first", action: export)
                     Button("Replace current log", role: .destructive) { confirmRestore = true }
                     Button("Cancel restore") { self.pendingBackup = nil }
@@ -65,7 +66,7 @@ struct SettingsView: View {
             Section {
                 LabeledContent("Sessions", value: "\(sessions.count)")
                 LabeledContent("Version", value: "0.1.0")
-                Text("Made for your next move.").foregroundStyle(.secondary)
+                Text("Made for your next move.").foregroundStyle(ClimbTheme.secondaryText)
             }
             if auth.account != nil {
                 Section {
@@ -74,6 +75,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .id(textSize)
         .navigationTitle("Settings")
         .sheet(isPresented: $editProfile) { ProfileEditorView() }
         .sheet(isPresented: $showLogin) { LoginPortalView() }

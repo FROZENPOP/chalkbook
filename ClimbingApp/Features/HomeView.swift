@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct HomeView: View {
+    @Environment(\.dynamicTypeSize) private var textSize
     @Environment(ProfileStore.self) private var profiles
     @Query(sort: \ClimbingSession.day, order: .reverse) private var sessions: [ClimbingSession]
     @State private var pastRecap = false
@@ -11,37 +12,41 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                HStack {
+                let header = textSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout())
+                header {
                     Label("CLIMB LOG", systemImage: "figure.climbing")
                         .font(.caption.weight(.bold)).tracking(2).foregroundStyle(ClimbTheme.forest)
-                    Spacer()
-                    Text(Date.now, format: .dateTime.month(.abbreviated).day()).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("journalBrand")
+                    if !textSize.isAccessibilitySize { Spacer() }
+                    Text(Date.now, format: .dateTime.month(.abbreviated).day()).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
+                        .accessibilityIdentifier("journalDate")
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     Text(active == nil ? "Your next move." : "Keep climbing.")
                         .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    Text("Small attempts. Real progress.").font(.subheadline).foregroundStyle(.secondary)
+                    Text("Small attempts. Real progress.").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                 }
                 Surface {
                     VStack(alignment: .leading, spacing: 18) {
-                        Image(systemName: "mountain.2.fill").font(.system(size: 44)).foregroundStyle(ClimbTheme.forest)
+                        Image(systemName: "mountain.2.fill").accessibilityHidden(true).font(.system(size: 44)).foregroundStyle(ClimbTheme.forest)
                         Text(active == nil ? "A good session starts here." : "You have a session in progress.")
                             .font(.title2.weight(.semibold))
                         Text(active?.title ?? "Log your climbs, celebrate your sends, and keep track of what’s next.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ClimbTheme.secondaryText)
                         if let active {
                             NavigationLink { SessionDetailView(session: active) } label: {
-                                Label("Resume session", systemImage: "arrow.right").frame(maxWidth: .infinity).padding(.vertical, 6)
+                                Label("Resume session", systemImage: "arrow.right").frame(maxWidth: .infinity).padding(.vertical, 6).foregroundStyle(Color(uiColor: .systemBackground))
                             }
                             .buttonStyle(.borderedProminent).accessibilityIdentifier("resumeSession")
                         } else {
                             Button { sheet = .new } label: {
-                                Label("Start session", systemImage: "plus").frame(maxWidth: .infinity).padding(.vertical, 6)
+                                Label("Start session", systemImage: "plus").frame(maxWidth: .infinity).padding(.vertical, 6).foregroundStyle(Color(uiColor: .systemBackground))
                             }
                             .buttonStyle(.borderedProminent).accessibilityIdentifier("startSession")
                         }
                     }
                 }
+                .id("journalSessionActions")
                 Surface {
                     JournalMetrics(first: "\(sessions.count)", firstLabel: "sessions", second: "\(JournalStatistics(sessions: sessions).distinctClimbsSent)", secondLabel: "climbs sent", third: JournalStatistics(sessions: sessions).knownAttempts.map(String.init) ?? "Unknown", thirdLabel: "attempts")
                 }
@@ -56,7 +61,7 @@ struct HomeView: View {
                     }
                 } else {
                     Label("Your log grows one session at a time.", systemImage: "leaf")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                        .font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                 }
             }
             .padding(20)

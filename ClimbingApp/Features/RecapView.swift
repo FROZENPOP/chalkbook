@@ -24,16 +24,16 @@ struct AggregateEditorView: View {
                 Section {
                     Picker("Coverage", selection: $coverage) { ForEach(ActivityCoverage.allCases) { Text($0.title).tag($0) } }.accessibilityIdentifier("recapCoverage")
                     Text(coverage == .additional ? "Only activity beyond your individual entries and other batches. Each batch must cover distinct activity." : "Describes the entire session. This replaces each supplied metric’s detailed total; it is never added to it.")
-                        .font(.subheadline).foregroundStyle(.secondary)
+                        .font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                 }
-                Section("What do you remember?") {
+                Section(header: Text("What do you remember?").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     TextField("Attempts — unknown if blank", text: $attempts).keyboardType(.numberPad).accessibilityIdentifier("recapAttempts")
                     TextField("Sends — unknown if blank", text: $sends).keyboardType(.numberPad).accessibilityIdentifier("recapSends")
                     TextField("Batch description (optional)", text: $label)
                     Text("Sends do not imply attempts, unique climbs, or flashes. Recalled totals never create individual attempts.").font(.caption)
                 }
-                Section("Recorded evidence") { Text("\(session.recordedAttempts.count) individual attempts · \(session.recordedAttempts.filter(\.sent).count) sends") }
-                if !validation.isEmpty { Section("Resolve before saving") { ForEach(validation, id: \.self) { Text($0).foregroundStyle(.red) } } }
+                Section(header: Text("Recorded evidence").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) { Text("\(session.recordedAttempts.count) individual attempts · \(session.recordedAttempts.filter(\.sent).count) sends") }
+                if !validation.isEmpty { Section(header: Text("Resolve before saving").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) { ForEach(validation, id: \.self) { Text($0).foregroundStyle(ClimbTheme.error) } } }
                 if let existing {
                     Section { Button("Delete recalled entry", role: .destructive) {
                         if store.save({ session.aggregates.removeAll { $0.id == existing.id }; store.context.delete(existing) }) { dismiss() }
@@ -101,7 +101,7 @@ struct FinishReviewView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Review") {
+                Section(header: Text("Review").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     Text("\(session.recordedAttempts.count) recorded attempts · \(session.completedClimbs) distinct climbs sent")
                     Text(session.totals.label)
                     Text("Attempts: \(session.totals.attempts.map(String.init) ?? "Unknown") · Sends: \(session.totals.sends.map(String.init) ?? "Unknown")")

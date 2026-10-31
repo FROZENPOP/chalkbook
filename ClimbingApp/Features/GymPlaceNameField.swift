@@ -83,7 +83,7 @@ struct GymPlaceNameField: View {
                 search.search(query)
             }
         if focused && query.count < 3 {
-            Text("Type a gym name and city to search Apple Maps, or enter a gym manually.").font(.caption).foregroundStyle(.secondary)
+            Text("Type a gym name and city to search Apple Maps, or enter a gym manually.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
         }
         if search.loading { SwiftUI.ProgressView("Finding gyms…").accessibilityIdentifier("gymPlaceLoading") }
         ForEach(search.suggestions) { place in
@@ -97,12 +97,12 @@ struct GymPlaceNameField: View {
                     Image(systemName: "mappin.circle").font(.title2)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(place.name).font(.body).foregroundStyle(.primary)
-                        if !place.address.isEmpty { Text(place.address).font(.caption).foregroundStyle(.secondary) }
+                        if !place.address.isEmpty { Text(place.address).font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
                     }
                 }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             }.buttonStyle(.borderless).accessibilityIdentifier("gymPlaceSuggestion")
         }
-        if !search.suggestions.isEmpty { Text("Suggestions from Apple Maps").font(.caption).foregroundStyle(.secondary) }
-        if let message = search.message { Text(message).font(.caption).foregroundStyle(.secondary) }
+        if !search.suggestions.isEmpty { Text("Suggestions from Apple Maps").font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
+        if let message = search.message { Text(message).font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
     }
 }

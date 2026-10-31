@@ -20,28 +20,28 @@ struct SocialProfileEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Discoverable profile") {
+                Section(header: Text("Discoverable profile").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     TextField("Username", text: $username).textInputAutocapitalization(.never).autocorrectionDisabled()
                     TextField("Display name", text: $name)
                     Text("Your username and display name are visible to signed-in climbers. Your email stays private.").font(.caption)
                 }
-                Section("Optional climbing profile") {
+                Section(header: Text("Optional climbing profile").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     ProfileAvatar(photo:photo)
                     PhotosPicker("Choose profile photo",selection:$selection,matching:.images)
                     if importing { SwiftUI.ProgressView("Preparing photo…") }
                     if let local=profiles.profile?.photo { Button("Use my local profile photo") { do { photo=try SocialPhoto.prepare(local) } catch { loadError=error.localizedDescription } } }
                     if photo != nil { Button("Remove shared photo",role:.destructive) { photo=nil } }
                     TextField("A little about your climbing",text:$bio,axis:.vertical).lineLimit(3...5)
-                    Text("\(bio.count)/240 characters").font(.caption).foregroundStyle(.secondary)
+                    Text("\(bio.count)/240 characters").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                     if let local=profiles.profile?.bio,!local.isEmpty { Button("Copy my local bio into this draft") { bio=String(local.prefix(240)) } }
                     Text("Only the photo and bio shown here will be published when you save. On a private account, only friends can see them. Public accounts make them visible to signed-in climbers.").font(.caption)
                 }.disabled(!ready || social.busy || importing)
-                Section("Account privacy") {
+                Section(header: Text("Account privacy").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     Toggle("Private account", isOn: $isPrivate)
                     Text("A private account limits Public entries to approved friends. Private entries are always yours alone. Friendship always requires acceptance.").font(.caption)
                 }
                 if social.me != nil {
-                    Section("Friend discovery") {
+                    Section(header: Text("Friend discovery").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         if social.suggestions.discoveryEnabled != nil {
                             Toggle("Let friends of friends find me",isOn:Binding(get:{ social.suggestions.discoveryEnabled ?? true },set:{ value in
                                 Task { await social.suggestions.setDiscovery(value,service:SocialSuggestionService(store:social,auth:auth)) }
@@ -50,16 +50,16 @@ struct SocialProfileEditor: View {
                         Text("Your profile may be suggested to climbers with mutual friends. Turn off to stop appearing in suggestions. Changes save immediately.").font(.caption)
                         if social.suggestions.savingSetting { SwiftUI.ProgressView("Saving discovery setting…") }
                         if let error=social.suggestions.settingError {
-                            Text(error).foregroundStyle(.red)
+                            Text(error).foregroundStyle(ClimbTheme.error)
                             Button("Retry discovery setting") { Task { await social.suggestions.loadDiscovery(SocialSuggestionService(store:social,auth:auth)) } }
                         }
                     }
                 }
-                if let message = social.errorMessage { Text(message).foregroundStyle(.red) }
+                if let message = social.errorMessage { Text(message).foregroundStyle(ClimbTheme.error) }
                 Button("Save social profile") {
                     Task { if await social.saveProfile(auth, username: username, name: name, isPrivate: isPrivate,bio:bio,photo:photo) { dismiss() } }
                 }.disabled(social.busy || !ready || importing || bio.count>240)
-                if let loadError { Text(loadError).foregroundStyle(.red);if !ready { Button("Retry loading profile") { Task { await loadDetails() } } } }
+                if let loadError { Text(loadError).foregroundStyle(ClimbTheme.error);if !ready { Button("Retry loading profile") { Task { await loadDetails() } } } }
                 if social.me != nil {
                     Section {
                         Button("Delete social profile", role: .destructive) { confirmDelete = true }.disabled(social.busy)
@@ -108,7 +108,7 @@ struct ReportClimberView: View {
                 TextField("Describe the concern", text: $reason, axis: .vertical).lineLimit(4...8)
                 Button("Submit report") { Task { submitted = await social.safetyAction(auth, target: target, block: false, reason: reason) } }
                     .disabled(reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || reason.count > 1000 || social.busy)
-                if let message = social.errorMessage { Text(message).foregroundStyle(.red) }
+                if let message = social.errorMessage { Text(message).foregroundStyle(ClimbTheme.error) }
             }
         }.navigationTitle("Report climber")
     }
@@ -120,17 +120,17 @@ struct SharedSessionPreview: View {
     @State private var viewingPhotos = false
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(entry.session_day).font(.subheadline)
-            if !entry.caption.isEmpty { Text(entry.caption) }
+            Text(entry.session_day).font(.subheadline).fixedSize(horizontal: false, vertical: true)
+            if !entry.caption.isEmpty { Text(entry.caption).fixedSize(horizontal: false, vertical: true) }
             Text("\(entry.attempts.map(String.init) ?? "Unknown") attempts · \(entry.sends.map(String.init) ?? "Unknown") sends")
             Text(entry.duration_minutes.map { "\($0) minutes recorded" } ?? "Duration not recorded").font(.caption)
-            Text(entry.completeness).font(.caption).foregroundStyle(.secondary)
+            Text(entry.completeness).fixedSize(horizontal: false, vertical: true).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
             if (routePhotos?.count ?? entry.route_photo_count ?? 0) > 0 {
                 Button("View climb photos", systemImage:"photo.on.rectangle") { viewingPhotos = true }
                     .frame(minHeight:44).accessibilityIdentifier("viewSharedRoutePhotos")
-                Text("Photos are never public; friends can view them when this entry is shared with them.").font(.caption).foregroundStyle(.secondary)
+                Text("Photos are never public; friends can view them when this entry is shared with them.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
             }
-        }.accessibilityElement(children: .contain)
+        }.fixedSize(horizontal: false, vertical: true).accessibilityElement(children: .contain)
             .sheet(isPresented:$viewingPhotos) {
                 NavigationStack { SharedRoutePhotosView(entryID:entry.id,previewPhotos:routePhotos) }
             }
@@ -145,14 +145,14 @@ struct FriendProgressView: View {
     private var entries: [SharedSession] { social.entries.filter { $0.owner_id == climberID } }
     var body: some View {
         List {
-            Section("Shared progress") {
+            Section(header: Text("Shared progress").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                 Text("\(entries.count) shared sessions in the currently loaded feed pages. This is not their complete climbing history.")
                 Text("\(entries.compactMap(\.attempts).reduce(0,+)) attempts across \(entries.filter { $0.attempts != nil }.count) entries with attempt totals")
                 Text("\(entries.compactMap(\.sends).reduce(0,+)) sends across \(entries.filter { $0.sends != nil }.count) entries with send totals")
-                Text("Missing values are excluded. No grades or flash rates are inferred.").font(.caption).foregroundStyle(.secondary)
+                Text("Missing values are excluded. No grades or flash rates are inferred.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
             }
             ForEach(entries) { SharedSessionPreview(entry: $0) }
-            if let message = social.errorMessage { Text(message).foregroundStyle(.red) }
+            if let message = social.errorMessage { Text(message).foregroundStyle(ClimbTheme.error) }
         }.navigationTitle(name).refreshable { await social.refresh(auth) }
     }
 }

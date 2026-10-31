@@ -14,8 +14,8 @@ struct GymsView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(gym.name).foregroundStyle(.primary).font(.headline)
-                                if !gym.address.isEmpty { Text(gym.address).font(.caption).foregroundStyle(.secondary) }
-                                Text(gym.scaleLabel).foregroundStyle(.secondary).font(.subheadline)
+                                if !gym.address.isEmpty { Text(gym.address).font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
+                                Text(gym.scaleLabel).foregroundStyle(ClimbTheme.secondaryText).font(.subheadline)
                             }
                             Spacer()
                             if gym.isDefault { Label("Default", systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(ClimbTheme.forest) }
@@ -25,9 +25,9 @@ struct GymsView: View {
                         Button("Make default") { store.makeDefault(gym) }.tint(ClimbTheme.forest)
                     }
                 }
-                Button("Add gym", systemImage: "plus") { sheet = .new }
-                    .accessibilityIdentifier("addSavedGym")
-            } footer: { Text("Your default gym is preselected for new sessions. Each climb starts with its session’s gym and grading scale.") }
+                Button { sheet = .new } label: { HStack { Image(systemName: "plus").accessibilityHidden(true); Text("Add gym").fixedSize(horizontal: false, vertical: true) } }
+                    .frame(minHeight: 44).accessibilityIdentifier("addSavedGym")
+            } footer: { Text("Your default gym is preselected for new sessions. Each climb starts with its session’s gym and grading scale.").font(.caption).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true) }
         }
         .navigationTitle("My gyms")
         .sheet(item: $sheet) { destination in GymEditorView(gym: destination.gym) }
@@ -62,8 +62,8 @@ struct GymSelectionRow: View {
             HStack {
                 Label("Gym", systemImage: "building.2")
                 Spacer()
-                Text(selectedName).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
-                Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(.secondary)
+                Text(selectedName).foregroundStyle(ClimbTheme.secondaryText).multilineTextAlignment(.trailing)
+                Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
             }
             .foregroundStyle(.primary).frame(minHeight: 44)
         }
@@ -100,7 +100,7 @@ struct GymEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Gym") {
+                Section(header: Text("Gym").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     GymPlaceNameField(name: $name, address: $address)
                     TextField("Address or city (optional)", text: $address).textContentType(.fullStreetAddress).accessibilityIdentifier("gymAddress")
                     Toggle("Use as my default gym", isOn: $isDefault)
@@ -114,10 +114,10 @@ struct GymEditorView: View {
                         TextField("Green, Blue, Red, Black", text: $gradesText, axis: .vertical)
                             .lineLimit(2...5).accessibilityIdentifier("customGradeOrder")
                     }
-                } header: { Text("How does this gym grade climbs?") } footer: {
+                } header: { Text("How does this gym grade climbs?").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true) } footer: {
                     Text(scale == .custom ? "Optionally list grades from easiest to hardest, separated by commas. You can also type any grade when logging a climb." : "We’ll preselect this scale whenever you log a climb at this gym.")
                 }
-                Section("Local color guide (optional)") {
+                Section(header: Text("Local color guide (optional)").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     TextField("e.g. Blue: V2–V4, Red: V4–V6", text: $colorGuide, axis: .vertical).lineLimit(2...5)
                     Text("Your descriptions are notes, not grade conversions. They are copied into new climbs so later changes do not rewrite history.").font(.caption)
                 }

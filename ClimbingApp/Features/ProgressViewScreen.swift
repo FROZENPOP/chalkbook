@@ -48,7 +48,7 @@ struct ProgressViewScreen: View {
                             Text("\(statistics.distinctClimbsSent)")
                                 .font(.system(.largeTitle, design: .rounded, weight: .bold)).foregroundStyle(ClimbTheme.forest)
                             Text("\(statistics.distinctClimbsSent) of \(statistics.distinctClimbsAttempted) identified climbs. Recalled sends cannot establish distinct climb identities.")
-                                .font(.subheadline).foregroundStyle(.secondary)
+                                .font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                         }
                     }
                     Surface {
@@ -57,16 +57,17 @@ struct ProgressViewScreen: View {
                             Text("\(statistics.recalledSessions) sessions include recalled activity. Other values count recorded activity only; unlogged activity remains unknown.")
                             Text("\(statistics.recordedMinutes) recorded minutes across \(statistics.durationCount) sessions with known duration.")
                             Text("Confirmed flashes: \(statistics.confirmedFlashes) / \(statistics.knownFlashDenominator) sent climbs with known history; \(statistics.unknownFlashCount) unknown.")
-                            Text("Flash classification uses the complete journal history even when this date filter covers fewer sessions.").font(.caption).foregroundStyle(.secondary)
+                            Text("Flash classification uses the complete journal history even when this date filter covers fewer sessions.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                         }.accessibilityElement(children: .combine)
                     }
                     Surface {
                         VStack(alignment: .leading, spacing: 16) {
-                            Text("Sessions per week").font(.headline)
+                            Text("Sessions per week").font(.headline).id("progressWeeklyActivity")
                             Chart(weeks) { week in
                                 BarMark(x: .value("Week", SessionDay.date(for: week.day) ?? .now, unit: .weekOfYear), y: .value("Sessions", week.sessions))
                                     .foregroundStyle(ClimbTheme.forest).cornerRadius(5)
                             }.frame(height: 160)
+                            .accessibilityElement(children: .ignore)
                             .accessibilityLabel("Weekly activity")
                             .accessibilityValue("\(filtered.count) sessions across \(weeks.count) weeks with activity")
                             ForEach(weeks) { week in Text("\(SessionDay.label(for: week.day)): \(week.sessions) sessions").font(.caption) }
@@ -74,10 +75,11 @@ struct ProgressViewScreen: View {
                                 Text("Recorded duration per week").font(.headline)
                                 Chart(weeks.filter { $0.durationCount > 0 }) { week in
                                     BarMark(x: .value("Week", SessionDay.date(for: week.day) ?? .now, unit: .weekOfYear), y: .value("Recorded minutes", week.minutes)).foregroundStyle(ClimbTheme.amber)
-                                }.frame(height: 160).accessibilityLabel("Weekly recorded duration")
+                                }.frame(height: 160).accessibilityElement(children: .ignore).accessibilityLabel("Weekly recorded duration")
+                                .accessibilityValue(weeks.filter { $0.durationCount > 0 }.map { "\(SessionDay.label(for: $0.day)): \($0.minutes) recorded minutes in \($0.durationCount) sessions" }.joined(separator: "; "))
                                 ForEach(weeks.filter { $0.durationCount > 0 }) { week in Text("\(SessionDay.label(for: week.day)): \(week.minutes) recorded minutes in \(week.durationCount) sessions").font(.caption) }
                             }
-                            Text("Weeks begin on your calendar’s first weekday.").font(.caption).foregroundStyle(.secondary)
+                            Text("Weeks begin on your calendar’s first weekday.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                         }
                     }
                     Surface {
@@ -85,7 +87,7 @@ struct ProgressViewScreen: View {
                             Picker("Grade scale", selection: $scale) { ForEach(GradeScale.allCases) { Text($0.rawValue).tag($0) } }
                                 .pickerStyle(.menu)
                             let distribution = statistics.distributions(in: scale)
-                            if distribution.isEmpty { Text("No individual attempts in this grading system yet. Recalled totals do not establish grade-level evidence.").foregroundStyle(.secondary) }
+                            if distribution.isEmpty { Text("No individual attempts in this grading system yet. Recalled totals do not establish grade-level evidence.").foregroundStyle(ClimbTheme.secondaryText) }
                             ForEach(distribution) { item in
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text(item.label).font(.headline)
@@ -93,7 +95,7 @@ struct ProgressViewScreen: View {
                                 }.accessibilityElement(children: .combine)
                             }
                             Text("Gym scales stay separate. Custom labels are shown in your gym’s saved order when available, and never converted into V grades.")
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                         }
                     }
                 }

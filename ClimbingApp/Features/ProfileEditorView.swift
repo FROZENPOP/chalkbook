@@ -46,24 +46,24 @@ struct ProfileEditorView: View {
                         Button("Remove profile photo", role: .destructive) { photo = nil }.frame(minHeight: 44).accessibilityIdentifier("removeProfilePhoto")
                     }
                     if importing { SwiftUI.ProgressView("Preparing your photo…") }
-                    if let importError { Text(importError).font(.subheadline).foregroundStyle(.red) }
-                } footer: { Text("A photo is optional. You can change or remove it later.") }
-                Section("About you") {
+                    if let importError { Text(importError).font(.subheadline).foregroundStyle(ClimbTheme.error) }
+                } footer: { Text("A photo is optional. You can change or remove it later.").font(.caption).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true) }
+                Section(header: Text("About you").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     TextField("Display name", text: $name).textContentType(.name).textInputAutocapitalization(.words).accessibilityIdentifier("profileName")
                     TextField("A little about your climbing (optional)", text: $bio, axis: .vertical).lineLimit(3...6).accessibilityIdentifier("profileBio")
-                    Text("Display name: 1–60 characters. Bio: up to 500 characters.").font(.caption).foregroundStyle(.secondary)
+                    Text("Display name: 1–60 characters. Bio: up to 500 characters.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                 }
                 if let account = auth.account {
-                    Section("Sign-in account") {
+                    Section(header: Text("Sign-in account").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         LabeledContent("Provider", value: account.provider == .google ? "Google" : "Apple")
                         if let email = account.email { LabeledContent("Email", value: email) }
-                        Text("To change your sign-in email, update it with your sign-in provider. Editing your display name here does not change that account.").font(.caption).foregroundStyle(.secondary)
+                        Text("To change your sign-in email, update it with your sign-in provider. Editing your display name here does not change that account.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                     }
                 }
-                Section { Text("Your profile is saved on this iPhone. It stays private and does not turn on sharing or cloud sync.").font(.footnote).foregroundStyle(.secondary) }
+                Section { Text("Your profile is saved on this iPhone. It stays private and does not turn on sharing or cloud sync.").font(.footnote).foregroundStyle(ClimbTheme.secondaryText) }
                 if let message = profiles.errorMessage {
-                    Section("Couldn’t save profile") {
-                        Text(message).foregroundStyle(.red)
+                    Section(header: Text("Couldn’t save profile").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
+                        Text(message).foregroundStyle(ClimbTheme.error)
                         Button("Retry") { save(retry: true) }.disabled(importing || !valid)
                     }
                 }

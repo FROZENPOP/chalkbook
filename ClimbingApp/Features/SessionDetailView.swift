@@ -24,20 +24,20 @@ struct SessionDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text(SessionDay.label(for: session.day)).font(.subheadline).foregroundStyle(.secondary)
+                Text(SessionDay.label(for: session.day)).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                 Surface {
                     VStack(alignment: .leading, spacing: 16) {
                         Label(session.isComplete ? "Session complete" : "In progress", systemImage: session.isComplete ? "checkmark.circle.fill" : "circle.dotted")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(ClimbTheme.forest)
                         JournalMetrics(first: session.totals.attempts.map(String.init) ?? "Unknown", firstLabel: "attempts", second: session.totals.sends.map(String.init) ?? "Unknown", secondLabel: "sends", third: "\(session.completedClimbs)", thirdLabel: "identified climbs sent")
-                        Text(session.totals.label).font(.caption).foregroundStyle(.secondary)
+                        Text(session.totals.label).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                         if let minutes = session.durationMinutes { Text("Recorded duration: \(minutes) minutes").font(.caption) }
-                        else { Text("Session duration not recorded").font(.caption).foregroundStyle(.secondary) }
-                        if !session.notes.isEmpty { Text(session.notes).font(.subheadline).foregroundStyle(.secondary) }
+                        else { Text("Session duration not recorded").font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
+                        if !session.notes.isEmpty { Text(session.notes).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText) }
                     }
                 }
                 HStack {
-                    Text("Your climbs").font(.title2.bold())
+                    Text("Your climbs").font(.title2.bold()).id("sessionClimbs")
                     Spacer()
                     if !session.isComplete {
                         Button { sheet = .addClimb } label: { Label("Add climb", systemImage: "plus") }
@@ -59,11 +59,11 @@ struct SessionDetailView: View {
                 }
                 ForEach(session.orderedClimbs.filter { $0.id != selected?.id }) { climb in
                     Button { _ = store.select(climb, in: session) } label: {
-                        Surface { VStack(alignment: .leading) { Text(climb.title).font(.headline); Text(climb.descriptor.label).font(.subheadline); Text("Select to log").font(.caption).foregroundStyle(.secondary) } }
+                        Surface { VStack(alignment: .leading) { Text(climb.title).font(.headline); Text(climb.descriptor.label).font(.subheadline); Text("Select to log").font(.caption).foregroundStyle(ClimbTheme.secondaryText) } }
                     }.buttonStyle(.plain)
                 }
                 Text("Recalled activity").font(.title2.bold())
-                Text("Additional batches cover distinct unlogged activity. Whole-session totals replace detailed totals. Reduce or remove a batch explicitly before replacing it with individual entries.").font(.caption).foregroundStyle(.secondary)
+                Text("Additional batches cover distinct unlogged activity. Whole-session totals replace detailed totals. Reduce or remove a batch explicitly before replacing it with individual entries.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                 ForEach(session.aggregates) { entry in
                     Button { editingAggregate = entry } label: {
                         Surface { VStack(alignment: .leading) {
@@ -146,8 +146,8 @@ struct ClimbCard: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(climb.title).font(.headline)
                         Text(climb.resultLabel).font(.subheadline)
-                            .foregroundStyle(climb.isSent ? ClimbTheme.forest : .secondary)
-                        Text("\(displayedAttempts.count) attempts · \(displayedAttempts.filter(\.sent).count) sends this session").font(.caption).foregroundStyle(.secondary)
+                            .foregroundStyle(climb.isSent ? ClimbTheme.forest : ClimbTheme.secondaryText)
+                        Text("\(displayedAttempts.count) attempts · \(displayedAttempts.filter(\.sent).count) sends this session").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                     }
                     Spacer(minLength: 0)
                     Button { editing = climb } label: { Image(systemName: "pencil").frame(width: 44, height: 44) }
@@ -155,16 +155,16 @@ struct ClimbCard: View {
                 }
                 if !climb.gymName.isEmpty {
                     Text(climb.gymName + (climb.scale == .custom ? " · " + climb.customScaleName : ""))
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                 }
                 ForEach(climb.media) { media in
                     Button { mediaPreview = media.draft } label: { MediaLabel(kind: media.kind, filename: media.filename) }
                 }
                 NavigationLink("Notebook and complete history") { ProjectDetailView(climb: climb) }.frame(minHeight: 44)
                 if !climb.styles.isEmpty {
-                    Text(climb.styles.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
+                    Text(climb.styles.joined(separator: " · ")).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                 }
-                if !climb.notes.isEmpty { Text(climb.notes).font(.subheadline).foregroundStyle(.secondary) }
+                if !climb.notes.isEmpty { Text(climb.notes).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText) }
                 if canLog {
                     ProjectNotebookSummary(climb:climb)
                     let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))
