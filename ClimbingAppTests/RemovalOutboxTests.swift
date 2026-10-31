@@ -172,7 +172,9 @@ private final class OutboxURLProtocol: URLProtocol {
         // A successful authenticated call schedules another bounded drain.
         try outbox.enqueue(contentID: UUID(), kind: .sessionSnapshot)
         _ = try await social.request("/rest/v1/example")
-        for _ in 0..<1000 { if outbox.entries.isEmpty { break }; await Task.yield() }
+        // The drain runs a stubbed network round trip; yields alone can finish before it on slow CI machines.
+        let deadline = Date.now.addingTimeInterval(5)
+        while !outbox.entries.isEmpty && Date.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
         XCTAssertTrue(outbox.entries.isEmpty)
     }
     func testAccountChangeDuringAwaitCannotSendAnotherRemoval() async throws {
@@ -256,7 +258,9 @@ private final class OutboxURLProtocol: URLProtocol {
             XCTAssertEqual(outbox.entries[0].attemptCount, 0, "Removal cannot race an in-flight save")
         }
         XCTAssertTrue(saved)
-        for _ in 0..<1000 { if outbox.entries.isEmpty { break }; await Task.yield() }
+        // The drain runs a stubbed network round trip; yields alone can finish before it on slow CI machines.
+        let deadline = Date.now.addingTimeInterval(5)
+        while !outbox.entries.isEmpty && Date.now < deadline { try await Task.sleep(for: .milliseconds(10)) }
         XCTAssertTrue(outbox.entries.isEmpty, "Finishing the save schedules the deferred drain")
     }
     func testExponentialBackoffIsCapped() async throws {
