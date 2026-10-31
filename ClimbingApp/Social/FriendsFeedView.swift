@@ -2,6 +2,7 @@ import SwiftUI
 import Observation
 
 struct FriendsFeedContent<Row: View>: View {
+    @Environment(\.dynamicTypeSize) private var textSize
     let feed: FriendsFeed
     let refreshing: Bool
     let next: () async -> Void
@@ -38,7 +39,11 @@ struct FriendsFeedContent<Row: View>: View {
                 }
             } else if feed.hasLoaded && !feed.hasMore && !feed.entries.isEmpty {
                 Label("You’re all caught up",systemImage:"checkmark.circle").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth:.infinity,minHeight:44).accessibilityElement(children:.combine).accessibilityLabel("End of friends feed").accessibilityIdentifier("friendsFeedEnd")
+                    // Refresh this stateless lazy row when text size changes so its measured
+                    // height and font update together, without rebuilding feed entries.
+                    .id(textSize)
             } else if feed.hasLoaded && feed.hasMore {
                 // Accessible/manual fallback; scrolling near the end also loads automatically.
                 Button("Load more activity") { Task { await next() } }.buttonStyle(.bordered).tint(Color.primary).frame(minHeight:44)
