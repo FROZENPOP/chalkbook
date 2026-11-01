@@ -9,10 +9,12 @@ struct ConsistencyCalendarView: View {
     @State private var selected: ConsistencyCalendar.Day?
     @State private var cursor: Int?
     @State private var width: CGFloat = 0
-    private let cell: CGFloat = 13
     private let gap: CGFloat = 3
     // Shows the weeks that fit instead of scrolling: text in a horizontal scroll view fails the Dynamic Type audit.
-    private var weeks: [ConsistencyCalendar.Week] { Array(calendar.weeks.suffix(max(1, Int((width + gap) / (cell + gap))))) }
+    private var weekCount: Int { min(calendar.weeks.count, max(1, Int((width + gap) / 16))) }
+    // Cells stretch from 13 pt so the grid fills the card edge to edge.
+    private var cell: CGFloat { width > 0 ? (width + gap) / CGFloat(weekCount) - gap : 13 }
+    private var weeks: [ConsistencyCalendar.Week] { Array(calendar.weeks.suffix(weekCount)) }
     private var cursorWeek: ConsistencyCalendar.Week? { weeks.indices.contains(cursor ?? -1) ? weeks[cursor!] : weeks.last }
 
     var body: some View {
@@ -97,15 +99,15 @@ struct ConsistencyCalendarView: View {
             HStack(spacing: 6) {
                 ForEach(week.days) { day in
                     Button { selected = day } label: {
-                        // Neutral tile with a shaded bar: text on the shaded fill fails contrast at the middle levels.
+                        // A light tint plus a shaded bar: text on the full shade fails contrast at the middle levels.
                         VStack(spacing: 4) {
                             Text(day.date.formatted(.dateTime.weekday(.narrow))).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                             Text(day.date.formatted(.dateTime.day())).font(.subheadline.weight(.semibold))
-                            Capsule().fill(fill(day)).frame(height: 4).padding(.horizontal, 8)
+                            Capsule().fill(day.sessions > 0 ? shade(day.level) : .clear).frame(height: 6).padding(.horizontal, 10)
                         }
                         .padding(.vertical, 6)
                         .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(Color(uiColor: .secondarySystemFill), in: RoundedRectangle(cornerRadius: 10))
+                        .background(day.sessions > 0 ? ClimbTheme.forest.opacity(0.16) : Color(uiColor: .secondarySystemFill), in: RoundedRectangle(cornerRadius: 10))
                         .overlay { if day.id == selected?.id { RoundedRectangle(cornerRadius: 10).stroke(.primary, lineWidth: 2) } }
                     }
                     .buttonStyle(.plain)
@@ -124,7 +126,7 @@ struct ConsistencyCalendarView: View {
         withAnimation(.snappy) { focusedWeek = weeks[column]; selected = nil; cursor = column }
     }
     private func fill(_ day: ConsistencyCalendar.Day) -> Color { day.isFuture ? Color(uiColor: .quaternarySystemFill) : shade(day.level) }
-    private func shade(_ level: Int) -> Color { level == 0 ? Color(uiColor: .systemFill) : ClimbTheme.forest.opacity([0, 0.35, 0.55, 0.78, 1][level]) }
+    private func shade(_ level: Int) -> Color { level == 0 ? Color(uiColor: .systemFill) : ClimbTheme.forest.opacity([0, 0.45, 0.65, 0.85, 1][level]) }
     private func monthLabel(_ week: ConsistencyCalendar.Week) -> String? {
         guard let first = week.days.first(where: { Calendar.current.component(.day, from: $0.date) == 1 }) else { return nil }
         return first.date.formatted(.dateTime.month(.abbreviated))
