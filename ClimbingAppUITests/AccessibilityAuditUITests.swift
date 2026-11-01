@@ -189,6 +189,11 @@ import XCTest
     private func connectHealth(_ app: XCUIApplication) {
         let toggle = app.switches["showHealthInsights"]
         XCTAssertTrue(toggle.exists || toggle.waitForExistence(timeout: 5))
+        // On small phones the toggle can start under the floating tab bar; short drags, because a swipe flings it off the top.
+        let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+        for _ in 0..<12 where toggle.frame.maxY > app.tabBars.firstMatch.frame.minY - 8 {
+            center.press(forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: 0, dy: -200)))
+        }
         if toggle.value as? String != "1" { toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap() }
         let connect = app.buttons["connectHealthInsights"]
         for _ in 0..<12 { if connect.isHittable { break }; app.swipeUp() }
@@ -203,6 +208,30 @@ import XCTest
             XCTAssertGreaterThanOrEqual(button.frame.width, 44)
             XCTAssertGreaterThanOrEqual(button.frame.height, 44)
         }
+        app.terminate()
+    }
+    func testConsistencyCalendarCollapses() {
+        let app = launch("progress")
+        let toggle = app.buttons["consistencyToggle"], grid = app.descendants(matching: .any)["Climbing calendar"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(toggle.frame.height, 44)
+        XCTAssertTrue(grid.exists)
+        // Year → this week → its first day → back to the year.
+        grid.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
+        let firstDay = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'consistencyDay-'")).firstMatch
+        XCTAssertTrue(firstDay.waitForExistence(timeout: 2))
+        XCTAssertGreaterThanOrEqual(firstDay.frame.height, 44)
+        firstDay.tap()
+        XCTAssertEqual(app.staticTexts["consistencyDetail"].label, firstDay.label)
+        audit(app, "progress week")
+        app.buttons["consistencyYear"].tap()
+        XCTAssertTrue(grid.waitForExistence(timeout: 2))
+        toggle.tap()
+        XCTAssertTrue(grid.waitForNonExistence(timeout: 2))
+        XCTAssertEqual(toggle.value as? String, "Collapsed")
+        // Expand again so the stored state doesn't hide the calendar from later audits.
+        toggle.tap()
+        XCTAssertTrue(grid.waitForExistence(timeout: 2))
         app.terminate()
     }
     func testProgressWithOptionalHealthAndEmptyReads() {
