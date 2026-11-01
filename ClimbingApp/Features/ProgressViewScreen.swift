@@ -32,6 +32,10 @@ struct ProgressViewScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                // The calendar always shows the past year, so it sits above the range picker it ignores.
+                if !sessions.isEmpty {
+                    Surface { ConsistencyCalendarView(calendar: ConsistencyCalendar(sessions: sessions.map { ($0.day, $0.attemptCount) })) }
+                }
                 Picker("Time range", selection: $range) { ForEach(ProgressRange.allCases) { Text($0.rawValue).tag($0) } }
                     .pickerStyle(.segmented)
                 ProgressHealthSection(sessionIDs: Set(filtered.map(\.id)))
