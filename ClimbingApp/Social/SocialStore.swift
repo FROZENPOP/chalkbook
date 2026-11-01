@@ -17,19 +17,23 @@ final class SocialStore {
     let suggestions = FriendSuggestions()
     private(set) var mediaRevision = 0
     var errorMessage: String?
+    /// Set when an Apple account has no saved Friends session and Apple must confirm the account again.
+    private(set) var needsAppleSignIn = false
     let configuration: SupabaseConfiguration?
     private var accessToken: String?
     private var expiresAt = Date.distantPast
     private let network: URLSession
     private let accountKey: String
     private let identityToken: (AccountSession) async throws -> String
+    private let sessions: FriendsSessionVault
     private weak var authorizedSession: AccountSession?
     private var retryScheduled = false
 
     init(configuration: SupabaseConfiguration? = .load(), network: URLSession = URLSession(configuration: .ephemeral),
-         accountKey: String = "guest", removals: RemovalOutbox? = nil,
-         identityToken: @escaping (AccountSession) async throws -> String = { try await $0.googleIdentityTokenForFriends() }) {
+         accountKey: String = "guest", removals: RemovalOutbox? = nil, sessions: FriendsSessionVault = .init(),
+         identityToken: @escaping (AccountSession) async throws -> String = { try await $0.identityTokenForFriends() }) {
         self.configuration = configuration; self.network = network; self.accountKey = accountKey; self.identityToken = identityToken
+        self.sessions = sessions
         let outbox = removals ?? RemovalOutbox(accountKey: accountKey)
         self.removals = outbox
         self.feed = FriendsFeed(isHidden: { outbox.hides($0) })
@@ -38,6 +42,7 @@ final class SocialStore {
     private struct TokenResponse: Decodable {
         struct User: Decodable { let id: UUID }
         let access_token: String
+        let refresh_token: String?
         let expires_in: Int
         let user: User
     }
@@ -72,12 +77,21 @@ final class SocialStore {
         guard let current = auth.account, current.storageKey == accountKey else { throw SocialError.signIn }
         authorizedSession = auth
         if accessToken != nil && expiresAt > .now { scheduleRemovals(); return }
-        let token = try await identityToken(auth)
-        let data = try await request("/auth/v1/token?grant_type=id_token", method: "POST", values: ["provider": "google", "id_token": token], authenticated: false)
-        let session = try JSONDecoder().decode(TokenResponse.self, from: data)
+        var data: Data?
+        if let refresh = sessions.load(current.storageKey) {
+            do { data = try await request("/auth/v1/token?grant_type=refresh_token", method: "POST", values: ["refresh_token": refresh], authenticated: false) }
+            catch let rejected as RemovalHTTPError where (400..<500).contains(rejected.status) { sessions.clear(current.storageKey) }
+        }
+        if data == nil {
+            let token = try await identityToken(auth)
+            data = try await request("/auth/v1/token?grant_type=id_token", method: "POST",
+                                     values: ["provider": current.provider.rawValue, "id_token": token], authenticated: false)
+        }
+        let session = try JSONDecoder().decode(TokenResponse.self, from: data ?? Data())
         guard auth.account == current else { throw SocialError.signIn }
         try removals.bind(owner: session.user.id, accountKey: current.storageKey)
-        // Tokens stay in memory. Google’s existing Keychain session supplies a fresh verified identity after relaunch.
+        // Supabase rotates refresh tokens, so each new one replaces the last.
+        if let refresh = session.refresh_token { sessions.save(refresh, for: current.storageKey) }
         accessToken = session.access_token; userID = session.user.id
         expiresAt = .now.addingTimeInterval(TimeInterval(max(0, session.expires_in - 60)))
         scheduleRemovals()
@@ -90,12 +104,13 @@ final class SocialStore {
         do {
             try await authorize(auth)
             try await operation()
-            errorMessage = nil
+            errorMessage = nil; needsAppleSignIn = false
             return true
         } catch {
             accessToken = nil; expiresAt = .distantPast
             feed.reset() // Do not keep showing possibly revoked entries after a failed refresh.
             errorMessage = (error as? SocialError)?.localizedDescription ?? SocialError.server.localizedDescription
+            needsAppleSignIn = error as? SocialError == .appleSignIn
             return false
         }
     }
@@ -278,8 +293,7 @@ final class SocialStore {
 
     /// Deletes the server account, which cascades to everything social, then signs out.
     func deleteAccount(_ auth: AccountSession) async -> Bool {
-        // shortcut: only Google accounts reach Supabase today; include Apple once its provider is enabled there.
-        if configuration != nil, auth.account?.provider == .google {
+        if configuration != nil {
             guard await perform(auth, operation: { _ = try await self.request("/rest/v1/rpc/delete_account", method: "POST", values: [:]) }) else { return false }
         }
         suggestions.reset(); me = nil; feed.reset(); friendships = []; peopleRecords = []; blocks = []

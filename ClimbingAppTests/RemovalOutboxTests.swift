@@ -31,6 +31,7 @@ private final class OutboxURLProtocol: URLProtocol {
     private let owner = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     private let account = ClimberAccount(provider: .google, subject: "outbox-test-account", name: "Test", email: nil)
     private var directories: [URL] = []
+    private let sessions = FriendsSessionVault(service: "com.frozenpop.ClimbingApp.tests.\(UUID().uuidString)")
     private func queue(bound: Bool = true) throws -> RemovalOutbox {
         let dir = URL.temporaryDirectory.appending(path: "OutboxTests-\(UUID().uuidString)")
         directories.append(dir)
@@ -40,16 +41,17 @@ private final class OutboxURLProtocol: URLProtocol {
     }
     override func tearDown() {
         for directory in directories { try? FileManager.default.removeItem(at: directory) }
+        sessions.clear()
         super.tearDown()
     }
     private func auth(_ value: ClimberAccount? = nil) -> AccountSession {
-        AccountSession(vault: OutboxAccountVault(value: value ?? account), googleSignOut: {})
+        AccountSession(vault: OutboxAccountVault(value: value ?? account), googleSignOut: {}, friendsSessions: sessions)
     }
     private func store(_ outbox: RemovalOutbox, handler: @escaping (URLRequest) throws -> (Int, Data)) -> SocialStore {
         OutboxURLProtocol.lock.lock(); OutboxURLProtocol.handler = handler; OutboxURLProtocol.lock.unlock()
         let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [OutboxURLProtocol.self]
         return SocialStore(configuration: .init(projectURL: URL(string: "https://test.invalid")!, publishableKey: "test"),
-            network: URLSession(configuration: config), accountKey: account.storageKey, removals: outbox, identityToken: { _ in "test-token" })
+            network: URLSession(configuration: config), accountKey: account.storageKey, removals: outbox, sessions: sessions, identityToken: { _ in "test-token" })
     }
     private func token() -> Data {
         Data("{\"access_token\":\"test-token\",\"expires_in\":3600,\"user\":{\"id\":\"\(owner)\"}}".utf8)

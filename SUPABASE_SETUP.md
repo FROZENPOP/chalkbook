@@ -33,7 +33,7 @@ Existing Google sign-in to the local app and signing in to Supabase are separate
 4. In Google **Data Access**, configure `openid`, `userinfo.email`, and `userinfo.profile`. While the Google app is in Testing, add each test Google account under **Audience → Test users**.
 5. Save, rebuild with `python3 scripts/ios_dev.py run --device iphone16`, sign in with Google, open **Friends**, and create a username/display name. This explicitly publishes those two fields; local email, bio and profile photo are not uploaded. Native SDK credentials remain in Keychain; Supabase access tokens are held only in memory and renewed using the native Google identity.
 
-Apple connection remains deferred until Apple developer/sign-in setup is available. Google-connected Friends does not require paid Apple enrollment in Simulator.
+Apple accounts connect too. In **Authentication → Providers → Apple**, enable Apple and add the bundle ID `com.frozenpop.ClimbingApp` under Client IDs; native sign-in needs no secret key. Apple can't re-issue an identity token silently, so the app asks Apple to confirm once (**Continue with Apple** in Friends), then keeps Supabase's rotating refresh token in the Keychain for later launches. Signing out clears it. Google-connected Friends does not require paid Apple enrollment in Simulator.
 
 See the official [Google provider setup](https://supabase.com/docs/guides/auth/social-sign-in/auth-google) and [row-level security guide](https://supabase.com/docs/guides/database/postgres/row-level-security).
 

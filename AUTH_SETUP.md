@@ -25,6 +25,7 @@ The tracked `Configuration/Auth.xcconfig` includes this local file when present.
 2. Register the bundle ID `com.frozenpop.ClimbingApp` in that team, or choose an available bundle ID and update both providers to match it.
 3. Enable Sign in with Apple for that App ID and the target's Signing & Capabilities. The entitlement file is already present.
 4. Set `APPLE_SIGN_IN_ENABLED = YES` in the local configuration and rebuild with signing enabled.
+   For Friends, also enable the Apple provider in Supabase with the bundle ID as its Client ID (SUPABASE_SETUP.md).
 5. Test on a signed build with a real Apple account. Check initial authorization, returning sign-in, cancellation, credential revocation, relaunch, and local sign-out.
 
 Apple reference: [Sign in with Apple entitlement](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.applesignin).
