@@ -31,7 +31,7 @@ struct SessionDetailView: View {
                             .font(.subheadline.weight(.semibold)).foregroundStyle(ClimbTheme.accent)
                         JournalMetrics(first: session.totals.attempts.map(String.init) ?? "Unknown", firstLabel: "attempts", second: session.totals.sends.map(String.init) ?? "Unknown", secondLabel: "sends", third: "\(session.completedClimbs)", thirdLabel: "identified climbs sent")
                         Text(session.totals.label).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-                        if let minutes = session.durationMinutes { Text("Recorded duration: \(minutes) minutes").font(.caption) }
+                        if let minutes = session.durationMinutes { Text("Recorded duration: \(minutes.counted("minute"))").font(.caption) }
                         else { Text("Session duration not recorded").font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
                         if !session.notes.isEmpty { Text(session.notes).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText) }
                     }
@@ -147,7 +147,7 @@ struct ClimbCard: View {
                         Text(climb.title).font(.headline)
                         Text(climb.resultLabel).font(.subheadline)
                             .foregroundStyle(climb.isSent ? ClimbTheme.accent : ClimbTheme.secondaryText)
-                        Text("\(displayedAttempts.count) attempts · \(displayedAttempts.filter(\.sent).count) sends this session").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
+                        Text("\(displayedAttempts.count.counted("attempt")) · \(displayedAttempts.filter(\.sent).count.counted("send")) this session").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                     }
                     Spacer(minLength: 0)
                     Button { editing = climb } label: { Image(systemName: "pencil").frame(width: 44, height: 44) }

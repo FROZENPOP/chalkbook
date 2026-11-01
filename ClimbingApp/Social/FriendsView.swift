@@ -128,10 +128,10 @@ struct SharedSessionPreview: View {
     @State private var viewingPhotos = false
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(entry.session_day).font(.subheadline).fixedSize(horizontal: false, vertical: true)
+            Text(SessionDay.label(for: entry.session_day)).font(.subheadline).fixedSize(horizontal: false, vertical: true)
             if !entry.caption.isEmpty { Text(entry.caption).fixedSize(horizontal: false, vertical: true) }
-            Text("\(entry.attempts.map(String.init) ?? "Unknown") attempts · \(entry.sends.map(String.init) ?? "Unknown") sends")
-            Text(entry.duration_minutes.map { "\($0) minutes recorded" } ?? "Duration not recorded").font(.caption)
+            Text("\(entry.attempts?.counted("attempt") ?? "Unknown attempts") · \(entry.sends?.counted("send") ?? "Unknown sends")")
+            Text(entry.duration_minutes.map { "\($0.counted("minute")) recorded" } ?? "Duration not recorded").font(.caption)
             Text(entry.completeness).fixedSize(horizontal: false, vertical: true).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
             if (routePhotos?.count ?? entry.route_photo_count ?? 0) > 0 {
                 Button("View climb photos", systemImage:"photo.on.rectangle") { viewingPhotos = true }

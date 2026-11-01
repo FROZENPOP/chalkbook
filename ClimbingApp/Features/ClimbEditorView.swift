@@ -157,7 +157,7 @@ struct ClimbEditorView: View {
                     if let climb, store.delete(climb) { dismiss() }
                 }
             } message: {
-                Text("This removes \(climb?.attempts.count ?? 0) attempts and \(climb?.media.count ?? 0) attachments across every session, plus its notebook. Original Photos and Files items stay intact.")
+                Text("This removes \((climb?.attempts.count ?? 0).counted("attempt")) and \((climb?.media.count ?? 0).counted("attachment")) across every session, plus its notebook. Original Photos and Files items stay intact.")
             }
         }
         .safeAreaInset(edge: .top) { SaveErrorBanner() }

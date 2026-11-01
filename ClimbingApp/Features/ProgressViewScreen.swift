@@ -60,8 +60,8 @@ struct ProgressViewScreen: View {
                     Surface {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Completeness and time").font(.headline)
-                            Text("\(statistics.recalledSessions) sessions include recalled activity. Other values count recorded activity only; unlogged activity remains unknown.")
-                            Text("\(statistics.recordedMinutes) recorded minutes across \(statistics.durationCount) sessions with known duration.")
+                            Text("\(statistics.recalledSessions.counted("session")) \(statistics.recalledSessions == 1 ? "includes" : "include") recalled activity. Other values count recorded activity only; unlogged activity remains unknown.")
+                            Text("\(statistics.recordedMinutes.counted("recorded minute")) across \(statistics.durationCount.counted("session")) with known duration.")
                             Text("Confirmed flashes: \(statistics.confirmedFlashes) / \(statistics.knownFlashDenominator) sent climbs with known history; \(statistics.unknownFlashCount) unknown.")
                             Text("Flash classification uses the complete journal history even when this date filter covers fewer sessions.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                         }.accessibilityElement(children: .combine)
@@ -75,15 +75,15 @@ struct ProgressViewScreen: View {
                             }.frame(height: 160)
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel("Weekly activity")
-                            .accessibilityValue("\(filtered.count) sessions across \(weeks.count) weeks with activity")
-                            ForEach(weeks) { week in Text("\(SessionDay.label(for: week.day)): \(week.sessions) sessions").font(.caption) }
+                            .accessibilityValue("\(filtered.count.counted("session")) across \(weeks.count.counted("week")) with activity")
+                            ForEach(weeks) { week in Text("\(SessionDay.label(for: week.day)): \(week.sessions.counted("session"))").font(.caption) }
                             if weeks.contains(where: { $0.durationCount > 0 }) {
                                 Text("Recorded duration per week").font(.headline)
                                 Chart(weeks.filter { $0.durationCount > 0 }) { week in
                                     BarMark(x: .value("Week", SessionDay.date(for: week.day) ?? .now, unit: .weekOfYear), y: .value("Recorded minutes", week.minutes)).foregroundStyle(ClimbTheme.accent)
                                 }.frame(height: 160).accessibilityElement(children: .ignore).accessibilityLabel("Weekly recorded duration")
-                                .accessibilityValue(weeks.filter { $0.durationCount > 0 }.map { "\(SessionDay.label(for: $0.day)): \($0.minutes) recorded minutes in \($0.durationCount) sessions" }.joined(separator: "; "))
-                                ForEach(weeks.filter { $0.durationCount > 0 }) { week in Text("\(SessionDay.label(for: week.day)): \(week.minutes) recorded minutes in \(week.durationCount) sessions").font(.caption) }
+                                .accessibilityValue(weeks.filter { $0.durationCount > 0 }.map { "\(SessionDay.label(for: $0.day)): \($0.minutes.counted("recorded minute")) in \($0.durationCount.counted("session"))" }.joined(separator: "; "))
+                                ForEach(weeks.filter { $0.durationCount > 0 }) { week in Text("\(SessionDay.label(for: week.day)): \(week.minutes.counted("recorded minute")) in \(week.durationCount.counted("session"))").font(.caption) }
                             }
                             Text("Weeks begin on your calendar’s first weekday.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                         }
@@ -97,7 +97,7 @@ struct ProgressViewScreen: View {
                             ForEach(distribution) { item in
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text(item.label).font(.headline)
-                                    Text("\(item.attempts) recorded attempts · \(item.sends) sends").font(.subheadline)
+                                    Text("\(item.attempts.counted("recorded attempt")) · \(item.sends.counted("send"))").font(.subheadline)
                                 }.accessibilityElement(children: .combine)
                             }
                             Text("Gym scales stay separate. Custom labels are shown in your gym’s saved order when available, and never converted into V grades.")

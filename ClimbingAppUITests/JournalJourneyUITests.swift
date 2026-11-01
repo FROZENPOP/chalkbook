@@ -50,7 +50,7 @@ final class JournalJourneyUITests: XCTestCase {
         tap(app,"saveClimb")
         XCTAssertTrue(app.staticTexts["Unknown grade"].waitForExistence(timeout:5))
         tap(app,"logAttempt")
-        XCTAssertTrue(app.staticTexts["1 attempts · 0 sends this session"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.staticTexts["1 attempt · 0 sends this session"].waitForExistence(timeout:5))
     }
     @MainActor func testProjectRetainsIdentityAndHistoryAcrossSessions() {
         let app = launch()
@@ -66,7 +66,7 @@ final class JournalJourneyUITests: XCTestCase {
         tap(app,"chooseExistingClimb")
         app.staticTexts["Heel hook project"].firstMatch.tap()
         tap(app,"logSend")
-        XCTAssertTrue(app.staticTexts["1 attempts · 1 sends this session"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.staticTexts["1 attempt · 1 send this session"].waitForExistence(timeout:5))
         tap(app,"Notebook and complete history")
         XCTAssertTrue(app.staticTexts["2 attempts across 2 sessions"].waitForExistence(timeout:5))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@","Earlier attempts or completion are known")).firstMatch.exists)

@@ -102,7 +102,7 @@ struct FinishReviewView: View {
         NavigationStack {
             Form {
                 Section(header: Text("Review").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
-                    Text("\(session.recordedAttempts.count) recorded attempts · \(session.completedClimbs) distinct climbs sent")
+                    Text("\(session.recordedAttempts.count.counted("recorded attempt")) · \(session.completedClimbs.counted("distinct climb")) sent")
                     Text(session.totals.label)
                     Text("Attempts: \(session.totals.attempts.map(String.init) ?? "Unknown") · Sends: \(session.totals.sends.map(String.init) ?? "Unknown")")
                 }
