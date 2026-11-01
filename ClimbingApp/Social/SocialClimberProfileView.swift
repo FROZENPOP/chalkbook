@@ -81,7 +81,7 @@ struct SessionReactionBar: View {
                     }
                 } label: {
                     Text("\(reaction.emoji) \(summary?.total ?? 0)").font(.subheadline.weight(.semibold)).padding(.horizontal,12).frame(minHeight:44)
-                        .background(summary?.mine == true ? ClimbTheme.forest.opacity(0.16) : Color.secondary.opacity(0.08),in:Capsule())
+                        .background(summary?.mine == true ? ClimbTheme.accent.opacity(0.16) : Color.secondary.opacity(0.08),in:Capsule())
                 }.buttonStyle(.plain).disabled(busy || social.me == nil || social.userID == entry.owner_id)
                     .accessibilityLabel("\(reaction.label), \(summary?.total ?? 0) reactions\(summary?.mine == true ? ", selected" : "")")
             }

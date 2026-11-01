@@ -19,11 +19,11 @@ struct GymsView: View {
                                 Text(gym.scaleLabel).foregroundStyle(ClimbTheme.secondaryText).font(.subheadline)
                             }
                             Spacer()
-                            if gym.isDefault { Label("Default", systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(ClimbTheme.forest) }
+                            if gym.isDefault { Label("Default", systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(ClimbTheme.accent) }
                         }.padding(.vertical, 5)
                     }
                     .swipeActions(edge: .leading) {
-                        Button("Make default") { store.makeDefault(gym) }.tint(ClimbTheme.forest)
+                        Button("Make default") { store.makeDefault(gym) }.tint(ClimbTheme.accent)
                     }
                     .swipeActions { Button("Remove", systemImage: "trash") { removing = gym }.tint(.red) }
                 }

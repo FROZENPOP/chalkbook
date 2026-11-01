@@ -10,7 +10,7 @@ struct ProfileAvatar: View {
             if let photo, let image = UIImage(data: photo) {
                 Image(uiImage: image).resizable().scaledToFill()
             } else {
-                Image(systemName: "person.crop.circle.fill").resizable().scaledToFit().foregroundStyle(ClimbTheme.forest.opacity(0.75))
+                Image(systemName: "person.crop.circle.fill").resizable().scaledToFit().foregroundStyle(ClimbTheme.accent.opacity(0.75))
             }
         }
         .frame(width: size, height: size).clipShape(Circle())

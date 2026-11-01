@@ -17,6 +17,8 @@ struct SettingsView: View {
     @Query private var allClimbs: [ClimbEntry]
     @Query private var sessions: [ClimbingSession]
     @AppStorage("defaultGradeScale") private var defaultScale = GradeScale.vScale.rawValue
+    // Device-wide, so it lives outside the per-account defaults.
+    @AppStorage("appearance", store: .standard) private var appearance = "dark"
     @State private var exportDocument = BackupDocument()
     @State private var exporting = false
     @State private var importing = false
@@ -47,6 +49,11 @@ struct SettingsView: View {
                     }) { healthEnabled = false }
                 }))
                 Text("Read access is requested only from a session’s Link Apple Health workout action. Turning this off removes local links. Measurements are never included in journal backups, and no workouts are exported.").font(.caption)
+            }
+            Section(header: Text("Appearance").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
+                Picker("Theme", selection: $appearance) {
+                    Text("Dark").tag("dark"); Text("Light").tag("light"); Text("Match iPhone").tag("system")
+                }.accessibilityIdentifier("appearancePicker")
             }
             Section(header: Text("Climbing").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                 Picker("Default grade scale", selection: $defaultScale) {

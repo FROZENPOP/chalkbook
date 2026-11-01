@@ -45,7 +45,7 @@ struct HealthLinkView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 workoutRow(workout)
                                 Text("Overlap with session: \(Int(HealthLinkRules.overlap(workout,start:session.startedAt,end:session.endedAt ?? .now)/60)) minutes").font(.caption)
-                                if HealthLinkRules.hasSimilarCandidate(workout,among:candidates) { Label("Similar or overlapping workout found. Review the source before selecting.", systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(ClimbTheme.amber) }
+                                if HealthLinkRules.hasSimilarCandidate(workout,among:candidates) { Label("Similar or overlapping workout found. Review the source before selecting.", systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(ClimbTheme.accent) }
                                 if links.contains(where: { $0.workoutID == workout.id && $0.sessionID != session.id }) { Text("Already linked to another session").font(.caption) }
                             }
                         }.disabled(!HealthLinkRules.canLink(workoutID:workout.id,to:session.id,existing:links.map { ($0.sessionID,$0.workoutID) }))

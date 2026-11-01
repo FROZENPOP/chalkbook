@@ -118,7 +118,7 @@ struct ConsistencyCalendarView: View {
                         }
                         .padding(.vertical, 6)
                         .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(day.sessions > 0 ? ClimbTheme.forest.opacity(0.16) : day.isFuture ? .clear : Color(uiColor: .secondarySystemFill), in: RoundedRectangle(cornerRadius: 10))
+                        .background(day.sessions > 0 ? ClimbTheme.accent.opacity(0.16) : day.isFuture ? .clear : Color(uiColor: .secondarySystemFill), in: RoundedRectangle(cornerRadius: 10))
                         // Future days are outlined rather than dimmed: dimmed text fails contrast.
                         .overlay { if day.isFuture { RoundedRectangle(cornerRadius: 10).stroke(Color(uiColor: .separator)) } }
                         .overlay { if day.id == selected?.id { RoundedRectangle(cornerRadius: 10).stroke(.primary, lineWidth: 2) } }
@@ -154,7 +154,7 @@ struct ConsistencyCalendarView: View {
         withAnimation(.snappy) { focusedWeek = weeks[column]; selected = nil; cursor = column }
     }
     private func fill(_ day: ConsistencyCalendar.Day) -> Color { day.isFuture ? Color(uiColor: .quaternarySystemFill) : shade(day.level) }
-    private func shade(_ level: Int) -> Color { level == 0 ? Color(uiColor: .systemFill) : ClimbTheme.forest.opacity([0, 0.45, 0.65, 0.85, 1][level]) }
+    private func shade(_ level: Int) -> Color { level == 0 ? Color(uiColor: .systemFill) : ClimbTheme.accent.opacity([0, 0.45, 0.65, 0.85, 1][level]) }
     private func monthLabel(_ week: ConsistencyCalendar.Week) -> String? {
         guard let first = week.days.first(where: { Calendar.current.component(.day, from: $0.date) == 1 }) else { return nil }
         return first.date.formatted(.dateTime.month(.abbreviated))
