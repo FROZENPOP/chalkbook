@@ -67,6 +67,35 @@ struct KeychainAccountVault: AccountVault {
     }
 }
 
+/// The Friends refresh token per account. Apple can't silently re-issue an identity token after relaunch, so this keeps Friends connected.
+struct FriendsSessionVault {
+    var service = "com.frozenpop.ClimbingApp.friends-session"
+    private func query(_ key: String?) -> [String: Any] {
+        var query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service]
+        if let key { query[kSecAttrAccount as String] = key }
+        return query
+    }
+    func load(_ key: String) -> String? {
+        var query = query(key)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var value: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &value) == errSecSuccess, let data = value as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+    func save(_ token: String, for key: String) {
+        let data = Data(token.utf8)
+        if SecItemUpdate(query(key) as CFDictionary, [kSecValueData as String: data] as CFDictionary) == errSecItemNotFound {
+            var item = query(key)
+            item[kSecValueData as String] = data
+            item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            SecItemAdd(item as CFDictionary, nil)
+        }
+    }
+    /// Without a key, removes every account's session.
+    func clear(_ key: String? = nil) { SecItemDelete(query(key) as CFDictionary) }
+}
+
 enum AccountError: LocalizedError {
     case keychain(OSStatus), unavailable, missingIdentity
     var errorDescription: String? {
@@ -98,12 +127,17 @@ final class AccountSession {
     var errorMessage: String?
     private let vault: any AccountVault
     private let googleSignOut: () -> Void
+    private let friendsSessions: FriendsSessionVault
+    // Apple identity tokens expire in minutes and can't be fetched silently, so only the latest one is kept, in memory.
+    private var appleIdentityToken: String?
     private var revision = 0
     private var restored = false
 
-    init(vault: any AccountVault = KeychainAccountVault(), googleSignOut: @escaping () -> Void = { GIDSignIn.sharedInstance.signOut() }) {
+    init(vault: any AccountVault = KeychainAccountVault(), googleSignOut: @escaping () -> Void = { GIDSignIn.sharedInstance.signOut() },
+         friendsSessions: FriendsSessionVault = .init()) {
         self.vault = vault
         self.googleSignOut = googleSignOut
+        self.friendsSessions = friendsSessions
         do { account = try vault.load() } catch { errorMessage = error.localizedDescription }
     }
 
@@ -112,12 +146,20 @@ final class AccountSession {
         case let .success(authorization):
             guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
                   !credential.user.isEmpty else { errorMessage = AccountError.missingIdentity.localizedDescription; return }
-            let fullName = credential.fullName.map { PersonNameComponentsFormatter().string(from: $0) } ?? ""
-            activate(ClimberAccount(provider: .apple, subject: credential.user,
-                                    name: fullName.isEmpty ? "Climber" : fullName, email: credential.email))
+            completeApple(subject: credential.user, name: credential.fullName.map { PersonNameComponentsFormatter().string(from: $0) },
+                          email: credential.email, identityToken: credential.identityToken.flatMap { String(data: $0, encoding: .utf8) })
         case let .failure(error):
             if (error as NSError).code != ASAuthorizationError.canceled.rawValue { errorMessage = error.localizedDescription }
         }
+    }
+
+    /// Apple shares the name and email only on the first authorization, so confirming the same Apple ID again keeps the saved ones.
+    func completeApple(subject: String, name: String?, email: String?, identityToken: String?) {
+        let existing = account?.provider == .apple && account?.subject == subject ? account : nil
+        let name = name ?? ""
+        activate(ClimberAccount(provider: .apple, subject: subject,
+                                name: name.isEmpty ? existing?.name ?? "Climber" : name, email: email ?? existing?.email))
+        if account?.subject == subject { appleIdentityToken = identityToken }
     }
 
     func signInWithGoogle(presenting controller: UIViewController) async {
@@ -155,6 +197,8 @@ final class AccountSession {
     func signOut() {
         do {
             try vault.clear()
+            friendsSessions.clear()
+            appleIdentityToken = nil
             revision += 1
             googleSignOut()
             account = nil
@@ -168,9 +212,13 @@ final class AccountSession {
         await verifyExistingSession()
     }
 
-    func googleIdentityTokenForFriends() async throws -> String {
+    func identityTokenForFriends() async throws -> String {
         guard let current = account else { throw SocialError.signIn }
-        guard current.provider == .google else { throw SocialError.applePending }
+        if current.provider == .apple {
+            guard let token = appleIdentityToken else { throw SocialError.appleSignIn }
+            appleIdentityToken = nil // Single use: Supabase returns its own refresh token.
+            return token
+        }
         guard let clientID = LoginConfiguration.googleClientID else { throw AccountError.unavailable }
         GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientID)
         let restored = try await GIDSignIn.sharedInstance.restorePreviousSignIn()

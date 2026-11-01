@@ -24,6 +24,10 @@ struct SettingsView: View {
     @State private var confirmRestore = false
     @State private var message: String?
 
+    private func deleteAccount() async {
+        deleteError = await social.deleteAccount(auth) ? nil : social.errorMessage ?? auth.errorMessage
+    }
+
     var body: some View {
         Form {
             AccountSection(openPortal: { showLogin = true }, editProfile: { editProfile = true })
@@ -77,7 +81,10 @@ struct SettingsView: View {
                         .frame(minHeight: 44).accessibilityIdentifier("signOut")
                     Button("Delete account", role: .destructive) { confirmDeleteAccount = true }
                         .frame(minHeight: 44).disabled(social.busy).accessibilityIdentifier("deleteAccount")
-                    if let deleteError { Text(deleteError).font(.caption).foregroundStyle(ClimbTheme.error) }
+                    if social.needsAppleSignIn && deleteError != nil {
+                        Text("Apple needs to confirm it’s you before your account can be deleted.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
+                        AppleConfirmButton { await deleteAccount() }
+                    } else if let deleteError { Text(deleteError).font(.caption).foregroundStyle(ClimbTheme.error) }
                 }
             }
         }
@@ -90,7 +97,7 @@ struct SettingsView: View {
         } message: { Text("Your account’s log stays on this iPhone. You’ll return to the separate guest log.") }
         .confirmationDialog("Delete your account?", isPresented: $confirmDeleteAccount, titleVisibility: .visible) {
             Button("Delete account", role: .destructive) {
-                Task { deleteError = await social.deleteAccount(auth) ? nil : social.errorMessage ?? auth.errorMessage }
+                Task { await deleteAccount() }
             }
         } message: { Text("This permanently deletes your Climb Log account, Friends profile, connections, shared entries and reactions from our servers, then signs you out. Your private journal stays on this iPhone until you delete the app. This can’t be undone.") }
         .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .json,

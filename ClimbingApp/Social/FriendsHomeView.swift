@@ -73,7 +73,8 @@ struct FriendsView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Label("Couldn’t connect", systemImage: "wifi.exclamationmark").font(.headline)
                             Text(message).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
-                            Button("Try again") { Task { await social.refresh(auth) } }.frame(minHeight: 44)
+                            if social.needsAppleSignIn { AppleConfirmButton { await refresh() } }
+                            else { Button("Try again") { Task { await social.refresh(auth) } }.frame(minHeight: 44) }
                         }
                     }
                 }

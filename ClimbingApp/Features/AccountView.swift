@@ -101,3 +101,21 @@ struct LoginPortalView: View {
         }
     }
 }
+
+/// Asks Apple to confirm the signed-in Apple ID again, for server actions that need a fresh identity token.
+struct AppleConfirmButton: View {
+    @Environment(AccountSession.self) private var auth
+    @Environment(\.colorScheme) private var colorScheme
+    let confirmed: () async -> Void
+    var body: some View {
+        SignInWithAppleButton(.continue) { request in
+            request.requestedScopes = []
+        } onCompletion: { result in
+            auth.completeApple(result)
+            if case .success = result { Task { await confirmed() } }
+        }
+        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+        .frame(height: 50)
+        .accessibilityIdentifier("appleConfirm")
+    }
+}

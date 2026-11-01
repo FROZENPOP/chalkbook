@@ -100,12 +100,12 @@ struct SupabaseConfiguration: Decodable {
 }
 
 enum SocialError: LocalizedError {
-    case setup, signIn, applePending, server, invalidProfile, migrationNeeded
+    case setup, signIn, appleSignIn, server, invalidProfile, migrationNeeded
     var errorDescription: String? {
         switch self {
         case .setup: "Friends is waiting for Supabase setup. Your private journal still works offline."
-        case .signIn: "Sign in with Google to connect to Friends."
-        case .applePending: "Apple account connection will be available after Apple developer setup. Your local journal is available."
+        case .signIn: "Sign in to connect to Friends."
+        case .appleSignIn: "Continue with Apple to connect to Friends. Your journal is unaffected."
         case .server: "The Friends service couldn’t complete this request. Check your connection and retry. No successful save has been confirmed."
         case .invalidProfile: "Choose a username with 3–24 lowercase letters, numbers or underscores, and a name with 1–60 characters."
         case .migrationNeeded: "This Friends update isn’t available yet. Please try again later. Your local journal is unaffected."
