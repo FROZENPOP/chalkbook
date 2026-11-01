@@ -26,6 +26,11 @@ final class HealthInsightsUITests: XCTestCase {
     @MainActor private func enable(_ app: XCUIApplication) {
         let toggle = app.switches["showHealthInsights"]
         XCTAssertEqual(toggle.value as? String, "0")
+        // The toggle can sit under the floating tab bar, which would take the tap; short drags so a swipe can't fling it off the top.
+        let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
+        for _ in 0..<12 where toggle.frame.maxY > app.tabBars.firstMatch.frame.minY - 8 {
+            center.press(forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: 0, dy: -200)))
+        }
         toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
         XCTAssertEqual(toggle.value as? String, "1")
         tap(app, "connectHealthInsights")
