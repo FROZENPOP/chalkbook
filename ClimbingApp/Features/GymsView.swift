@@ -5,6 +5,7 @@ struct GymsView: View {
     @Environment(ClimbingStore.self) private var store
     @Query(sort: \SavedGym.name) private var gyms: [SavedGym]
     @State private var sheet: GymSheet?
+    @State private var removing: SavedGym?
 
     var body: some View {
         List {
@@ -24,12 +25,16 @@ struct GymsView: View {
                     .swipeActions(edge: .leading) {
                         Button("Make default") { store.makeDefault(gym) }.tint(ClimbTheme.forest)
                     }
+                    .swipeActions { Button("Remove", systemImage: "trash") { removing = gym }.tint(.red) }
                 }
                 Button { sheet = .new } label: { HStack { Image(systemName: "plus").accessibilityHidden(true); Text("Add gym").fixedSize(horizontal: false, vertical: true) } }
                     .frame(minHeight: 44).accessibilityIdentifier("addSavedGym")
             } footer: { Text("Your default gym is preselected for new sessions. Each climb starts with its session’s gym and grading scale.").font(.caption).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true) }
         }
         .navigationTitle("My gyms")
+        .confirmationDialog("Remove this saved gym?", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }), titleVisibility: .visible, presenting: removing) { gym in
+            Button("Remove gym", role: .destructive) { _ = store.deleteGym(gym) }
+        } message: { _ in Text("Your existing sessions and climbs keep their gym names and grades.") }
         .sheet(item: $sheet) { destination in GymEditorView(gym: destination.gym) }
     }
 }

@@ -221,9 +221,25 @@ import XCTest
         let firstDay = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'consistencyDay-'")).firstMatch
         XCTAssertTrue(firstDay.waitForExistence(timeout: 2))
         XCTAssertGreaterThanOrEqual(firstDay.frame.height, 44)
+        // The previous-week button and a swipe both move between weeks.
+        let thisWeek = firstDay.identifier
+        app.buttons["consistencyPreviousWeek"].tap()
+        XCTAssertNotEqual(firstDay.identifier, thisWeek)
+        firstDay.swipeLeft()
+        XCTAssertEqual(firstDay.identifier, thisWeek)
+        XCTAssertFalse(app.buttons["consistencyNextWeek"].isEnabled)
+        firstDay.swipeRight()
+        XCTAssertNotEqual(firstDay.identifier, thisWeek)
+        app.buttons["consistencyNextWeek"].tap()
+        XCTAssertEqual(firstDay.identifier, thisWeek)
         firstDay.tap()
         XCTAssertEqual(app.staticTexts["consistencyDetail"].label, firstDay.label)
         audit(app, "progress week")
+        // A vertical drag that starts on the tiles still scrolls the page.
+        let top = toggle.frame.minY
+        firstDay.swipeUp()
+        XCTAssertLessThan(toggle.frame.minY, top)
+        app.swipeDown(); app.swipeDown()
         app.buttons["consistencyYear"].tap()
         XCTAssertTrue(grid.waitForExistence(timeout: 2))
         toggle.tap()
@@ -232,6 +248,17 @@ import XCTest
         // Expand again so the stored state doesn't hide the calendar from later audits.
         toggle.tap()
         XCTAssertTrue(grid.waitForExistence(timeout: 2))
+        app.terminate()
+    }
+    func testHistorySwipeDeletesSessionAfterConfirming() {
+        let app = launch("history")
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Audit gym'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        row.swipeLeft()
+        app.buttons["Delete"].tap()
+        app.buttons["Delete session"].tap()
+        XCTAssertTrue(row.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Your story starts here"].exists)
         app.terminate()
     }
     func testProgressWithOptionalHealthAndEmptyReads() {
