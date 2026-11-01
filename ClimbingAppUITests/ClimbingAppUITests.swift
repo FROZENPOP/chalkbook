@@ -27,14 +27,14 @@ final class ClimbingAppUITests: XCTestCase {
         expectation(for: enabled, evaluatedWith: send)
         waitForExpectations(timeout: 5)
         send.tap()
-        XCTAssertTrue(app.staticTexts["2 attempts · 1 sends this session"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["2 attempts · 1 send this session"].waitForExistence(timeout: 5))
         app.terminate()
         app.launchArguments = ["--ui-testing"]
         app.launch()
         XCTAssertTrue(app.buttons["resumeSession"].waitForExistence(timeout: 10))
         app.buttons["resumeSession"].tap()
         XCTAssertTrue(app.staticTexts["Blue slab"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["2 attempts · 1 sends this session"].exists)
+        XCTAssertTrue(app.staticTexts["2 attempts · 1 send this session"].exists)
         let finish = app.buttons["finishSession"]
         if !finish.isHittable { app.swipeUp() }
         finish.tap()

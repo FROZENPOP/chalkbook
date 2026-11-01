@@ -35,7 +35,7 @@ struct ProjectsView: View {
                                 if let photo = climb.media.first(where: { $0.kind == .photo }) { RouteThumbnail(data: photo.data,annotationJSON:photo.annotationJSON) }
                                 Text(climb.title).font(.title3.bold())
                                 Text("\(climb.descriptor.label) · \(climb.gymName)").font(.subheadline)
-                                Text("\(climb.attempts.count) recorded attempts · \(climb.projectStatus.capitalized)").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
+                                Text("\(climb.attempts.count.counted("recorded attempt")) · \(climb.projectStatus.capitalized)").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                             }
                         }
                     }.buttonStyle(.plain)
@@ -112,10 +112,10 @@ struct ProjectDetailView: View {
                 }
                 if let firstSend = climb.orderedAttempts.firstIndex(where: \.sent) {
                     let before = Array(climb.orderedAttempts.prefix(firstSend + 1))
-                    Text("Before first recorded send: \(before.count) recorded attempts across \(Set(before.compactMap(\.effectiveSessionID)).count) sessions. Earlier unrecorded activity is unknown.").font(.subheadline)
+                    Text("Before first recorded send: \(before.count.counted("recorded attempt")) across \(Set(before.compactMap(\.effectiveSessionID)).count.counted("session")). Earlier unrecorded activity is unknown.").font(.subheadline)
                 }
                 Text("Complete recorded history").font(.title2.bold())
-                Text("\(climb.attempts.count) attempts across \(historySessions) sessions").font(.subheadline)
+                Text("\(climb.attempts.count.counted("attempt")) across \(historySessions.counted("session"))").font(.subheadline)
                 Text("Flash: \(climb.flash.state == .confirmed ? "confirmed" : climb.flash.state == .notFlash ? "not flash" : "unknown"). \(climb.flash.reason)").font(.caption)
                 ForEach(climb.orderedAttempts) { item in
                     Button { attempt = item } label: {

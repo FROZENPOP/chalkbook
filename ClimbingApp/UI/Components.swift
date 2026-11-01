@@ -14,6 +14,44 @@ enum ClimbTheme {
     static let background = Color(uiColor: .systemGroupedBackground)
 }
 
+/// The two chevrons from the app icon (scripts/app_icon.swift), cropped to their own bounds and drawn in the foreground style.
+struct AscentMark: View {
+    var body: some View {
+        Canvas { context, size in
+            let scale = size.width / 590
+            for (y, opacity) in [(455.0, 0.45), (255.0, 1.0)] {
+                var chevron = Path()
+                chevron.move(to: CGPoint(x: 55 * scale, y: y * scale))
+                chevron.addLine(to: CGPoint(x: 295 * scale, y: (y - 200) * scale))
+                chevron.addLine(to: CGPoint(x: 535 * scale, y: y * scale))
+                context.opacity = opacity
+                context.stroke(chevron, with: .foreground, style: StrokeStyle(lineWidth: 110 * scale, lineCap: .round, lineJoin: .round))
+            }
+        }
+        .aspectRatio(590 / 510, contentMode: .fit)
+        .accessibilityHidden(true)
+    }
+}
+
+/// The app icon itself, with its fixed colors, for places that present the brand.
+struct AscentIcon: View {
+    let size: CGFloat
+    var body: some View {
+        AscentMark()
+            .foregroundStyle(Color(red: 0.98, green: 0.69, blue: 0.36))
+            .frame(width: size * 590 / 1024)
+            .offset(y: -size * 48 / 1024)
+            .frame(width: size, height: size)
+            .background(Color(red: 0.043, green: 0.051, blue: 0.047), in: .rect(cornerRadius: size * 0.225))
+            .overlay { RoundedRectangle(cornerRadius: size * 0.225).stroke(.white.opacity(0.1)) }
+    }
+}
+
+extension Int {
+    /// "1 attempt", "2 attempts".
+    func counted(_ noun: String) -> String { "\(self) \(noun)\(self == 1 ? "" : "s")" }
+}
+
 struct SaveErrorBanner: View {
     @Environment(ClimbingStore.self) private var store
     @Environment(\.dynamicTypeSize) private var typeSize

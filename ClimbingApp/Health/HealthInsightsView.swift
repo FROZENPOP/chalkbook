@@ -8,7 +8,7 @@ struct ProgressHealthSection: View {
     @AppStorage("healthInsightsEnabled") private var showInsights = false
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Toggle("Health insights (optional)", isOn: $showInsights).tint(Color(uiColor: .systemBlue)).accessibilityIdentifier("showHealthInsights")
+            Toggle("Health insights (optional)", isOn: $showInsights).accessibilityIdentifier("showHealthInsights")
             if showInsights {
                 Text("Linked climbing workouts for this journal range. Weeks use workout start dates.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                 HealthInsightsPanel(workoutIDs: links.filter { sessionIDs.contains($0.sessionID) }.map(\.workoutID), weekly: true)

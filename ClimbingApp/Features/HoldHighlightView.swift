@@ -52,7 +52,7 @@ struct HoldHighlightView: View {
                     }.pickerStyle(.segmented).accessibilityIdentifier("highlightComparison")
                         .accessibilityHint("Compare views without changing saved selections")
                     Toggle("Show highlight", isOn: Binding(get: { selection?.isEnabled ?? false }, set: { selection?.isEnabled = $0 }))
-                        .disabled(selection == nil).accessibilityIdentifier("enableHoldHighlight")
+                        .tint(ClimbTheme.accent).disabled(selection == nil).accessibilityIdentifier("enableHoldHighlight")
                     Button(includeMore ? "Tap another hold…" : "Include more holds", systemImage: "plus.circle") {
                         includeMore.toggle(); showOriginal = false
                     }.frame(minHeight: 44).disabled(selection == nil || (selection?.selections.count ?? 0) >= 64)

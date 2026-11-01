@@ -69,7 +69,7 @@ struct SettingsView: View {
             }
             if let pendingBackup {
                 Section(header: Text("Backup ready to restore").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
-                    Text("\(pendingBackup.sessions.count) sessions · \(pendingBackup.climbCount) climbs")
+                    Text("\(pendingBackup.sessions.count.counted("session")) · \(pendingBackup.climbCount.counted("climb"))")
                     Text("Exported \(pendingBackup.exportedAt.formatted(date: .abbreviated, time: .shortened))")
                         .font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                     Button("Back up current log first", action: export)
