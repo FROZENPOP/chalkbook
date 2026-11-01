@@ -44,10 +44,12 @@ enum ClimbingSchemaV6: VersionedSchema {
         }
         var orderedClimbs: [ClimbEntry] { allClimbs.sorted { $0.createdAt < $1.createdAt } }
         var recordedAttempts: [ClimbAttempt] { allClimbs.flatMap(\.attempts).filter { $0.effectiveSessionID == id } }
-        var totals: ActivityTotals { JournalRules.totals(detailedAttempts: recordedAttempts.count, detailedSends: recordedAttempts.filter(\.sent).count, batches: aggregates.map(\.batch)) }
+        var totals: ActivityTotals { totals(recordedAttempts) }
+        // Takes the attempts so callers walk the relationships once; that walk dominates large journals.
+        private func totals(_ recorded: [ClimbAttempt]) -> ActivityTotals { JournalRules.totals(detailedAttempts: recorded.count, detailedSends: recorded.filter(\.sent).count, batches: aggregates.map(\.batch)) }
         var durationMinutes: Int? { guard durationKnown, let endedAt else { return nil }; return max(0, Int(endedAt.timeIntervalSince(startedAt) / 60)) }
-        var attemptCount: Int { totals.attempts ?? recordedAttempts.count }
-        var sendCount: Int { totals.sends ?? recordedAttempts.filter(\.sent).count }
+        var attemptCount: Int { let recorded = recordedAttempts; return totals(recorded).attempts ?? recorded.count }
+        var sendCount: Int { let recorded = recordedAttempts; return totals(recorded).sends ?? recorded.filter(\.sent).count }
         var completedClimbs: Int { Set(recordedAttempts.filter(\.sent).compactMap { $0.climb?.id }).count }
     }
 

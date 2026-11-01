@@ -5,10 +5,13 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @Environment(\.dynamicTypeSize) private var textSize
     @Environment(AccountSession.self) private var auth
+    @Environment(SocialStore.self) private var social
     @AppStorage("healthEnabled") private var healthEnabled = false
     @State private var showLogin = false
     @State private var editProfile = false
     @State private var confirmSignOut = false
+    @State private var confirmDeleteAccount = false
+    @State private var deleteError: String?
     @Environment(ClimbingStore.self) private var store
     @Query(sort: \SavedGym.name) private var gyms: [SavedGym]
     @Query private var allClimbs: [ClimbEntry]
@@ -65,13 +68,16 @@ struct SettingsView: View {
             }
             Section {
                 LabeledContent("Sessions", value: "\(sessions.count)")
-                LabeledContent("Version", value: "0.1.0")
+                LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
                 Text("Made for your next move.").foregroundStyle(ClimbTheme.secondaryText)
             }
             if auth.account != nil {
                 Section {
                     Button("Sign out", role: .destructive) { confirmSignOut = true }
                         .frame(minHeight: 44).accessibilityIdentifier("signOut")
+                    Button("Delete account", role: .destructive) { confirmDeleteAccount = true }
+                        .frame(minHeight: 44).disabled(social.busy).accessibilityIdentifier("deleteAccount")
+                    if let deleteError { Text(deleteError).font(.caption).foregroundStyle(ClimbTheme.error) }
                 }
             }
         }
@@ -82,6 +88,11 @@ struct SettingsView: View {
         .confirmationDialog("Sign out of your account?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Sign out", role: .destructive) { auth.signOut() }
         } message: { Text("Your account’s log stays on this iPhone. You’ll return to the separate guest log.") }
+        .confirmationDialog("Delete your account?", isPresented: $confirmDeleteAccount, titleVisibility: .visible) {
+            Button("Delete account", role: .destructive) {
+                Task { deleteError = await social.deleteAccount(auth) ? nil : social.errorMessage ?? auth.errorMessage }
+            }
+        } message: { Text("This permanently deletes your Climb Log account, Friends profile, connections, shared entries and reactions from our servers, then signs you out. Your private journal stays on this iPhone until you delete the app. This can’t be undone.") }
         .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .json,
                       defaultFilename: "ClimbingLog-\(SessionDay.key(for: .now))") { result in
             if case let .failure(error) = result { message = error.localizedDescription }

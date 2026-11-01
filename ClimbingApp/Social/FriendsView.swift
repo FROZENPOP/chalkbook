@@ -17,6 +17,7 @@ struct SocialProfileEditor: View {
     @State private var importing=false
     @State private var initialized=false
     @State private var loadError:String?
+    @State private var agreed = false
     var body: some View {
         NavigationStack {
             Form {
@@ -55,10 +56,17 @@ struct SocialProfileEditor: View {
                         }
                     }
                 }
+                if social.me == nil {
+                    // Required before any user-generated content is shared (App Store Guideline 1.2).
+                    Section(header: Text("Community rules").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
+                        Text("No objectionable, hateful, sexual or harassing content, and no abuse of other climbers. Report or block anyone who breaks these rules. We review reports and remove content and accounts that break them.").font(.caption)
+                        Toggle("I agree to the community rules", isOn: $agreed).accessibilityIdentifier("agreeCommunityRules")
+                    }
+                }
                 if let message = social.errorMessage { Text(message).foregroundStyle(ClimbTheme.error) }
                 Button("Save social profile") {
                     Task { if await social.saveProfile(auth, username: username, name: name, isPrivate: isPrivate,bio:bio,photo:photo) { dismiss() } }
-                }.disabled(social.busy || !ready || importing || bio.count>240)
+                }.disabled(social.busy || !ready || importing || bio.count>240 || (social.me == nil && !agreed))
                 if let loadError { Text(loadError).foregroundStyle(ClimbTheme.error);if !ready { Button("Retry loading profile") { Task { await loadDetails() } } } }
                 if social.me != nil {
                     Section {

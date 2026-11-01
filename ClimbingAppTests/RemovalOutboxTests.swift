@@ -75,6 +75,24 @@ private final class OutboxURLProtocol: URLProtocol {
         let removed = await social.removeShare(auth(), sessionID: UUID())
         XCTAssertTrue(removed); XCTAssertEqual(social.removals.entries.count, 1)
     }
+    func testDeleteAccountCallsServerThenSignsOut() async throws {
+        let auth = auth()
+        var paths: [String] = []
+        let social = store(try queue()) { request in
+            paths.append(request.url!.path)
+            return (200, request.url!.path.hasPrefix("/auth/") ? self.token() : Data())
+        }
+        XCTAssertNotNil(auth.account)
+        let deleted = await social.deleteAccount(auth)
+        XCTAssertTrue(deleted); XCTAssertNil(auth.account)
+        XCTAssertTrue(paths.contains("/rest/v1/rpc/delete_account"))
+    }
+    func testFailedAccountDeletionKeepsYouSignedIn() async throws {
+        let auth = auth()
+        let social = store(try queue()) { _ in throw URLError(.notConnectedToInternet) }
+        let deleted = await social.deleteAccount(auth)
+        XCTAssertFalse(deleted); XCTAssertNotNil(auth.account); XCTAssertNotNil(social.errorMessage)
+    }
     func testPersistenceAcrossRecreationAndCoalescing() throws {
         let outbox = try queue(), id = UUID()
         try outbox.enqueue(contentID: id, kind: .sessionSnapshot)

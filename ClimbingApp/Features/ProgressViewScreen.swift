@@ -34,7 +34,9 @@ struct ProgressViewScreen: View {
             VStack(alignment: .leading, spacing: 20) {
                 // The calendar always shows the past year, so it sits above the range picker it ignores.
                 if !sessions.isEmpty {
-                    Surface { ConsistencyCalendarView(calendar: ConsistencyCalendar(sessions: sessions.map { ($0.day, $0.attemptCount) })) }
+                    // Attempts only shade the visible year; streaks need just the days, so older sessions skip the costly count.
+                    let since = SessionDay.key(for: .now.addingTimeInterval(-380 * 86_400))
+                    Surface { ConsistencyCalendarView(calendar: ConsistencyCalendar(sessions: sessions.map { ($0.day, $0.day >= since ? $0.attemptCount : 0) })) }
                 }
                 Picker("Time range", selection: $range) { ForEach(ProgressRange.allCases) { Text($0.rawValue).tag($0) } }
                     .pickerStyle(.segmented)
