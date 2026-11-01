@@ -27,7 +27,10 @@ await as(a); await db.query("select public.friend_action($1,'request')",[d]);
 await as(d); await db.query("select public.friend_action($1,'accept')",[a]);
 
 await db.exec('reset role'); await run(target);
-await as(a); equal(await count('select * from public.follows'), 2, 'friendship backfills as two accepted follows');
+await as(a); equal(await count('select * from public.follows'), 0, 'friendships are not copied into follows before the cutover');
+await db.query("select public.follow_action($1,'follow')",[d]);
+await as(d); await db.query("select public.follow_action($1,'approve')",[a]); await db.query("select public.follow_action($1,'follow')",[a]);
+await as(a); await db.query("select public.follow_action($1,'approve')",[d]);
 
 // Follows: private profiles approve requests; the requester cannot approve their own.
 await as(b); await db.query("select public.follow_action($1,'follow')",[a]);
@@ -77,7 +80,7 @@ await as(a); equal((await db.query(`select caption from public.sessions where id
 const sees = async (id, n, message) => { await as(id); equal(await count(`select * from public.sessions where id='${s1}'`) + await count(`select * from public.attempts where session_id='${s1}'`), n, message); };
 await sees(b, 3, 'follower sees the session and both attempts');
 await sees(c, 0, 'non-follower cannot see a followers post');
-await sees(d, 3, 'friend turned follower sees the session');
+await sees(d, 3, 'mutual follower sees the session');
 await as(a); await db.exec(`update public.sessions set visibility='private' where id='${s1}'`);
 await sees(b, 0, 'a private session is invisible to a follower');
 await as(a); await db.exec(`update public.sessions set visibility='public' where id='${s1}'`);
@@ -90,8 +93,9 @@ await as(a); await db.exec(`update public.sessions set hide_gym=false, visibilit
 await as(a); await db.exec(`update public.attempts set deleted_at=now() where id='${a2}'`);
 await sees(b, 2, 'tombstoned attempts disappear for others');
 await sees(a, 3, 'owners still sync their tombstones');
-await as(a); await db.exec(`insert into public.media(id,owner_id,session_id,kind,storage_path,visibility) values(gen_random_uuid(),'${a}','${s1}','photo','a/1.jpg','private')`);
-await db.exec(`insert into public.media(id,owner_id,session_id,kind,storage_path) values(gen_random_uuid(),'${a}','${s1}','photo','a/2.jpg')`);
+await as(a); await db.exec(`insert into public.media(id,owner_id,session_id,kind,storage_path,visibility) values(gen_random_uuid(),'${a}','${s1}','photo','${a}/1.jpg','private')`);
+await denied(`insert into public.media(id,owner_id,session_id,kind,storage_path) values(gen_random_uuid(),'${a}','${s1}','photo','${b}/private.jpg')`, 'media rows cannot point at another climber\'s files');
+await db.exec(`insert into public.media(id,owner_id,session_id,kind,storage_path) values(gen_random_uuid(),'${a}','${s1}','photo','${a}/2.jpg')`);
 await as(b); equal(await count('select * from public.media'), 1, 'private media stays with the owner');
 await as(a); await db.exec(`insert into public.route_notes(id,owner_id,route_id,body) values(gen_random_uuid(),'${a}','${route}','Heel hook left')`);
 await as(b); equal(await count('select * from public.route_notes') + await count('select * from public.personal_routes'), 0, 'notes and personal routes are private');
