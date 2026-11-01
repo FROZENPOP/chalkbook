@@ -31,7 +31,7 @@ struct AccountSection: View {
                 Text("Signed in with \(account.provider == .apple ? "Apple" : "Google")").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
             } else {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("You’re using Climb Log as a guest").font(.headline)
+                    Text("You’re using Sendr as a guest").font(.headline)
                     Text("Sign in with Apple or Google to join Friends and share the sessions you choose. Your guest log stays on this iPhone.")
                         .font(.subheadline).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true)
                     Button(action: openPortal) {
@@ -58,7 +58,7 @@ struct LoginPortalView: View {
                     VStack(spacing: 24) {
                         VStack(spacing: 16) {
                             AscentIcon(size: 96)
-                            Text(onFinish == nil ? "Your climbing,\nyour account." : "Welcome to\nClimb Log.").font(.system(.largeTitle, design: .rounded, weight: .bold))
+                            Text(onFinish == nil ? "Your climbing,\nyour account." : "Welcome to\nSendr.").font(.system(.largeTitle, design: .rounded, weight: .bold))
                             Text("Sign in with your existing Apple or Google account to connect with friends. No new password to remember.").foregroundStyle(ClimbTheme.secondaryText)
                         }
                         .fixedSize(horizontal: false, vertical: true)
