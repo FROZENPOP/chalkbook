@@ -52,7 +52,7 @@ struct ProgressViewScreen: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Text("Climbs completed").font(.headline)
                             Text("\(statistics.distinctClimbsSent)")
-                                .font(.system(.largeTitle, design: .rounded, weight: .bold)).foregroundStyle(ClimbTheme.forest)
+                                .font(.system(.largeTitle, design: .rounded, weight: .bold)).foregroundStyle(ClimbTheme.accent)
                             Text("\(statistics.distinctClimbsSent) of \(statistics.distinctClimbsAttempted) identified climbs. Recalled sends cannot establish distinct climb identities.")
                                 .font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                         }
@@ -71,7 +71,7 @@ struct ProgressViewScreen: View {
                             Text("Sessions per week").font(.headline).id("progressWeeklyActivity")
                             Chart(weeks) { week in
                                 BarMark(x: .value("Week", SessionDay.date(for: week.day) ?? .now, unit: .weekOfYear), y: .value("Sessions", week.sessions))
-                                    .foregroundStyle(ClimbTheme.forest).cornerRadius(5)
+                                    .foregroundStyle(ClimbTheme.accent).cornerRadius(5)
                             }.frame(height: 160)
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel("Weekly activity")
@@ -80,7 +80,7 @@ struct ProgressViewScreen: View {
                             if weeks.contains(where: { $0.durationCount > 0 }) {
                                 Text("Recorded duration per week").font(.headline)
                                 Chart(weeks.filter { $0.durationCount > 0 }) { week in
-                                    BarMark(x: .value("Week", SessionDay.date(for: week.day) ?? .now, unit: .weekOfYear), y: .value("Recorded minutes", week.minutes)).foregroundStyle(ClimbTheme.amber)
+                                    BarMark(x: .value("Week", SessionDay.date(for: week.day) ?? .now, unit: .weekOfYear), y: .value("Recorded minutes", week.minutes)).foregroundStyle(ClimbTheme.accent)
                                 }.frame(height: 160).accessibilityElement(children: .ignore).accessibilityLabel("Weekly recorded duration")
                                 .accessibilityValue(weeks.filter { $0.durationCount > 0 }.map { "\(SessionDay.label(for: $0.day)): \($0.minutes) recorded minutes in \($0.durationCount) sessions" }.joined(separator: "; "))
                                 ForEach(weeks.filter { $0.durationCount > 0 }) { week in Text("\(SessionDay.label(for: week.day)): \(week.minutes) recorded minutes in \(week.durationCount) sessions").font(.caption) }

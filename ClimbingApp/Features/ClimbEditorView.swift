@@ -56,7 +56,7 @@ struct ClimbEditorView: View {
                                     HStack {
                                         ForEach(customOrder, id: \.self) { choice in
                                             Button { grade = choice } label: { Text(choice).frame(minHeight: 44) }.buttonStyle(.bordered)
-                                                .tint(grade == choice ? ClimbTheme.forest : .secondary)
+                                                .tint(grade == choice ? ClimbTheme.accent : .secondary)
                                         }
                                     }
                                 }

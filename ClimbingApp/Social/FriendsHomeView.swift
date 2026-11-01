@@ -43,7 +43,7 @@ struct FriendsView: View {
                 } else if social.me == nil && !auditConnected {
                     Surface {
                         VStack(alignment: .leading, spacing: 16) {
-                            Image(systemName: "person.2.fill").font(.largeTitle).foregroundStyle(ClimbTheme.forest)
+                            Image(systemName: "person.2.fill").font(.largeTitle).foregroundStyle(ClimbTheme.accent)
                             Text("Find your climbing people.").font(.title2.bold())
                             Text("Choose a username so friends can find you. You decide which sessions to share.").foregroundStyle(ClimbTheme.secondaryText)
                             Button("Set up Friends") { profile = true }.buttonStyle(.borderedProminent).disabled(social.userID == nil || social.busy)
@@ -114,7 +114,7 @@ struct FriendsView: View {
                     Spacer()
                     Image(systemName: "plus.circle.fill").font(.title2)
                 }.padding(18).background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
-            }.buttonStyle(.plain).foregroundStyle(ClimbTheme.forest).accessibilityIdentifier("findFriends")
+            }.buttonStyle(.plain).foregroundStyle(ClimbTheme.accent).accessibilityIdentifier("findFriends")
         }
     }
 
@@ -176,8 +176,8 @@ struct FriendInitials: View {
     private var initials: String { name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased() }
     var body: some View {
         Text(initials.isEmpty ? "?" : initials).font(.system(.headline, design: .rounded, weight: .bold))
-            .foregroundStyle(ClimbTheme.forest).frame(width: size, height: size)
-            .background(ClimbTheme.forest.opacity(0.1), in: Circle()).accessibilityHidden(true)
+            .foregroundStyle(ClimbTheme.accent).frame(width: size, height: size)
+            .background(ClimbTheme.accent.opacity(0.1), in: Circle()).accessibilityHidden(true)
     }
 }
 
@@ -189,7 +189,7 @@ struct FriendsEmptyCard<Actions: View>: View {
     var body: some View {
         Surface {
             VStack(alignment: .leading, spacing: 16) {
-                Image(systemName: symbol).font(.largeTitle).foregroundStyle(ClimbTheme.forest)
+                Image(systemName: symbol).font(.largeTitle).foregroundStyle(ClimbTheme.accent)
                 Text(title).font(.title3.bold())
                 Text(message).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                 actions.frame(minHeight: 44)

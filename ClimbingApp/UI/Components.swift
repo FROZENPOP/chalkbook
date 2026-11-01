@@ -1,11 +1,8 @@
 import SwiftUI
 
 enum ClimbTheme {
-    // Preserve the original light palette; lift the same hues on dark grouped surfaces.
-    static let forest = Color(uiColor: UIColor { traits in
-        traits.userInterfaceStyle == .dark ? UIColor(red: 0.43, green: 0.78, blue: 0.64, alpha: 1) : UIColor(red: 0.12, green: 0.36, blue: 0.29, alpha: 1)
-    })
-    static let amber = Color(uiColor: UIColor { traits in
+    // Amber on black, matching the app icon; the light variant is darkened to keep text contrast on white.
+    static let accent = Color(uiColor: UIColor { traits in
         traits.userInterfaceStyle == .dark ? UIColor(red: 0.98, green: 0.69, blue: 0.36, alpha: 1) : UIColor(red: 0.65, green: 0.31, blue: 0.08, alpha: 1)
     })
     static let secondaryText = Color(uiColor: UIColor { traits in
@@ -80,13 +77,13 @@ struct SessionRow: View {
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: session.isComplete ? "mountain.2.fill" : "figure.climbing").accessibilityHidden(true)
-                .font(.title2).foregroundStyle(ClimbTheme.forest)
+                .font(.title2).foregroundStyle(ClimbTheme.accent)
                 .frame(width: 48, height: 48)
-                .background(ClimbTheme.forest.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
+                .background(ClimbTheme.accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
             VStack(alignment: .leading, spacing: 5) {
                 Text(session.title).font(.headline)
                 Text(SessionDay.label(for: session.day)).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
-                if !session.isComplete { Text("In progress").font(.caption.weight(.semibold)).foregroundStyle(ClimbTheme.forest) }
+                if !session.isComplete { Text("In progress").font(.caption.weight(.semibold)).foregroundStyle(ClimbTheme.accent) }
             }
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 5) {

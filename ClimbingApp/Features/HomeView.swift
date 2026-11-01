@@ -15,7 +15,7 @@ struct HomeView: View {
                 let header = textSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout())
                 header {
                     Label("CLIMB LOG", systemImage: "figure.climbing")
-                        .font(.caption.weight(.bold)).tracking(2).foregroundStyle(ClimbTheme.forest)
+                        .font(.caption.weight(.bold)).tracking(2).foregroundStyle(ClimbTheme.accent)
                         .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("journalBrand")
                     if !textSize.isAccessibilitySize { Spacer() }
                     Text(Date.now, format: .dateTime.month(.abbreviated).day()).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
@@ -28,7 +28,7 @@ struct HomeView: View {
                 }
                 Surface {
                     VStack(alignment: .leading, spacing: 18) {
-                        Image(systemName: "mountain.2.fill").accessibilityHidden(true).font(.system(size: 44)).foregroundStyle(ClimbTheme.forest)
+                        Image(systemName: "mountain.2.fill").accessibilityHidden(true).font(.system(size: 44)).foregroundStyle(ClimbTheme.accent)
                         Text(active == nil ? "A good session starts here." : "You have a session in progress.")
                             .font(.title2.weight(.semibold))
                         Text(active?.title ?? "Log your climbs, celebrate your sends, and keep track of what’s next.")

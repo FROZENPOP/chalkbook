@@ -18,6 +18,7 @@ struct ShareSessionView: View {
     @State private var preparingPhoto = false
     @State private var photoError: String?
     @State private var preparation: Task<Void,Never>?
+    @State private var login = false
 
     var body: some View {
         NavigationStack {
@@ -68,6 +69,11 @@ struct ShareSessionView: View {
                             .disabled(social.busy || preparingPhoto || !photosLoaded || draft.caption.count > 1000)
                         Text("Saving replaces this entry’s shared snapshot. Later journal edits do not silently change published content. Visibility changes require a connection and a confirmed save.").font(.caption)
                     }
+                } else if social.configuration != nil && auth.account == nil {
+                    Section {
+                        Text("Sign in to share this session with friends. It stays private on this device until you do.")
+                        Button("Sign in to share") { login = true }.frame(minHeight: 44).accessibilityIdentifier("shareSignIn")
+                    }
                 } else {
                     Text(social.configuration == nil ? "Friends is waiting for Supabase setup. This session is private on this device." : "Connect and set up your social profile in Friends before sharing.")
                 }
@@ -88,6 +94,7 @@ struct ShareSessionView: View {
             .navigationTitle("Share session")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() }.accessibleToolbarAction() } }
             .task { await load() }
+            .sheet(isPresented: $login) { LoginPortalView() }
             .onDisappear { preparation?.cancel() }
         }
     }

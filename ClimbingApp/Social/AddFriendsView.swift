@@ -19,7 +19,7 @@ struct AddFriendsView: View {
                     }
                 }
                 HStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(ClimbTheme.forest).accessibilityHidden(true)
+                    Image(systemName: "magnifyingglass").foregroundStyle(ClimbTheme.accent).accessibilityHidden(true)
                     TextField("Name or @username", text: $query, axis: .vertical).lineLimit(1...3)
                         .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.asciiCapable)
                         .accessibilityLabel("Search by name or username").submitLabel(.search).focused($focused).accessibilityIdentifier("friendSearchField")
@@ -36,7 +36,7 @@ struct AddFriendsView: View {
                 }
                 .padding(.leading, 16).padding(.trailing, query.isEmpty ? 16 : 4).frame(minHeight: 56)
                 .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
-                .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(focused ? ClimbTheme.forest : Color.secondary.opacity(0.2), lineWidth: focused ? 2 : 1) }
+                .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(focused ? ClimbTheme.accent : Color.secondary.opacity(0.2), lineWidth: focused ? 2 : 1) }
 
                 results
 
@@ -117,7 +117,7 @@ struct FriendPersonRow: View {
                 layout {
                     if let link {
                         if link.status == "accepted" {
-                            Label("Friends", systemImage: "checkmark.circle.fill").font(.subheadline).foregroundStyle(ClimbTheme.forest)
+                            Label("Friends", systemImage: "checkmark.circle.fill").font(.subheadline).foregroundStyle(ClimbTheme.accent)
                             Spacer(minLength: 0)
                             NavigationLink("View progress") { FriendProgressView(climberID: personID, name: person?.display_name ?? "Climber") }.buttonStyle(.bordered).frame(minHeight: 44)
                         } else if link.recipient == social.userID {

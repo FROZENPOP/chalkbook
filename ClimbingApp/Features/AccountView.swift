@@ -31,10 +31,14 @@ struct AccountSection: View {
             if let account = auth.account {
                 Text("Signed in with \(account.provider == .apple ? "Apple" : "Google")").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
             } else {
-                Button(action: openPortal) {
-                    HStack { Image(systemName: "person.crop.circle").accessibilityHidden(true); Text("Sign in or create an account").fixedSize(horizontal: false, vertical: true) }.frame(minHeight: 44)
-                }.accessibilityIdentifier("openLogin")
-                Text("You’re logging on this device without an account.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("You’re using Climb Log as a guest").font(.headline)
+                    Text("Sign in with Apple or Google to join Friends and share the sessions you choose. Your guest log stays on this iPhone.")
+                        .font(.subheadline).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true)
+                    Button(action: openPortal) {
+                        Label("Sign in or create an account", systemImage: "person.crop.circle").frame(maxWidth: .infinity, minHeight: 44)
+                    }.buttonStyle(.borderedProminent).accessibilityIdentifier("openLogin")
+                }.padding(.vertical, 4)
             }
         }
     }
@@ -44,14 +48,17 @@ struct LoginPortalView: View {
     @Environment(AccountSession.self) private var auth
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    /// Set for the first-launch welcome, which replaces the app instead of being presented over it.
+    var onFinish: (() -> Void)? = nil
+    private func finish() { if let onFinish { onFinish() } else { dismiss() } }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    Image(systemName: "figure.climbing").font(.system(size: 50)).foregroundStyle(ClimbTheme.forest)
-                    Text("Your climbing,\nyour account.").font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    Text("Sign in with your existing Apple or Google account. No new password to remember.").foregroundStyle(ClimbTheme.secondaryText)
+                    Image(systemName: "chevron.up.2").font(.system(size: 50, weight: .bold)).accessibilityHidden(true).foregroundStyle(ClimbTheme.accent)
+                    Text(onFinish == nil ? "Your climbing,\nyour account." : "Welcome to\nClimb Log.").font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    Text("Sign in with your existing Apple or Google account to connect with friends. No new password to remember.").foregroundStyle(ClimbTheme.secondaryText)
                     if !LoginConfiguration.appleEnabled {
                         Text("Apple sign-in isn’t available in this build. You can still use Google when configured, or continue without an account.")
                             .font(.subheadline).foregroundStyle(ClimbTheme.secondaryText).accessibilityIdentifier("appleSetupMessage")
@@ -67,10 +74,14 @@ struct LoginPortalView: View {
                             auth.completeApple(result)
                         }
                         .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                        // The UIKit-backed button fixes its style at creation, so rebuild it when the app's forced appearance applies.
+                        .id(colorScheme)
                         .frame(height: 52)
                         .disabled(!LoginConfiguration.appleEnabled || auth.isBusy)
                         .accessibilityIdentifier("appleLogin")
-                        GoogleSignInButton {
+                        // The provider buttons don't report a disabled state to VoiceOver; the setup message above explains instead.
+                        .accessibilityHidden(!LoginConfiguration.appleEnabled)
+                        GoogleSignInButton(scheme: colorScheme == .dark ? .dark : .light, style: .wide) {
                             guard let scene = UIApplication.shared.connectedScenes
                                 .compactMap({ $0 as? UIWindowScene }).first(where: { $0.activationState == .foregroundActive }),
                                   var presenter = scene.windows.first(where: \.isKeyWindow)?.rootViewController else {
@@ -82,6 +93,7 @@ struct LoginPortalView: View {
                         .frame(height: 52)
                         .disabled(LoginConfiguration.googleClientID == nil || auth.isBusy)
                         .accessibilityIdentifier("googleLogin")
+                        .accessibilityHidden(LoginConfiguration.googleClientID == nil)
                         if auth.isBusy { SwiftUI.ProgressView("Signing in…") }
                     }
                     if let message = auth.errorMessage {
@@ -90,14 +102,15 @@ struct LoginPortalView: View {
                     }
                     Text("Your log and route media stay on this iPhone. Sign-in doesn’t turn on cloud sync. Your guest log remains separate; use backup and restore to move it into your account.")
                         .font(.footnote).foregroundStyle(ClimbTheme.secondaryText)
-                    Button("Continue without an account") { dismiss() }.frame(maxWidth: .infinity, minHeight: 44)
+                    Button(onFinish == nil ? "Continue without an account" : "Continue as guest", action: finish)
+                        .buttonStyle(.bordered).tint(.primary).frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("continueAsGuest")
                 }.padding(24)
             }
             .background(ClimbTheme.background)
-            .navigationTitle("Sign in")
+            .navigationTitle(onFinish == nil ? "Sign in" : "")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
-            .onChange(of: auth.account) { _, account in if account != nil { dismiss() } }
+            .toolbar { if onFinish == nil { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } } }
+            .onChange(of: auth.account) { _, account in if account != nil { finish() } }
         }
     }
 }
@@ -115,6 +128,7 @@ struct AppleConfirmButton: View {
             if case .success = result { Task { await confirmed() } }
         }
         .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+        .id(colorScheme)
         .frame(height: 50)
         .accessibilityIdentifier("appleConfirm")
     }

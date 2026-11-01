@@ -28,7 +28,7 @@ struct SessionDetailView: View {
                 Surface {
                     VStack(alignment: .leading, spacing: 16) {
                         Label(session.isComplete ? "Session complete" : "In progress", systemImage: session.isComplete ? "checkmark.circle.fill" : "circle.dotted")
-                            .font(.subheadline.weight(.semibold)).foregroundStyle(ClimbTheme.forest)
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(ClimbTheme.accent)
                         JournalMetrics(first: session.totals.attempts.map(String.init) ?? "Unknown", firstLabel: "attempts", second: session.totals.sends.map(String.init) ?? "Unknown", secondLabel: "sends", third: "\(session.completedClimbs)", thirdLabel: "identified climbs sent")
                         Text(session.totals.label).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                         if let minutes = session.durationMinutes { Text("Recorded duration: \(minutes) minutes").font(.caption) }
@@ -142,11 +142,11 @@ struct ClimbCard: View {
                 let header = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12)) : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
                 header {
                     Text(climb.descriptor.label).font(.system(.title2, design: .rounded, weight: .bold))
-                        .padding(12).background(ClimbTheme.forest.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
+                        .padding(12).background(ClimbTheme.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
                     VStack(alignment: .leading, spacing: 5) {
                         Text(climb.title).font(.headline)
                         Text(climb.resultLabel).font(.subheadline)
-                            .foregroundStyle(climb.isSent ? ClimbTheme.forest : ClimbTheme.secondaryText)
+                            .foregroundStyle(climb.isSent ? ClimbTheme.accent : ClimbTheme.secondaryText)
                         Text("\(displayedAttempts.count) attempts · \(displayedAttempts.filter(\.sent).count) sends this session").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                     }
                     Spacer(minLength: 0)

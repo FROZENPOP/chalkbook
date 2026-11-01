@@ -7,8 +7,12 @@ import SwiftData
 struct ClimbingApp: App {
     @State private var auth: AccountSession
     @State private var invitations = FriendInviteRouter()
+    @AppStorage("appearance", store: .standard) private var appearance = "dark"
     @Environment(\.scenePhase) private var scenePhase
     private let testing = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+    // UI tests opt in so every other test still starts in the journal.
+    @State private var welcome = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+        ? ProcessInfo.processInfo.arguments.contains("--show-welcome") : !UserDefaults.standard.bool(forKey: "chosenStart")
 
     init() {
         let testing = ProcessInfo.processInfo.arguments.contains("--ui-testing")
@@ -19,20 +23,27 @@ struct ClimbingApp: App {
 
     var body: some Scene {
         WindowGroup {
-            WorkspaceRoot(accountKey: auth.account?.storageKey, testing: testing)
-                .id(auth.account?.storageKey ?? "guest")
-                .environment(auth)
-                .environment(invitations)
-                .onOpenURL { url in invitations.open(url); _ = GIDSignIn.sharedInstance.handle(url) }
-                .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in if let url=activity.webpageURL { invitations.open(url) } }
-                .task { if !testing { await auth.restore() } }
-                .onChange(of: scenePhase) { _, phase in
-                    if phase == .active && !testing { Task { await auth.verifyExistingSession() } }
+            Group {
+                if welcome && auth.account == nil {
+                    LoginPortalView { welcome = false; if !testing { UserDefaults.standard.set(true, forKey: "chosenStart") } }
+                } else {
+                    WorkspaceRoot(accountKey: auth.account?.storageKey, testing: testing)
+                        .id(auth.account?.storageKey ?? "guest")
                 }
-                .onReceive(NotificationCenter.default.publisher(for: ASAuthorizationAppleIDProvider.credentialRevokedNotification)) { _ in
-                    if auth.account?.provider == .apple { auth.signOut() }
-                }
-
+            }
+            // UI tests keep the system appearance; audits pick light or dark themselves.
+            .preferredColorScheme(testing ? nil : appearance == "light" ? .light : appearance == "system" ? nil : .dark)
+            .environment(auth)
+            .environment(invitations)
+            .onOpenURL { url in invitations.open(url); _ = GIDSignIn.sharedInstance.handle(url) }
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in if let url=activity.webpageURL { invitations.open(url) } }
+            .task { if !testing { await auth.restore() } }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active && !testing { Task { await auth.verifyExistingSession() } }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: ASAuthorizationAppleIDProvider.credentialRevokedNotification)) { _ in
+                if auth.account?.provider == .apple { auth.signOut() }
+            }
         }
     }
 }
@@ -147,7 +158,7 @@ struct AppRoot: View {
             }
         }
         .id(store.dataRevision)
-        .tint(ClimbTheme.forest)
+        .tint(ClimbTheme.accent)
         .environment(store)
         .environment(profiles)
         .environment(social)

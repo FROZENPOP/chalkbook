@@ -98,7 +98,7 @@ struct ProjectNotebookSummary: View {
     var body: some View {
         if let pinned = climb.pinnedNote {
             VStack(alignment:.leading,spacing:8) { Label("Next move",systemImage:"pin.fill").font(.subheadline.bold());Text(pinned.text).lineLimit(4) }
-                .padding(14).frame(maxWidth:.infinity,alignment:.leading).background(ClimbTheme.forest.opacity(0.08),in:RoundedRectangle(cornerRadius:14))
+                .padding(14).frame(maxWidth:.infinity,alignment:.leading).background(ClimbTheme.accent.opacity(0.08),in:RoundedRectangle(cornerRadius:14))
         }
         ForEach(climb.recentNotebook,id:\.id) { note in
             VStack(alignment:.leading,spacing:4) { Text(note.text).font(.subheadline).lineLimit(3);Text(note.updatedAt,format:.dateTime.month().day()).font(.caption).foregroundStyle(ClimbTheme.secondaryText) }

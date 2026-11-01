@@ -74,12 +74,11 @@ final class GymFeatureUITests: XCTestCase {
         app.profileButton.tap()
         app.buttons["openLogin"].tap()
         XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5))
+        // An unconfigured provider is hidden from accessibility and explained by its setup message.
+        XCTAssertNotEqual(app.buttons["appleLogin"].exists, app.staticTexts["appleSetupMessage"].exists)
         let google = app.buttons["googleLogin"]
-        for _ in 0..<4 { if google.isHittable { break }; app.scrollViews.firstMatch.swipeUp() }
-        XCTAssertTrue(app.buttons["appleLogin"].exists)
-        XCTAssertTrue(google.exists)
-        if app.staticTexts["googleSetupMessage"].exists { XCTAssertFalse(google.isEnabled) }
-        else { XCTAssertTrue(google.isEnabled) }
+        XCTAssertNotEqual(google.exists, app.staticTexts["googleSetupMessage"].exists)
+        if google.exists { XCTAssertTrue(google.isEnabled) }
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "Apple and Google login portal"
         screenshot.lifetime = .keepAlways
