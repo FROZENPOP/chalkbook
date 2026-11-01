@@ -1,4 +1,5 @@
 -- Phase 0 of REBUILD_PLAN.md: the server-backed journal, shared gyms and routes, and one-way follows.
+-- Friendships are copied into follows at the Phase 3 cutover, not here, so the two cannot drift apart before then.
 -- The app does not read these tables yet. Health data never enters them.
 begin;
 create table public.gyms (
@@ -101,6 +102,7 @@ create table public.media (
   route_id uuid references public.routes(id) on delete set null,
   kind text not null check(kind in ('photo','video')),
   storage_path text not null check(length(storage_path) between 1 and 500),
+  check(split_part(storage_path,'/',1) = owner_id::text), -- Storage access can key off this row, so a row may only name its owner's files.
   visibility text not null default 'session' check(visibility in ('private','session')), -- 'session' follows the session's audience.
   updated_at timestamptz not null default now(),
   deleted_at timestamptz
@@ -128,12 +130,6 @@ create table public.follows (
   primary key(follower_id,followee_id), check(follower_id <> followee_id)
 );
 create index follows_followee on public.follows(followee_id);
-
--- Existing friends become mutual follows. Rerun at the Phase 3 cutover; it is idempotent.
-insert into public.follows(follower_id,followee_id,status)
- select requester,recipient,'accepted' from public.friendships where status='accepted'
- union select recipient,requester,'accepted' from public.friendships where status='accepted'
-on conflict do nothing;
 
 create function social_private.following(owner uuid) returns boolean
 language sql stable security definer set search_path='' as $$
