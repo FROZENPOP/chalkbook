@@ -276,6 +276,17 @@ final class SocialStore {
         return true
     }
 
+    /// Deletes the server account, which cascades to everything social, then signs out.
+    func deleteAccount(_ auth: AccountSession) async -> Bool {
+        // shortcut: only Google accounts reach Supabase today; include Apple once its provider is enabled there.
+        if configuration != nil, auth.account?.provider == .google {
+            guard await perform(auth, operation: { _ = try await self.request("/rest/v1/rpc/delete_account", method: "POST", values: [:]) }) else { return false }
+        }
+        suggestions.reset(); me = nil; feed.reset(); friendships = []; peopleRecords = []; blocks = []
+        auth.signOut()
+        return auth.account == nil
+    }
+
     func sharedEntry(_ auth: AccountSession, session: ClimbingSession) async -> SharedSession? {
         guard !removals.contains(sessionID: session.id) else { return nil }
         var result: SharedSession?
