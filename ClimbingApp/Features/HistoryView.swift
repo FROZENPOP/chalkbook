@@ -2,7 +2,11 @@ import SwiftUI
 import SwiftData
 
 struct HistoryView: View {
+    @Environment(ClimbingStore.self) private var store
+    @Environment(SocialStore.self) private var social
+    @Environment(AccountSession.self) private var auth
     @Query(sort: \ClimbingSession.day, order: .reverse) private var sessions: [ClimbingSession]
+    @State private var deleting: ClimbingSession?
     @State private var search = ""
     @State private var completedOnly = false
 
@@ -34,8 +38,12 @@ struct HistoryView: View {
             }
             ForEach(filtered) { session in
                 NavigationLink { SessionDetailView(session: session) } label: { SessionRow(session: session) }
+                    .swipeActions { Button("Delete", systemImage: "trash") { deleting = session }.tint(.red) }
             }
         }
         .navigationTitle("History")
+        .confirmationDialog("Delete this session and its recorded activity?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible, presenting: deleting) { session in
+            Button("Delete session", role: .destructive) { _ = social.deleteSession(session, store: store, auth: auth) }
+        } message: { _ in Text("Its attempts, recalled entries, and any shared recap will be removed. Climbs, projects, notebooks, media, and other sessions stay in your journal.") }
     }
 }

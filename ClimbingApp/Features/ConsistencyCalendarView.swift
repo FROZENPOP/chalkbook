@@ -51,8 +51,11 @@ struct ConsistencyCalendarView: View {
                 ZStack(alignment: .topLeading) {
                     ForEach(Array(weeks.enumerated()), id: \.element.id) { index, week in
                         if let month = monthLabel(week) {
-                            Text(month).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-                                .padding(.leading, CGFloat(index) * (cell + gap))
+                            // A month starting in the last columns is right-aligned so it doesn't wrap at the edge.
+                            let nearEnd = index >= weeks.count - 2
+                            Text(month).font(.caption).foregroundStyle(ClimbTheme.secondaryText).lineLimit(1)
+                                .padding(.leading, nearEnd ? 0 : CGFloat(index) * (cell + gap))
+                                .frame(maxWidth: .infinity, alignment: nearEnd ? .trailing : .leading)
                         }
                     }
                 }
@@ -96,29 +99,54 @@ struct ConsistencyCalendarView: View {
             }
             .accessibilityHint("Shows the whole year.")
             .accessibilityIdentifier("consistencyYear")
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // Buttons for the same move as the swipe below, so it never depends on a gesture.
+            .overlay(alignment: .trailing) {
+                HStack(spacing: 0) {
+                    weekStep(-1, "chevron.left", "Previous week", "consistencyPreviousWeek")
+                    weekStep(1, "chevron.right", "Next week", "consistencyNextWeek")
+                }
+            }
             HStack(spacing: 6) {
                 ForEach(week.days) { day in
                     Button { selected = day } label: {
                         // A light tint plus a shaded bar: text on the full shade fails contrast at the middle levels.
                         VStack(spacing: 4) {
                             Text(day.date.formatted(.dateTime.weekday(.narrow))).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-                            Text(day.date.formatted(.dateTime.day())).font(.subheadline.weight(.semibold))
+                            Text(day.date.formatted(.dateTime.day())).font(.subheadline.weight(.semibold)).foregroundStyle(day.isFuture ? ClimbTheme.secondaryText : .primary)
                             Capsule().fill(day.sessions > 0 ? shade(day.level) : .clear).frame(height: 6).padding(.horizontal, 10)
                         }
                         .padding(.vertical, 6)
                         .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(day.sessions > 0 ? ClimbTheme.forest.opacity(0.16) : Color(uiColor: .secondarySystemFill), in: RoundedRectangle(cornerRadius: 10))
+                        .background(day.sessions > 0 ? ClimbTheme.forest.opacity(0.16) : day.isFuture ? .clear : Color(uiColor: .secondarySystemFill), in: RoundedRectangle(cornerRadius: 10))
+                        // Future days are outlined rather than dimmed: dimmed text fails contrast.
+                        .overlay { if day.isFuture { RoundedRectangle(cornerRadius: 10).stroke(Color(uiColor: .separator)) } }
                         .overlay { if day.id == selected?.id { RoundedRectangle(cornerRadius: 10).stroke(.primary, lineWidth: 2) } }
                     }
                     .buttonStyle(.plain)
-                    .disabled(day.isFuture)
-                    .opacity(day.isFuture ? 0.4 : 1)
+                    // Not .disabled: SwiftUI dims disabled buttons below the contrast minimum.
+                    .allowsHitTesting(!day.isFuture)
+                    .accessibilityRemoveTraits(day.isFuture ? .isButton : [])
                     .accessibilityLabel(detail(day))
                     .accessibilityAddTraits(day.id == selected?.id ? .isSelected : [])
                     .accessibilityIdentifier("consistencyDay-\(day.key)")
                 }
             }
+            .highPriorityGesture(DragGesture(minimumDistance: 20).onEnded {
+                guard abs($0.translation.width) > abs($0.translation.height) else { return }
+                open(column: (cursor ?? weeks.count - 1) + ($0.translation.width < 0 ? 1 : -1))
+            })
         }
+    }
+
+    private func weekStep(_ delta: Int, _ symbol: String, _ label: String, _ id: String) -> some View {
+        let column = (cursor ?? weeks.count - 1) + delta
+        return Button { open(column: column) } label: {
+            Image(systemName: symbol).font(.subheadline.weight(.semibold)).frame(width: 44, height: 44).contentShape(Rectangle())
+        }
+        .disabled(!weeks.indices.contains(column))
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(id)
     }
 
     private func open(column: Int) {
