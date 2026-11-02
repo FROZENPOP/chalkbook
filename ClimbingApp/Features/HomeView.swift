@@ -14,7 +14,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 24) {
                 let header = textSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout())
                 header {
-                    Label { Text("CLIMB LOG") } icon: { AscentMark().frame(width: 14) }
+                    Label { Text("SENDR") } icon: { AscentMark().frame(width: 14) }
                         .font(.caption.weight(.bold)).tracking(2).foregroundStyle(ClimbTheme.accent)
                         .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("journalBrand")
                     if !textSize.isAccessibilitySize { Spacer() }

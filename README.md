@@ -1,4 +1,4 @@
-# Climb Log · iOS
+# Sendr · iOS
 
 A native, offline-capable personal bouldering log built with SwiftUI, SwiftData, and Swift Charts.
 

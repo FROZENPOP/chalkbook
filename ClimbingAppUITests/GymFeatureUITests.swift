@@ -127,7 +127,7 @@ final class GymFeatureUITests: XCTestCase {
             if app.buttons["Browse"].waitForExistence(timeout: 5) { app.buttons["Browse"].tap() }
             let phone = app.staticTexts["On My iPhone"]
             if phone.waitForExistence(timeout: 5) { phone.tap() }
-            let folder = app.staticTexts["Climb Log"]
+            let folder = app.staticTexts["Sendr"]
             if folder.waitForExistence(timeout: 3) { folder.tap() }
         }
         XCTAssertTrue(item.waitForExistence(timeout: 10))

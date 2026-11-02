@@ -22,7 +22,7 @@ final class ProfileUITests: XCTestCase {
         if !photo.isHittable {
             if app.buttons["Browse"].waitForExistence(timeout:5) { app.buttons["Browse"].tap() }
             if app.staticTexts["On My iPhone"].waitForExistence(timeout:5) { app.staticTexts["On My iPhone"].tap() }
-            if app.staticTexts["Climb Log"].waitForExistence(timeout:5) { app.staticTexts["Climb Log"].tap() }
+            if app.staticTexts["Sendr"].waitForExistence(timeout:5) { app.staticTexts["Sendr"].tap() }
         }
         XCTAssertTrue(photo.waitForExistence(timeout:10));photo.tap()
         if app.buttons["Open"].waitForExistence(timeout:2) { app.buttons["Open"].tap() }

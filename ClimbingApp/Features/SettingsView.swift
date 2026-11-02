@@ -106,9 +106,9 @@ struct SettingsView: View {
             Button("Delete account", role: .destructive) {
                 Task { await deleteAccount() }
             }
-        } message: { Text("This permanently deletes your Climb Log account, Friends profile, connections, shared entries and reactions from our servers, then signs you out. Your private journal stays on this iPhone until you delete the app. This can’t be undone.") }
+        } message: { Text("This permanently deletes your Sendr account, Friends profile, connections, shared entries and reactions from our servers, then signs you out. Your private journal stays on this iPhone until you delete the app. This can’t be undone.") }
         .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .json,
-                      defaultFilename: "ClimbingLog-\(SessionDay.key(for: .now))") { result in
+                      defaultFilename: "Sendr-\(SessionDay.key(for: .now))") { result in
             if case let .failure(error) = result { message = error.localizedDescription }
         }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
