@@ -115,6 +115,17 @@ final class SocialStore {
         }
     }
 
+    #if DEBUG
+    var auditReactions: [UUID: [ReactionSummary]] = [:]
+    var auditComments: [UUID: [SessionComment]] = [:]
+    func loadAuditSample() {
+        guard me == nil else { return } // Friends reloads on every return; keep comments added during the run.
+        userID = SocialAuditSample.me.id; me = SocialAuditSample.me
+        peopleRecords = SocialAuditSample.people; friendships = SocialAuditSample.friendships
+        auditReactions = SocialAuditSample.reactions(); auditComments = SocialAuditSample.comments()
+    }
+    #endif
+
     private func reload() async throws {
         // Invalidate pending pages before refreshing relationships/visibility.
         feed.reset()
@@ -190,9 +201,12 @@ final class SocialStore {
         }
     }
 
-    func routePhotos(_ auth: AccountSession, entryID: UUID) async throws -> [SharedRoutePhoto] {
+    func routePhotos(_ auth: AccountSession, entryID: UUID, limit: Int = 3) async throws -> [SharedRoutePhoto] {
+        #if DEBUG
+        if SocialAuditSample.enabled { return Array(SocialAuditSample.photos(for: entryID).prefix(limit)) }
+        #endif
         try await authorize(auth)
-        let data = try await request("/rest/v1/shared_route_photos?entry_id=eq.\(entryID.uuidString)&select=id,entry_id,original_base64,highlighted_base64&order=position&limit=3")
+        let data = try await request("/rest/v1/shared_route_photos?entry_id=eq.\(entryID.uuidString)&select=id,entry_id,original_base64,highlighted_base64&order=position&limit=\(limit)")
         try Task.checkCancellation()
         let photos = try JSONDecoder().decode([SharedRoutePhoto].self, from:data)
         return try photos.map { try $0.validated() }

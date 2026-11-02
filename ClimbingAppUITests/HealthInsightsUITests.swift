@@ -2,14 +2,14 @@ import XCTest
 
 final class HealthInsightsUITests: XCTestCase {
     override func setUp() { continueAfterFailure = false }
-    @MainActor private func launch(fixture: Bool = false, empty: Bool = false, large: Bool = false) -> XCUIApplication {
+    @MainActor private func launch(fixture: Bool = false, empty: Bool = false, large: Bool = false, audit: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data"]
+        if audit { app.launchArguments += ["--accessibility-audit", "session-log"] }
         if fixture { app.launchArguments.append("--health-insights-fixture") }
         if empty { app.launchArguments.append("--health-insights-empty") }
         if large { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
         app.launch()
-        XCTAssertTrue(app.tabBars.buttons["Progress"].waitForExistence(timeout: 15))
         return app
     }
     @MainActor private func reveal(_ app: XCUIApplication, _ element: XCUIElement) {
@@ -20,75 +20,78 @@ final class HealthInsightsUITests: XCTestCase {
         }
         XCTAssertTrue(element.waitForExistence(timeout: 5), app.debugDescription)
     }
-    @MainActor private func tap(_ app: XCUIApplication, _ id: String) {
-        let button = app.buttons[id].firstMatch; reveal(app, button); button.tap()
-    }
-    @MainActor private func enable(_ app: XCUIApplication) {
-        let toggle = app.switches["showHealthInsights"]
-        XCTAssertEqual(toggle.value as? String, "0")
-        // The toggle can sit under the floating tab bar, which would take the tap; short drags so a swipe can't fling it off the top.
-        let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6))
-        for _ in 0..<12 where toggle.frame.maxY > app.tabBars.firstMatch.frame.minY - 8 {
-            center.press(forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: 0, dy: -200)))
-        }
-        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
-        XCTAssertEqual(toggle.value as? String, "1")
-        tap(app, "connectHealthInsights")
-    }
-    @MainActor func testHealthIsOffByDefaultAndUnavailableIsHonest() {
-        let app = launch()
+    @MainActor private func openLog(_ app: XCUIApplication, _ title: String) {
+        XCTAssertTrue(app.tabBars.buttons["Progress"].waitForExistence(timeout: 15))
         app.tabBars.buttons["Progress"].tap()
-        XCTAssertEqual(app.switches["showHealthInsights"].value as? String, "0")
-        XCTAssertFalse(app.buttons["connectHealthInsights"].exists)
-        XCTAssertFalse(app.descendants(matching: .any)["healthInsightsHeading"].exists)
-        app.switches["showHealthInsights"].coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
-        let connect = app.buttons["connectHealthInsights"]
-        XCTAssertTrue(connect.waitForExistence(timeout: 5));XCTAssertFalse(connect.isEnabled)
-        XCTAssertTrue(app.staticTexts["Apple Health is unavailable on this device."].exists)
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
+        reveal(app, row); row.tap()
+        XCTAssertTrue(app.navigationBars["Session log"].waitForExistence(timeout: 5))
     }
-    @MainActor func testWeeklyAndLinkedSessionCardsWithFakeReaderAndUnlinkedSessionHasNone() {
-        let app = launch(fixture: true)
-        app.tabBars.buttons["Progress"].tap(); enable(app)
-        let calories = app.staticTexts["432.0 kcal"].firstMatch
-        reveal(app, calories)
-        XCTAssertTrue(calories.waitForExistence(timeout: 5))
-        app.swipeUp()
-        let trendShot = XCTAttachment(screenshot: app.screenshot());trendShot.name = "Linked workout weekly calorie trend";trendShot.lifetime = .keepAlways;add(trendShot)
-        let recovery = app.staticTexts["Recovery context"]
-        reveal(app, recovery)
-        XCTAssertTrue(app.staticTexts["58.0 bpm"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["54.0 ms"].exists)
-        let weeklyShot = XCTAttachment(screenshot: app.screenshot());weeklyShot.name = "Private weekly Health insights";weeklyShot.lifetime = .keepAlways;add(weeklyShot)
-        app.tabBars.buttons["Journal"].tap()
-        let unlinked = app.buttons.matching(NSPredicate(format:"label CONTAINS %@", "Unlinked fixture session")).firstMatch
-        reveal(app, unlinked);unlinked.tap()
-        XCTAssertFalse(app.buttons["viewSessionHealthInsights"].exists)
+    @MainActor private func connect(_ app: XCUIApplication) {
+        let button = app.buttons["connectHealthInsights"]
+        if button.waitForExistence(timeout: 3) { reveal(app, button); button.tap() }
+    }
+    @MainActor func testUnavailableHealthIsHonestAndAsksForNothing() {
+        let app = launch(audit: true)
+        let message = app.staticTexts["Apple Health is unavailable on this device."]
+        reveal(app, message)
+        XCTAssertFalse(app.buttons["connectHealthInsights"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["healthEffortCard"].exists)
-        app.navigationBars.buttons.firstMatch.tap()
-        let linked = app.buttons.matching(NSPredicate(format:"label CONTAINS %@", "Health fixture session")).firstMatch
-        reveal(app, linked);linked.tap()
-        let effort = app.staticTexts["Climb effort estimate"].firstMatch
+    }
+    @MainActor func testLogPutsClimbingFirstAndHealthAtKeyStatistics() {
+        let app = launch(fixture: true)
+        openLog(app, "Health fixture session")
+        let sends = app.staticTexts["sends"], heading = app.staticTexts["Key statistics"]
+        XCTAssertTrue(sends.waitForExistence(timeout: 5))
+        reveal(app, heading)
+        XCTAssertLessThan(sends.frame.minY, heading.frame.minY)
+        connect(app)
+        let effort = app.descendants(matching: .any)["healthEffortCard"]
         reveal(app, effort)
         XCTAssertTrue(effort.waitForExistence(timeout: 10))
-        let ring = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@ AND value == %@", "Climb effort estimate", "5.7 out of 10")).firstMatch
-        XCTAssertTrue(ring.waitForExistence(timeout: 5))
-        reveal(app, ring)
-        let effortShot = XCTAttachment(screenshot: app.screenshot());effortShot.name = "Transparent app effort estimate";effortShot.lifetime = .keepAlways;add(effortShot)
-        let heart = app.staticTexts["Heart rate"].firstMatch
-        reveal(app, heart)
-        XCTAssertTrue(app.staticTexts["Average: 144 bpm"].exists)
-        XCTAssertTrue(app.staticTexts["Maximum: 176 bpm"].exists)
-        app.swipeUp()
-        let sessionShot = XCTAttachment(screenshot: app.screenshot());sessionShot.name = "Linked workout heart-rate card";sessionShot.lifetime = .keepAlways;add(sessionShot)
+        XCTAssertTrue((effort.value as? String)?.contains("5.7 / 10") == true)
+        let average = app.descendants(matching: .any)["healthAverageHeartRateCard"]
+        reveal(app, average)
+        XCTAssertTrue((average.value as? String)?.contains("144 bpm") == true)
+        XCTAssertTrue((app.descendants(matching: .any)["healthMaximumHeartRateCard"].value as? String)?.contains("176 bpm") == true)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "Session log key statistics"; shot.lifetime = .keepAlways; add(shot)
+        reveal(app, app.descendants(matching: .any)["healthHeartRateChart"])
+    }
+    @MainActor func testUnlinkedLogOffersLinkAndShowsNoNumbers() {
+        let app = launch(fixture: true)
+        openLog(app, "Unlinked fixture session")
+        reveal(app, app.buttons["linkHealthWorkout"])
+        XCTAssertFalse(app.descendants(matching: .any)["healthEffortCard"].exists)
+    }
+    @MainActor func testHealthStaysOutOfTheJournalEntry() {
+        let app = launch(fixture: true)
+        XCTAssertTrue(app.tabBars.buttons["Journal"].waitForExistence(timeout: 15))
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Health fixture session")).firstMatch
+        reveal(app, row); row.tap()
+        XCTAssertTrue(app.staticTexts["Your climbs"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Key statistics"].exists)
+        XCTAssertFalse(app.buttons["linkHealthWorkout"].exists)
+    }
+    @MainActor func testDeletingFromTheLogReturnsToProgress() {
+        let app = launch(fixture: true)
+        openLog(app, "Health fixture session")
+        app.buttons["openJournalEntry"].tap()
+        app.buttons["Session options"].tap()
+        app.buttons["Delete session"].tap()
+        XCTAssertTrue(app.buttons["Delete session"].waitForExistence(timeout: 5))
+        app.buttons["Delete session"].tap()
+        XCTAssertTrue(app.navigationBars["Progress"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Health fixture session")).firstMatch.exists)
     }
     @MainActor func testEmptyReadsAtAccessibilityTextSizeDoNotInventMetrics() {
         let app = launch(fixture: true, empty: true, large: true)
-        app.tabBars.buttons["Progress"].tap(); enable(app)
+        openLog(app, "Health fixture session")
+        connect(app)
         let message = app.staticTexts["healthInsightsMessage"]
         reveal(app, message)
         XCTAssertTrue(message.waitForExistence(timeout: 10))
         XCTAssertTrue(message.label.contains("No accessible data found"))
-        XCTAssertFalse(app.staticTexts["5.7"].exists)
-        let shot = XCTAttachment(screenshot: app.screenshot());shot.name = "Empty Health reads at accessibility XXXL";shot.lifetime = .keepAlways;add(shot)
+        XCTAssertFalse(app.descendants(matching: .any)["healthEffortCard"].exists)
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "Empty Health reads at accessibility XXXL"; shot.lifetime = .keepAlways; add(shot)
     }
 }

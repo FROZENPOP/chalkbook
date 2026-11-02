@@ -24,6 +24,7 @@ struct ClimbingBackup: Codable {
     struct SessionExtras: Codable {
         var id: UUID; var linkedClimbIDs: [UUID]; var selectedClimbID: UUID?
         var createdAt: Date; var updatedAt: Date; var durationKnown: Bool
+        var pausedAt: Date? = nil; var pausedSeconds: Double? = nil
     }
     struct ClimbExtras: Codable {
         var pinnedNoteID: UUID? = nil
@@ -135,7 +136,8 @@ struct ClimbingBackup: Codable {
         detachedClimbs = all.filter { !nested.contains($0.id) }.map(Self.record)
         journal = JournalArchive(sessions: sessions.map {
             SessionExtras(id: $0.id, linkedClimbIDs: $0.linkedClimbs.map(\.id), selectedClimbID: $0.selectedClimbID,
-                          createdAt: $0.createdAt, updatedAt: $0.updatedAt, durationKnown: $0.durationKnown)
+                          createdAt: $0.createdAt, updatedAt: $0.updatedAt, durationKnown: $0.durationKnown,
+                          pausedAt: $0.pausedAt, pausedSeconds: $0.pausedSeconds)
         }, climbs: all.map {
             ClimbExtras(pinnedNoteID: $0.pinnedNoteID, id: $0.id, projectRaw: $0.projectRaw, historyIncomplete: $0.historyIncomplete, gradeKind: $0.gradeKindRaw, gradeUpper: $0.gradeUpper, updatedAt: $0.updatedAt)
         }, notes: all.flatMap { climb in climb.notebook.map {
@@ -371,6 +373,7 @@ extension ClimbingStore {
                     session.linkedClimbs = item.linkedClimbIDs.compactMap { currentClimbs[$0] }
                     session.selectedClimbID = item.selectedClimbID; session.createdAt = item.createdAt
                     session.updatedAt = item.updatedAt; session.durationKnown = item.durationKnown
+                    session.pausedAt = item.pausedAt; session.pausedSeconds = item.pausedSeconds ?? 0
                 }
                 for item in journal.climbs {
                     guard let climb = currentClimbs[item.id] else { continue }

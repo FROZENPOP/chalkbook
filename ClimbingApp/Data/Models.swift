@@ -1,8 +1,8 @@
 import Foundation
 import SwiftData
 
-enum ClimbingSchemaV6: VersionedSchema {
-    static var versionIdentifier: Schema.Version { Schema.Version(6, 0, 0) }
+enum ClimbingSchemaV7: VersionedSchema {
+    static var versionIdentifier: Schema.Version { Schema.Version(7, 0, 0) }
     static var models: [any PersistentModel.Type] { [ClimbingSession.self, ClimbEntry.self, ClimbAttempt.self, SavedGym.self, RouteMedia.self, AggregateEntry.self, ClimbNote.self, HealthWorkoutLink.self] }
 
     @Model
@@ -21,6 +21,8 @@ enum ClimbingSchemaV6: VersionedSchema {
         var createdAt: Date = Date.distantPast
         var updatedAt: Date = Date.distantPast
         var durationKnown: Bool = true
+        var pausedAt: Date? = nil
+        var pausedSeconds: Double = 0
         var selectedClimbID: UUID? = nil
         @Relationship(deleteRule: .nullify, inverse: \ClimbEntry.sessions) var linkedClimbs: [ClimbEntry] = []
         @Relationship(deleteRule: .cascade, inverse: \AggregateEntry.session) var aggregates: [AggregateEntry] = []
@@ -47,7 +49,15 @@ enum ClimbingSchemaV6: VersionedSchema {
         var totals: ActivityTotals { totals(recordedAttempts) }
         // Takes the attempts so callers walk the relationships once; that walk dominates large journals.
         private func totals(_ recorded: [ClimbAttempt]) -> ActivityTotals { JournalRules.totals(detailedAttempts: recorded.count, detailedSends: recorded.filter(\.sent).count, batches: aggregates.map(\.batch)) }
-        var durationMinutes: Int? { guard durationKnown, let endedAt else { return nil }; return max(0, Int(endedAt.timeIntervalSince(startedAt) / 60)) }
+        var durationMinutes: Int? { guard durationKnown, let endedAt else { return nil }; return max(0, Int((endedAt.timeIntervalSince(startedAt) - pausedSeconds) / 60)) }
+        var isPaused: Bool { pausedAt != nil }
+        // Shifting the start by the paused time lets the stopwatch run from a plain date.
+        var stopwatchStart: Date { startedAt.addingTimeInterval(pausedSeconds) }
+        func endPause() {
+            guard let pausedAt else { return }
+            pausedSeconds += max(0, Date.now.timeIntervalSince(pausedAt))
+            self.pausedAt = nil
+        }
         var attemptCount: Int { let recorded = recordedAttempts; return totals(recorded).attempts ?? recorded.count }
         var sendCount: Int { let recorded = recordedAttempts; return totals(recorded).sends ?? recorded.filter(\.sent).count }
         var completedClimbs: Int { Set(recordedAttempts.filter(\.sent).compactMap { $0.climb?.id }).count }
@@ -235,18 +245,18 @@ enum ClimbingSchemaV6: VersionedSchema {
 
 }
 
-typealias ClimbingSession = ClimbingSchemaV6.ClimbingSession
-typealias ClimbEntry = ClimbingSchemaV6.ClimbEntry
-typealias ClimbAttempt = ClimbingSchemaV6.ClimbAttempt
-typealias SavedGym = ClimbingSchemaV6.SavedGym
-typealias RouteMedia = ClimbingSchemaV6.RouteMedia
+typealias ClimbingSession = ClimbingSchemaV7.ClimbingSession
+typealias ClimbEntry = ClimbingSchemaV7.ClimbEntry
+typealias ClimbAttempt = ClimbingSchemaV7.ClimbAttempt
+typealias SavedGym = ClimbingSchemaV7.SavedGym
+typealias RouteMedia = ClimbingSchemaV7.RouteMedia
 
-typealias HealthWorkoutLink = ClimbingSchemaV6.HealthWorkoutLink
-typealias AggregateEntry = ClimbingSchemaV6.AggregateEntry
-typealias ClimbNote = ClimbingSchemaV6.ClimbNote
+typealias HealthWorkoutLink = ClimbingSchemaV7.HealthWorkoutLink
+typealias AggregateEntry = ClimbingSchemaV7.AggregateEntry
+typealias ClimbNote = ClimbingSchemaV7.ClimbNote
 
 enum ClimbingMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [ClimbingSchemaV1.self, ClimbingSchemaV2.self, ClimbingSchemaV3.self, ClimbingSchemaV4.self, ClimbingSchemaV5.self, ClimbingSchemaV6.self] }
+    static var schemas: [any VersionedSchema.Type] { [ClimbingSchemaV1.self, ClimbingSchemaV2.self, ClimbingSchemaV3.self, ClimbingSchemaV4.self, ClimbingSchemaV5.self, ClimbingSchemaV6.self, ClimbingSchemaV7.self] }
     static var stages: [MigrationStage] { [.lightweight(fromVersion: ClimbingSchemaV1.self, toVersion: ClimbingSchemaV2.self), .lightweight(fromVersion: ClimbingSchemaV2.self, toVersion: ClimbingSchemaV3.self), .custom(fromVersion: ClimbingSchemaV3.self, toVersion: ClimbingSchemaV4.self, willMigrate: nil, didMigrate: { context in
         for climb in try context.fetch(FetchDescriptor<ClimbingSchemaV4.ClimbEntry>()) {
             for attempt in climb.attempts {
@@ -256,13 +266,13 @@ enum ClimbingMigrationPlan: SchemaMigrationPlan {
             }
         }
         try context.save()
-    }), .lightweight(fromVersion: ClimbingSchemaV4.self, toVersion: ClimbingSchemaV5.self), .lightweight(fromVersion: ClimbingSchemaV5.self, toVersion: ClimbingSchemaV6.self)] }
+    }), .lightweight(fromVersion: ClimbingSchemaV4.self, toVersion: ClimbingSchemaV5.self), .lightweight(fromVersion: ClimbingSchemaV5.self, toVersion: ClimbingSchemaV6.self), .lightweight(fromVersion: ClimbingSchemaV6.self, toVersion: ClimbingSchemaV7.self)] }
 }
 
 @MainActor
 enum Persistence {
     static func container(inMemory: Bool = false, accountKey: String? = nil, rootDirectory: URL? = nil) throws -> ModelContainer {
-        let schema = Schema(versionedSchema: ClimbingSchemaV6.self)
+        let schema = Schema(versionedSchema: ClimbingSchemaV7.self)
         let configuration: ModelConfiguration
         if let accountKey, !inMemory {
             guard accountKey.count == 64, accountKey.allSatisfy({ "0123456789abcdef".contains($0) }) else {

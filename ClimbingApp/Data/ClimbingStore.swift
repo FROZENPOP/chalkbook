@@ -52,10 +52,21 @@ final class ClimbingStore {
         return save { context.insert(session) } ? session : nil
     }
 
+    func pause(_ session: ClimbingSession) {
+        guard !session.isComplete, !session.isPaused else { return }
+        save { session.pausedAt = .now }
+    }
+
+    func resume(_ session: ClimbingSession) {
+        save { session.endPause() }
+    }
+
     func finish(_ session: ClimbingSession) {
         save {
+            session.endPause()
             session.isComplete = true
             session.endedAt = .now
+            session.durationKnown = true
         }
     }
 

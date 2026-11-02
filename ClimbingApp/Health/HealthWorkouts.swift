@@ -19,37 +19,28 @@ protocol HealthWorkoutReading {
     func requestReadAccess() async throws
     func nearby(start: Date, end: Date) async throws -> [HealthWorkout]
     func workout(id: UUID) async throws -> HealthWorkout?
-    func requestReadAccess(includeRecovery: Bool) async throws
-    func readAccessState(includeRecovery: Bool) async throws -> HealthReadAccessState
+    func readAccessState() async throws -> HealthReadAccessState
     func heartRates(workoutID: UUID) async throws -> [HealthHeartRateSample]
-    func recoveryContext() async throws -> HealthRecoveryContext
 }
 
 extension HealthWorkoutReading {
-    func requestReadAccess(includeRecovery: Bool) async throws { try await requestReadAccess() }
-    func readAccessState(includeRecovery: Bool) async throws -> HealthReadAccessState { available ? .needsRequest : .unavailable }
+    func readAccessState() async throws -> HealthReadAccessState { available ? .needsRequest : .unavailable }
     func heartRates(workoutID: UUID) async throws -> [HealthHeartRateSample] { [] }
-    func recoveryContext() async throws -> HealthRecoveryContext { .init() }
 }
 
 @MainActor
 final class AppleHealthWorkouts: HealthWorkoutReading {
     private let store = HKHealthStore()
     var available: Bool { HKHealthStore.isHealthDataAvailable() }
-    private func readTypes(includeRecovery: Bool) -> Set<HKObjectType> {
-        var types: Set<HKObjectType> = [HKObjectType.workoutType(), HKQuantityType(.activeEnergyBurned), HKQuantityType(.heartRate)]
-        if includeRecovery { types.formUnion([HKQuantityType(.restingHeartRate), HKQuantityType(.heartRateVariabilitySDNN)]) }
-        return types
-    }
-    func requestReadAccess() async throws { try await requestReadAccess(includeRecovery: false) }
-    func requestReadAccess(includeRecovery: Bool) async throws {
+    private var readTypes: Set<HKObjectType> { [HKObjectType.workoutType(), HKQuantityType(.activeEnergyBurned), HKQuantityType(.heartRate)] }
+    func requestReadAccess() async throws {
         guard available else { throw BackupError.invalid("Apple Health is unavailable on this device.") }
-        try await store.requestAuthorization(toShare: [], read: readTypes(includeRecovery: includeRecovery))
+        try await store.requestAuthorization(toShare: [], read: readTypes)
     }
-    func readAccessState(includeRecovery: Bool) async throws -> HealthReadAccessState {
+    func readAccessState() async throws -> HealthReadAccessState {
         guard available else { return .unavailable }
         return try await withCheckedThrowingContinuation { continuation in
-            store.getRequestStatusForAuthorization(toShare: [], read: readTypes(includeRecovery: includeRecovery)) { status, error in
+            store.getRequestStatusForAuthorization(toShare: [], read: readTypes) { status, error in
                 if let error { continuation.resume(throwing: error) }
                 else { continuation.resume(returning: status == .unnecessary ? .requested : .needsRequest) }
             }
@@ -62,21 +53,9 @@ final class AppleHealthWorkouts: HealthWorkoutReading {
         let unit = HKUnit.count().unitDivided(by: .minute())
         return samples.map { HealthHeartRateSample(id: $0.uuid, date: $0.startDate, beatsPerMinute: $0.quantity.doubleValue(for: unit)) }
     }
-    func recoveryContext() async throws -> HealthRecoveryContext {
-        // Independent reads: missing access/data for either quantity does not erase the other.
-        let resting = try? await latest(type: HKQuantityType(.restingHeartRate), unit: HKUnit.count().unitDivided(by: .minute()))
-        let hrv = try? await latest(type: HKQuantityType(.heartRateVariabilitySDNN), unit: .secondUnit(with: .milli))
-        return HealthRecoveryContext(restingHeartRate: resting, hrvMilliseconds: hrv)
-    }
-    private func latest(type: HKQuantityType, unit: HKUnit) async throws -> HealthQuantityReading? {
-        let predicate = HKQuery.predicateForSamples(withStart: Date.now.addingTimeInterval(-7 * 86400), end: .now, options: .strictStartDate)
-        guard let sample = try await quantities(type: type, predicate: predicate, limit: 1).first,
-              let value = HealthInsights.nonnegative(sample.quantity.doubleValue(for: unit)), value > 0 else { return nil }
-        return HealthQuantityReading(value: value, date: sample.startDate, source: sample.sourceRevision.source.name)
-    }
-    private func quantities(type: HKQuantityType, predicate: NSPredicate, limit: Int = HKObjectQueryNoLimit) async throws -> [HKQuantitySample] {
+    private func quantities(type: HKQuantityType, predicate: NSPredicate) async throws -> [HKQuantitySample] {
         try await withCheckedThrowingContinuation { continuation in
-            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: limit, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)]) { _, samples, error in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)]) { _, samples, error in
                 if let error { continuation.resume(throwing: error) }
                 else { continuation.resume(returning: samples as? [HKQuantitySample] ?? []) }
             }

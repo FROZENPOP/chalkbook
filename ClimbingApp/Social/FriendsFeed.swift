@@ -6,9 +6,10 @@ import Observation
 struct FriendsFeedCursor: Equatable {
     let day: String
     let id: UUID
-    static func path(viewer: UUID, after: Self?, limit: Int = 20) throws -> String {
+    static func path(after: Self?, limit: Int = 20) throws -> String {
         var query = [URLQueryItem(name:"select",value:"*"),
-                     URLQueryItem(name:"owner_id",value:"neq.\(viewer.uuidString)"),
+                     // Includes your own posts so you can see their reactions and comments. Others' private posts never pass RLS.
+                     URLQueryItem(name:"visibility",value:"neq.private"),
                      URLQueryItem(name:"order",value:"session_day.desc,id.desc"),
                      URLQueryItem(name:"limit",value:String(min(20,max(1,limit))))]
         if let after {
@@ -88,8 +89,8 @@ struct FriendsFeedPage {
     var auth: AccountSession? = nil
     func page(after: FriendsFeedCursor?, limit: Int) async throws -> FriendsFeedPage {
         if let auth { try await store.authorize(auth) }
-        guard let viewer = store.userID else { throw SocialError.signIn }
-        let rows = try JSONDecoder().decode([SharedSession].self,from:await store.request(FriendsFeedCursor.path(viewer:viewer,after:after,limit:limit)))
+        guard store.userID != nil else { throw SocialError.signIn }
+        let rows = try JSONDecoder().decode([SharedSession].self,from:await store.request(FriendsFeedCursor.path(after:after,limit:limit)))
         let ids = Set(rows.map(\.owner_id)).subtracting(store.people.map(\.id)).sorted { $0.uuidString < $1.uuidString }
         var profiles: [SocialProfile] = []
         for start in stride(from:0,to:ids.count,by:50) {

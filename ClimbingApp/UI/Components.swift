@@ -81,8 +81,6 @@ struct SaveErrorBanner: View {
     private func details(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(message).font(.subheadline).fixedSize(horizontal: false, vertical: true)
-            Text("Your input is kept. Retry Save or the logging action after resolving the issue.")
-                .font(.caption).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -102,7 +100,7 @@ struct Metric: View {
     let label: String
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(value).font(.system(.title, design: .rounded, weight: .bold)).monospacedDigit()
+            Text(value).font(.system(.title, design: .rounded, weight: .bold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
             Text(label).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -111,24 +109,31 @@ struct Metric: View {
 }
 
 struct SessionRow: View {
+    @Environment(\.dynamicTypeSize) private var size
     let session: ClimbingSession
     var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: session.isComplete ? "mountain.2.fill" : "figure.climbing").accessibilityHidden(true)
-                .font(.title2).foregroundStyle(ClimbTheme.accent)
-                .frame(width: 48, height: 48)
-                .background(ClimbTheme.accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
+        // At accessibility sizes three columns break words mid-way, so the row stacks instead.
+        let stacked = size.isAccessibilitySize
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10)) : AnyLayout(HStackLayout(spacing: 14))
+        layout {
+            if !stacked {
+                Image(systemName: session.isComplete ? "mountain.2.fill" : "figure.climbing").accessibilityHidden(true)
+                    .font(.title2).foregroundStyle(ClimbTheme.accent)
+                    .frame(width: 48, height: 48)
+                    .background(ClimbTheme.accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
+            }
             VStack(alignment: .leading, spacing: 5) {
                 Text(session.title).font(.headline)
                 Text(SessionDay.label(for: session.day)).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                 if !session.isComplete { Text("In progress").font(.caption.weight(.semibold)).foregroundStyle(ClimbTheme.accent) }
             }
-            Spacer(minLength: 0)
-            VStack(alignment: .trailing, spacing: 5) {
+            if !stacked { Spacer(minLength: 0) }
+            VStack(alignment: stacked ? .leading : .trailing, spacing: 5) {
                 Text("\(session.completedClimbs)").font(.title3.bold()).monospacedDigit()
                 Text("climbs sent").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 6)
         .accessibilityElement(children: .combine)
     }

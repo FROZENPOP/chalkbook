@@ -28,7 +28,6 @@ struct SocialClimberProfileView: View {
                     else if social.me == nil { Button("Set up Friends to send a request") { editing=true } }
                     else { FriendPersonRow(person:page.profile,personID:page.profile.id,showsProfileLink:false) }
                     Text("Shared sessions").font(.title2.bold())
-                    Text("Only sessions this person has made visible to you appear here. Their private journal is never shown.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                     if page.entries.isEmpty { Text("No sessions shared with you yet.").foregroundStyle(ClimbTheme.secondaryText) }
                     ForEach(page.entries) { entry in
                         Surface { VStack(alignment:.leading,spacing:16) { SharedSessionPreview(entry:entry);SessionReactionBar(entry:entry) } }
@@ -55,6 +54,7 @@ struct SessionReactionBar: View {
     @Environment(AccountSession.self) private var auth
     let entry:SharedSession
     @State private var summaries:[ReactionSummary]=[]
+    @State private var comments:[SessionComment]?
     @State private var busy=false
     @State private var loaded=false
     @State private var error:String?
@@ -65,7 +65,9 @@ struct SessionReactionBar: View {
             else if error == nil { SwiftUI.ProgressView("Loading reactions…") }
             if social.me == nil { Text("Set up Friends to react.").font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
             if let error { Text(error).font(.caption).foregroundStyle(ClimbTheme.error);Button("Retry reactions") { Task { await load() } }.frame(minHeight:44) }
+            if let comments, !comments.isEmpty { commentPreview(comments) }
         }.task(id:entry.id) { await load() }
+        .task(id:entry.id) { comments=try? await social.comments(auth,entry:entry.id) }
     }
     private var reactionButtons: some View {
         let layout=textSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment:.leading,spacing:10)) : AnyLayout(HStackLayout(spacing:10))
@@ -85,12 +87,26 @@ struct SessionReactionBar: View {
                 }.buttonStyle(.plain).disabled(busy || social.me == nil || social.userID == entry.owner_id)
                     .accessibilityLabel("\(reaction.label), \(summary?.total ?? 0) reactions\(summary?.mine == true ? ", selected" : "")")
             }
+            NavigationLink { SessionCommentsView(entry:entry,comments:$comments) } label: {
+                Text(comments.map { "💬 \($0.count)" } ?? "💬").font(.subheadline.weight(.semibold)).padding(.horizontal,12).frame(minHeight:44)
+                    .background(Color.secondary.opacity(0.08),in:Capsule())
+            }.buttonStyle(.plain).accessibilityLabel("Comments\(comments.map { ", \($0.count)" } ?? "")").accessibilityIdentifier("openComments")
         }
     }
+    private func commentPreview(_ rows:[SessionComment]) -> some View {
+        NavigationLink { SessionCommentsView(entry:entry,comments:$comments) } label: {
+            VStack(alignment:.leading,spacing:6) {
+                ForEach(rows.suffix(2)) { comment in
+                    Text("\(Text(comment.author?.display_name ?? "Climber").fontWeight(.semibold)) \(comment.body)")
+                        .font(.subheadline).lineLimit(textSize.isAccessibilitySize ? nil : 2)
+                }
+                if rows.count > 2 { Text("View all \(rows.count) comments").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText) }
+            }.frame(maxWidth:.infinity,minHeight:44,alignment:.leading).multilineTextAlignment(.leading)
+        }.buttonStyle(.plain).accessibilityIdentifier("commentPreview")
+    }
     private func load() async {
-        loaded=false
         do { summaries=try await social.reactions(auth,entry:entry.id);loaded=true;error=nil }
-        catch { summaries=[];self.error=error.localizedDescription }
+        catch { summaries=[];loaded=false;self.error=error.localizedDescription }
     }
 }
 
@@ -101,8 +117,7 @@ struct SocialAvatar: View {
     let name:String
     @State private var photo:Data?
     var body: some View {
-        Group { if let photo { ProfileAvatar(photo:photo,size:48) } else { FriendInitials(name:name) } }
+        Group { if let photo { ProfileAvatar(photo:photo,size:48).accessibilityHidden(true) } else { FriendInitials(name:name) } }
             .task(id:id) { photo=(try? await social.profileDetails(auth,id:id))?.photo }
-            .accessibilityHidden(true)
     }
 }

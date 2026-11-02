@@ -24,7 +24,6 @@ final class GymPlaceUITests: XCTestCase {
         app.buttons["Cancel"].tap()
         app.navigationBars.buttons.firstMatch.tap()
         for _ in 0..<6 { app.swipeUp() }
-        XCTAssertTrue(app.staticTexts["Made for your next move."].exists)
         XCTAssertFalse(app.buttons["Delete all climbing data"].exists)
     }
     @MainActor func testLivePlaceSuggestionFillsGymNameAndAddress() throws {

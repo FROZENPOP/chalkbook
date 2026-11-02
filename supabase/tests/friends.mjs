@@ -13,6 +13,7 @@ grant execute on function auth.uid() to authenticated,anon;`);
 await db.exec(await readFile(new URL('../migrations/20261025033437_friends.sql', import.meta.url), 'utf8'));
 await db.exec(await readFile(new URL('../migrations/20261026223012_profiles_search_reactions.sql', import.meta.url), 'utf8'));
 await db.exec(await readFile(new URL('../migrations/20261026223942_social_access_audit.sql', import.meta.url), 'utf8'));
+await db.exec(await readFile(new URL('../migrations/20261102222531_session_comments.sql', import.meta.url), 'utf8'));
 const [a,b,c] = [1,2,3].map(i => `00000000-0000-0000-0000-00000000000${i}`);
 const source = '10000000-0000-0000-0000-000000000001';
 for (const id of [a,b,c]) await db.query('insert into auth.users values($1)',[id]);
@@ -98,14 +99,37 @@ await as(c); equal(await count(`select * from public.session_reactions where ent
 await denied(`select * from public.reaction_summary(array['${entry}']::uuid[])`);checks++;
 await denied(`select public.set_session_reaction('${entry}','clap')`); checks++;
 await as(a); await denied(`select public.set_session_reaction('${entry}','clap')`); checks++;
-await db.query('select public.block_climber($1)',[b]);
+await as(b); const comment=(await db.query('select (public.add_session_comment($1,$2)).id',[entry,'  Nice send  '])).rows[0].id;
+equal((await db.query('select body from public.session_comments')).rows[0].body,'Nice send'); // Trimmed on save.
+await denied(`select public.add_session_comment('${entry}','   ')`); checks++;
+await denied(`select public.add_session_comment('${entry}',repeat('a',501))`); checks++;
+await denied(`insert into public.session_comments(entry_id,user_id,body) values('${entry}','${b}','Forged')`); checks++;
+await denied(`delete from public.session_comments`); checks++;
+await as(c); equal(await count('select * from public.session_comments'),0); // Outside the post's audience.
+await denied(`select public.add_session_comment('${entry}','Hello')`); checks++;
+await denied(`select public.delete_session_comment('${comment}')`); checks++;
+await as(a); const ownerComment=(await db.query('select (public.add_session_comment($1,$2)).id',[entry,'Thanks'])).rows[0].id;
+equal(await count('select * from public.session_comments'),2);
+await as(b); await denied(`select public.delete_session_comment('${ownerComment}')`); checks++; // Only your own, or on your own post.
+const second=(await db.query('select (public.add_session_comment($1,$2)).id',[entry,'Second'])).rows[0].id;
+await db.query('select public.delete_session_comment($1)',[second]);
+equal(await count('select * from public.session_comments'),2);
+await as(a); await db.query('select public.delete_session_comment($1)',[comment]); // Post owner moderates.
+equal(await count('select * from public.session_comments'),1);
+await as(b); const kept=(await db.query('select (public.add_session_comment($1,$2)).id',[entry,'Still here'])).rows[0].id;
+await as(a); await db.query('select public.block_climber($1)',[b]);
+equal(await count(`select * from public.session_comments where id='${kept}'`),0); // Blocked climbers' comments are hidden.
 await as(b); equal(await count('select * from public.climber_profile_details'),1); // Own details only.
 equal(await count('select * from public.session_reactions'),0);
+equal(await count('select * from public.session_comments'),0);
+await denied(`select public.add_session_comment('${entry}','Hello')`); checks++;
 await db.exec('reset role'); await db.exec('set role anon');
 await denied("select public.search_climbers('alice')"); checks++;
 await denied('select * from public.climber_profile_details'); checks++;
 await denied('select * from public.session_reactions'); checks++;
+await denied('select * from public.session_comments'); checks++;
 await as(a); await db.exec('select public.delete_social_profile()');
 equal(await count('select * from public.shared_sessions'),0);
+await db.exec('reset role'); equal(await count('select * from public.session_comments'),0); // Removed with the post.
 await db.close();
 console.log(`${checks} PostgreSQL permission and privacy checks passed.`);

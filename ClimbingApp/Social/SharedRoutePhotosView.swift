@@ -38,6 +38,59 @@ struct SharedRoutePhotosView: View {
     }
 }
 
+/// A post's first photo; tapping shows them all. Nothing shows if the viewer can't open this post's photos.
+struct SharedPostPhoto: View {
+    @Environment(SocialStore.self) private var social
+    @Environment(AccountSession.self) private var auth
+    let entryID: UUID
+    let count: Int
+    var previewPhotos: [SharedRoutePhoto]? = nil
+    let open: () -> Void
+    @State private var image: UIImage?
+    @State private var failed = false
+    @State private var loadedKey: String?
+    var body: some View {
+        let key = "\(entryID):\(social.mediaRevision):\(previewPhotos?.first?.id.uuidString ?? "")"
+        VStack(spacing: 0) {
+            if let image {
+                Button(action: open) {
+                    Color.clear.aspectRatio(4 / 3, contentMode: .fit)
+                        .overlay { Image(uiImage: image).resizable().scaledToFill() }
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .overlay(alignment: .topTrailing) {
+                            if count > 1 {
+                                Text("\(count) photos").font(.caption.weight(.semibold)).foregroundStyle(.white)
+                                    .padding(.horizontal, 10).padding(.vertical, 5).background(.black.opacity(0.65), in: Capsule()).padding(8)
+                            }
+                        }
+                        .contentShape(RoundedRectangle(cornerRadius: 16))
+                }.buttonStyle(.plain)
+                    .accessibilityLabel(count > 1 ? "View \(count) climb photos" : "View climb photo").accessibilityIdentifier("viewSharedRoutePhotos")
+            } else if failed {
+                Button("View climb photos", systemImage: "photo.on.rectangle", action: open)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).accessibilityIdentifier("viewSharedRoutePhotos")
+            } else if loadedKey == nil {
+                RoundedRectangle(cornerRadius: 16).fill(Color.secondary.opacity(0.08)).aspectRatio(4 / 3, contentMode: .fit)
+                    .overlay { SwiftUI.ProgressView() }.accessibilityLabel("Loading climb photo")
+            }
+        }.task(id: key) {
+            guard loadedKey != key else { return } // Scrolling back to a post shouldn't download its photo again.
+            do {
+                let first: SharedRoutePhoto?
+                if let previewPhotos { first = previewPhotos.first }
+                else { first = try await social.routePhotos(auth, entryID: entryID, limit: 1).first }
+                let decoded = await Task.detached(priority: .userInitiated) { () -> UIImage? in
+                    (first?.highlighted_base64 ?? first?.original_base64).flatMap { Data(base64Encoded: $0) }.flatMap { UIImage(data: $0) }
+                }.value
+                guard !Task.isCancelled else { return }
+                image = decoded; failed = first != nil && decoded == nil; loadedKey = key
+            } catch {
+                if !Task.isCancelled { failed = true }
+            }
+        }
+    }
+}
+
 struct SharedRoutePhotoPairView: View {
     let photo: SharedRoutePhoto
     @State private var original: UIImage?

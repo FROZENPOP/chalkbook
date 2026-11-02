@@ -15,7 +15,7 @@ struct FriendInviteView: View {
                     Image(uiImage:code).interpolation(.none).resizable().scaledToFit().padding(20).background(.white,in:RoundedRectangle(cornerRadius:20)).frame(maxWidth:300)
                         .accessibilityLabel("Friend invitation QR code for \(profile.display_name)")
                 }
-                Text(link.scheme != "https" ? "Scan with the iPhone camera. Sendr must already be installed. You can also share your username." : "Scan this code or share your invite link to open your profile. Sending a request still needs your friend’s approval.")
+                Text(link.scheme != "https" ? "Scan with the iPhone camera. Sendr must be installed." : "Scan or share to open your profile.")
                     .font(.subheadline).foregroundStyle(ClimbTheme.secondaryText).multilineTextAlignment(.center)
                 ShareLink(item:link) { Label("Share invite link",systemImage:"square.and.arrow.up").frame(minHeight:44) }.buttonStyle(.borderedProminent)
                 ShareLink(item:"Add me on Sendr: @\(profile.username)") { Label("Share username",systemImage:"at").frame(minHeight:44) }.buttonStyle(.bordered)

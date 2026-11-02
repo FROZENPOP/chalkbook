@@ -28,7 +28,7 @@ struct ShareSessionView: View {
                         Picker("Visibility", selection: Binding(get: { draft.visibility }, set: { self.draft?.visibility = $0 })) {
                             ForEach(EntryVisibility.allCases) { Text($0.title).tag($0) }
                         }
-                        Text(social.me?.is_private == true ? "Your account is private: Public entries can only be seen by friends. Private entries remain yours alone." : "Public entries are visible to signed-in climbers. Friends entries require mutual acceptance. Private entries are yours alone.").font(.caption)
+                        Text(social.me?.is_private == true ? "On a private account, Public means friends only." : "Public entries are visible to signed-in climbers.").font(.caption)
                     }
                     Section(header: Text("Choose what to share").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         TextField("Separate public caption", text: Binding(get: { draft.caption }, set: { self.draft?.caption = $0 }), axis: .vertical)
@@ -42,7 +42,7 @@ struct ShareSessionView: View {
                         }
                     }
                     Section(header: Text("Climb photos (optional)").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
-                        Text("Choose up to three photos. When shared with friends, they can switch between the original and highlighted versions. Photos are never public.").font(.caption)
+                        Text("Up to three. Photos are never public.").font(.caption)
                         ForEach(Array(availablePhotos.enumerated()), id: \.element.id) { index, media in
                             HStack(spacing:12) {
                                 RouteThumbnail(data:media.data).frame(width:90,height:80).clipped()
@@ -62,12 +62,11 @@ struct ShareSessionView: View {
                     }
                     Section(header: Text("Exact preview").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         if let preview { SharedSessionPreview(entry: preview,routePhotos:reviewedPhotos) }
-                        Text("Only this date, caption, selected summary values and the photo versions shown above are sent. Notes, gym details, videos, private markup and Health data stay private. Your original files remain on this device.").font(.caption)
+                        Text("Only what’s shown here is sent. Notes, gym details, videos, markup and Health data stay private.").font(.caption)
                     }
                     Section {
                         Button("Save reviewed entry") { Task { if let preview, await social.publish(auth, entry: preview, photos:reviewedPhotos) { dismiss() } } }
                             .disabled(social.busy || preparingPhoto || !photosLoaded || draft.caption.count > 1000)
-                        Text("Saving replaces this entry’s shared snapshot. Later journal edits do not silently change published content. Visibility changes require a connection and a confirmed save.").font(.caption)
                     }
                 } else if social.configuration != nil && auth.account == nil {
                     Section {

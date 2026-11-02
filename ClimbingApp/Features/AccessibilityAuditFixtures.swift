@@ -73,6 +73,8 @@ struct AccessibilityAuditDestination: View {
         case "climb-editor": ClimbEditorView(climb: climbs.first)
         case "projects": ProjectsView()
         case "progress": ProgressViewScreen()
+        case "progress-stats": ProgressStatsView()
+        case "session-log": if let session = sessions.first(where: { $0.location == "Audit gym" }) { SessionLogView(session: session) }
         case "gyms": GymsView()
         case "settings": SettingsView()
         case "friends": FriendsView(auditProfile: arguments.contains("--audit-empty") ? nil : .init(id: UUID(), username: "audit_climber", display_name: "Audit Climber", is_private: true))

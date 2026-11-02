@@ -17,7 +17,7 @@ final class JournalJourneyUITests: XCTestCase {
         button.tap()
     }
     @MainActor private func start(_ app: XCUIApplication) {
-        tap(app,"startSession"); tap(app,"saveSession"); tap(app,"resumeSession")
+        tap(app,"startSession"); tap(app,"saveSession")
     }
     @MainActor func testProjectsEmptyStateCreatesAndRecoversFilteredProjectAtLargeText() {
         let app = launch(largeText: true)
@@ -43,12 +43,12 @@ final class JournalJourneyUITests: XCTestCase {
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "Project created from empty state"; shot.lifetime = .keepAlways; add(shot)
     }
 
-    @MainActor func testUnnamedClimbDefaultsToUnknownDifficulty() {
+    @MainActor func testUnnamedClimbDefaultsToExactGrade() {
         let app = launch()
         start(app); tap(app,"addClimb")
         XCTAssertFalse(app.textFields["customGrade"].exists)
         tap(app,"saveClimb")
-        XCTAssertTrue(app.staticTexts["Unknown grade"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.staticTexts["V0"].waitForExistence(timeout:5))
         tap(app,"logAttempt")
         XCTAssertTrue(app.staticTexts["1 attempt · 0 sends this session"].waitForExistence(timeout:5))
     }
@@ -67,14 +67,14 @@ final class JournalJourneyUITests: XCTestCase {
         app.staticTexts["Heel hook project"].firstMatch.tap()
         tap(app,"logSend")
         XCTAssertTrue(app.staticTexts["1 attempt · 1 send this session"].waitForExistence(timeout:5))
-        tap(app,"Notebook and complete history")
+        tap(app,"Notebook")
         XCTAssertTrue(app.staticTexts["2 attempts across 2 sessions"].waitForExistence(timeout:5))
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@","Earlier attempts or completion are known")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["Flash: not flash"].exists)
         let shot = XCTAttachment(screenshot:app.screenshot()); shot.name = "Project across two sessions"; shot.lifetime = .keepAlways; add(shot)
     }
     @MainActor func testWholeSessionTotalsReplaceDetailedActivity() {
         let app = launch(); start(app); tap(app,"addClimb"); tap(app,"saveClimb"); tap(app,"logAttempt")
-        tap(app,"addRecap")
+        tap(app,"addFromMemory"); tap(app,"addRecap")
         app.buttons["recapCoverage"].tap(); app.buttons["Whole-session totals"].tap()
         app.textFields["recapAttempts"].tap(); app.textFields["recapAttempts"].typeText("12")
         app.textFields["recapSends"].tap(); app.textFields["recapSends"].typeText("4")
@@ -92,7 +92,7 @@ final class JournalJourneyUITests: XCTestCase {
         for _ in 0..<12 { if sends.isHittable { break }; app.swipeUp() }
         XCTAssertTrue(sends.waitForExistence(timeout:5)); sends.tap(); sends.typeText("4")
         tap(app,"saveRecap")
-        tap(app,"Browse all history")
+        tap(app,"browseHistory")
         app.staticTexts["Bouldering session"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["Unknown"].waitForExistence(timeout:5))
         let shot = XCTAttachment(screenshot:app.screenshot()); shot.name = "Sends-only recap at accessibility text size"; shot.lifetime = .keepAlways; add(shot)

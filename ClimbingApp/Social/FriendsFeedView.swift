@@ -13,7 +13,7 @@ struct FriendsFeedContent<Row: View>: View {
         // stale row heights when Dynamic Type changes and can clip the recap's text.
         Group {
             if feed.entries.isEmpty && feed.hasLoaded && !feed.loading && feed.errorMessage == nil && !refreshing {
-                FriendsEmptyCard(symbol:"figure.climbing",title:"A little encouragement goes a long way.",message:"Shared sessions from your friends will appear here. Find a climbing buddy to get started.") {
+                FriendsEmptyCard(symbol:"figure.climbing",title:"A little encouragement goes a long way.",message:"Shared sessions appear here.") {
                     Button("Add friends",systemImage:"person.badge.plus",action:findFriends).buttonStyle(.borderedProminent)
                 }
             }
@@ -23,9 +23,6 @@ struct FriendsFeedContent<Row: View>: View {
                         Task { await next() }
                     }
                 }
-            }
-            if !feed.entries.isEmpty {
-                Text("Only sessions shared with you appear here, not anyone’s complete journal.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
             }
             if feed.loading {
                 SwiftUI.ProgressView(feed.entries.isEmpty ? "Loading activity…" : "Loading more activity…")

@@ -2,207 +2,183 @@ import Charts
 import SwiftData
 import SwiftUI
 
-struct ProgressHealthSection: View {
-    let sessionIDs: Set<UUID>
-    @Query private var links: [HealthWorkoutLink]
-    @AppStorage("healthInsightsEnabled") private var showInsights = false
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Toggle("Health insights (optional)", isOn: $showInsights).accessibilityIdentifier("showHealthInsights")
-            if showInsights {
-                Text("Linked climbing workouts for this journal range. Weeks use workout start dates.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-                HealthInsightsPanel(workoutIDs: links.filter { sessionIDs.contains($0.sessionID) }.map(\.workoutID), weekly: true)
-            }
-        }.tint(.primary)
-    }
-}
-
-struct SessionHealthSection: View {
-    let workoutID: UUID
-    @AppStorage("healthInsightsEnabled") private var showInsights = false
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if showInsights { HealthInsightsPanel(workoutIDs: [workoutID], weekly: false) }
-            else {
-                Button("View Health insights", systemImage: "heart.text.square") { showInsights = true }
-                    .frame(minHeight: 44).accessibilityIdentifier("viewSessionHealthInsights")
-            }
-        }.tint(.primary)
-    }
-}
-
-struct HealthInsightsPanel: View {
-    let workoutIDs: [UUID]
-    let weekly: Bool
+/// The Health half of a session log. Read-only; never shared or backed up.
+struct SessionHealthStatistics: View {
+    let session: ClimbingSession
     @Environment(\.scenePhase) private var phase
+    @Environment(\.dynamicTypeSize) private var textSize
     @AppStorage("healthEnabled") private var enabled = false
+    @Query private var links: [HealthWorkoutLink]
+    @Query private var sessions: [ClimbingSession]
     @State private var model = HealthInsightsModel(reader: HealthInsightsReaderFactory.make())
     @State private var refresh = 0
     @State private var request = 0
     @State private var consumedRequest = 0
-    private var key: String { "\(enabled)-\(refresh)-\(request)-" + workoutIDs.map(\.uuidString).sorted().joined(separator: ",") }
+    @State private var linking = false
+    private var workoutID: UUID? { links.first { $0.sessionID == session.id }?.workoutID }
+    // Session days only bound what is read; the comparison itself uses exact workout times.
+    private var comparisonIDs: [UUID] {
+        let day = SessionDay.date(for: session.day) ?? session.startedAt
+        let since = SessionDay.key(for: day.addingTimeInterval(-31 * 86_400))
+        let recent = Set(sessions.filter { $0.id != session.id && $0.day >= since && $0.day <= session.day }.map(\.id))
+        return links.filter { recent.contains($0.sessionID) }.map(\.workoutID)
+    }
+    private var insight: HealthSessionInsight? { model.sessions.first { $0.id == workoutID } }
+    private var others: [HealthSessionInsight] { model.sessions.filter { $0.id != workoutID } }
+    private var hasComparison: Bool {
+        guard let insight else { return false }
+        return [\HealthSessionInsight.effort, \.calories, \.averageHeartRate, \.maximumHeartRate, \.durationMinutes].contains { insight.thirtyDayAverage(of: $0, among: others) != nil }
+    }
+    private var key: String { "\(enabled)-\(refresh)-\(request)-\(workoutID?.uuidString ?? "")-" + comparisonIDs.map(\.uuidString).sorted().joined(separator: ",") }
+    private var message: String? { model.access == .unavailable ? "Apple Health is unavailable on this device." : model.message }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Health").font(.title2.bold()).accessibilityIdentifier("healthInsightsHeading")
-            Text("Private, read-only insights. Effort is an app estimate, not WHOOP strain or a medical metric. Health values are never shared or backed up.").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
-            if model.access == .unavailable { Text("Apple Health is unavailable on this device.").foregroundStyle(ClimbTheme.secondaryText) }
-            if model.loading { SwiftUI.ProgressView("Reading accessible Health data…") }
-            if let message = model.message { Text(message).font(.subheadline).accessibilityIdentifier("healthInsightsMessage") }
-            if !enabled || model.access != .requested {
-                Text(weekly ? "Connect to review access to climbing workouts, heart rate, active energy, resting heart rate, and HRV. Recovery readings are optional; each measurement may be unavailable." : "Connect to review read access to climbing workouts, heart rate, and active energy. Each measurement may be unavailable.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
+        VStack(alignment: .leading, spacing: 12) {
+            let header = textSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+            header {
+                Text("Key statistics").font(.title3.bold()).accessibilityIdentifier("healthInsightsHeading")
+                if !textSize.isAccessibilitySize { Spacer(minLength: 8) }
+                if hasComparison { Text("vs. 30-day avg").font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
             }
-            Button("Connect Health / review read access", systemImage: "heart") { enabled = true; request += 1 }
-                .frame(minHeight: 44).disabled(model.loading || model.access == .unavailable).accessibilityIdentifier("connectHealthInsights")
-            if enabled {
-                Button("Refresh Health insights", systemImage: "arrow.clockwise") { refresh += 1 }
-                    .frame(minHeight: 44).disabled(model.loading).accessibilityIdentifier("refreshHealthInsights")
+            if workoutID == nil {
+                Button("Link Apple Health workout", systemImage: "heart.text.square") { linking = true }
+                    .foregroundStyle(ClimbTheme.accent).frame(minHeight: 44).accessibilityIdentifier("linkHealthWorkout")
+            } else {
+                if model.access != .unavailable && (!enabled || model.access == .needsRequest) {
+                    Button("Connect Apple Health", systemImage: "heart") { enabled = true; request += 1 }
+                        .foregroundStyle(ClimbTheme.accent).frame(minHeight: 44).disabled(model.loading).accessibilityIdentifier("connectHealthInsights")
+                }
+                if model.loading { SwiftUI.ProgressView() }
+                if let message {
+                    Text(message).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText).accessibilityIdentifier("healthInsightsMessage")
+                }
+                if let insight { HealthStatisticCards(insight: insight, others: others) }
+                Button("Change workout") { linking = true }.foregroundStyle(ClimbTheme.accent).frame(minHeight: 44).accessibilityIdentifier("changeHealthWorkout")
             }
-            if model.unavailableWorkouts > 0 {
-                Text("\(model.unavailableWorkouts) linked workouts are unavailable or inaccessible. Their values are excluded; journal entries are unchanged.").font(.caption)
-            }
-            if weekly {
-                weeklyCards
-                recoveryCard
-            } else if let session = model.sessions.first { HealthSessionCards(insight: session) }
-            else if !model.loading {
-                Text("No data. Connect or refresh to read this linked workout. Missing measurements are never replaced with zero.").foregroundStyle(ClimbTheme.secondaryText)
-            }
-            DisclosureGroup("How the effort estimate works") {
-                Text("0–10 estimate: 10 × √(D × I), rounded to one decimal. D is duration divided by 120 minutes, capped at 1. I averages available inputs: (average bpm − 60) ÷ 120, clamped to 0–1, and active kcal per minute ÷ 12, capped at 1. At least one intensity input and a positive duration are required. These fixed reference values are a journal heuristic, not personal heart-rate zones. Different available inputs affect comparability.")
-                    .font(.caption)
-            }.frame(minHeight: 44)
         }
         .tint(.primary)
+        .sheet(isPresented: $linking) { HealthLinkView(session: session) }
         .task(id: key) {
-            guard enabled else { model.clear(); return }
+            guard enabled, let workoutID else { model.clear(); return }
             let shouldRequest = request > consumedRequest
             consumedRequest = request
-            await model.load(ids: workoutIDs, requestAccess: shouldRequest, includeRecovery: weekly)
+            await model.load(ids: [workoutID] + comparisonIDs, requestAccess: shouldRequest, samplesFor: workoutID)
         }
         .onChange(of: phase) { _, value in if value == .active && enabled && !model.loading { refresh += 1 } }
         .onDisappear { model.clear() }
     }
-    private var weeklyCards: some View {
-        let weeks = HealthInsightWeek.grouped(model.sessions)
-        return VStack(alignment: .leading, spacing: 16) {
-            if weeks.isEmpty { Text("No weekly Health data yet.").foregroundStyle(ClimbTheme.secondaryText) }
-            HealthTrendCard(title: "Active calories", unit: "kcal", points: weeks.compactMap { week in week.calories.map { HealthTrendPoint(date: week.start, value: $0) } })
-            HealthTrendCard(title: "Average effort estimate", unit: "/ 10", points: weeks.compactMap { week in week.effort.map { HealthTrendPoint(date: week.start, value: $0) } })
-            HealthTrendCard(title: "Average session heart rate", unit: "bpm", points: weeks.compactMap { week in week.heartRate.map { HealthTrendPoint(date: week.start, value: $0) } })
-            ForEach(weeks) { week in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(week.start, format: .dateTime.month().day()).font(.headline)
-                    Text("Active calories: \(metric(week.calories)) kcal · \(week.calorieCount)/\(week.sessions.count) accessible workouts")
-                    Text("Effort estimate: \(metric(week.effort, decimals: 1))/10 · \(week.effortCount)/\(week.sessions.count) accessible workouts")
-                    Text("Average heart rate: \(metric(week.heartRate)) bpm · \(week.heartRateCount)/\(week.sessions.count) accessible workouts")
-                }.font(.caption).accessibilityElement(children: .combine)
-            }
-            Text("Only accessible linked workouts contribute. Missing weeks/metrics stay unknown. Heart rate and effort are equal-weight averages of available session values, not time-weighted averages. Partial calories are recorded totals, not complete weekly expenditure.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-        }
-    }
-    private var recoveryCard: some View {
-        HealthInsightCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Recovery context").font(.headline)
-                if model.recovery.hasData {
-                    if let resting = model.recovery.restingHeartRate { recoveryReading("Resting heart rate", reading: resting, unit: "bpm") }
-                    else { Text("Resting heart rate: No data") }
-                    if let hrv = model.recovery.hrvMilliseconds { recoveryReading("HRV (SDNN)", reading: hrv, unit: "ms") }
-                    else { Text("HRV: No data") }
-                    Text("Latest accessible readings from the last 7 days. No recovery/readiness score is inferred from isolated readings or an unknown personal baseline.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-                } else {
-                    Text("Not available").font(.title2.bold())
-                    Text("No accessible resting heart rate or HRV found. These optional readings depend on your device, source app, and read access. No recovery score is invented.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-                }
-            }
-        }.accessibilityIdentifier("healthRecoveryContext")
-    }
-    private func recoveryReading(_ label: String, reading: HealthQuantityReading, unit: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.subheadline)
-            Text("\(metric(reading.value, decimals: 1)) \(unit)").font(.title.bold()).monospacedDigit()
-            Text("\(reading.source) · \(reading.date.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-        }
-    }
 }
 
-struct HealthSessionCards: View {
+private struct HealthStatisticCards: View {
     let insight: HealthSessionInsight
+    let others: [HealthSessionInsight]
+    @Environment(\.dynamicTypeSize) private var textSize
+    private func card(_ title: String, _ metric: KeyPath<HealthSessionInsight, Double?>, unit: String, decimals: Int = 0, caption: String? = nil, id: String) -> some View {
+        HealthStatisticCard(title: title, value: insight[keyPath: metric], unit: unit, decimals: decimals, caption: caption, average: insight.thirtyDayAverage(of: metric, among: others))
+            .accessibilityIdentifier(id)
+    }
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("\(insight.workout.sourceName) · \(insight.workout.start.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-            HealthInsightCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Climb effort estimate").font(.headline)
-                    ZStack {
-                        Circle().stroke(.primary.opacity(0.12), lineWidth: 12)
-                        if let score = insight.effort {
-                            Circle().trim(from: 0, to: score / 10).stroke(.primary, style: StrokeStyle(lineWidth: 12, lineCap: .round)).rotationEffect(.degrees(-90))
-                        }
-                        Text(metric(insight.effort, decimals: 1)).font(.system(.title, design: .rounded, weight: .bold)).minimumScaleFactor(0.5).lineLimit(1)
-                    }.frame(width: 140, height: 140).padding(8)
-                        .accessibilityElement(children: .ignore).accessibilityLabel("Climb effort estimate").accessibilityValue(insight.effort.map { "\(metric($0, decimals: 1)) out of 10" } ?? "No data")
-                    Text("App estimate · 0–10").font(.subheadline.bold())
-                    Text(insight.effort == nil ? "Needs positive duration and accessible average heart rate or active energy." : "Inputs: \(insight.inputs). Missing inputs are omitted.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-                }
-            }.accessibilityIdentifier("healthEffortCard")
-            HealthInsightCard {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Active calories").font(.headline)
-                    Text(metric(insight.calories)).font(.largeTitle.bold()).monospacedDigit()
-                    Text("kcal · workout-associated active energy").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-                }
-            }.accessibilityIdentifier("healthCaloriesCard")
-            HealthInsightCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Heart rate").font(.headline)
-                    Text("Average: \(metric(insight.averageHeartRate)) bpm").font(.title2.bold()).monospacedDigit()
-                    Text("Maximum: \(metric(insight.maximumHeartRate)) bpm").font(.headline)
-                    Text(insight.averageFromSamples ? "Average of recorded sample values, not a time-weighted mean." : "Workout-associated statistics; missing values show No data.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-                    if insight.maximumFromSamples { Text("Maximum of recorded samples; gaps may contain higher values.").font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
-                    if !insight.samples.isEmpty {
-                        Chart(insight.samples) { sample in
-                            PointMark(x: .value("Time", sample.date), y: .value("Heart rate (bpm)", sample.beatsPerMinute)).foregroundStyle(Color.primary)
-                        }.frame(height: 160).accessibilityElement(children: .ignore).accessibilityLabel("Recorded heart rate over time")
-                        .accessibilityValue("\(insight.samples.count) samples. Average \(metric(insight.averageHeartRate)) beats per minute.")
-                        Text("\(insight.samples.count) recorded samples. Dots show measurements; gaps are not filled. Only this workout’s associated samples are used.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-                    } else { Text("No accessible heart-rate samples. Summary statistics may still be available.").font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
-                }
-            }.accessibilityIdentifier("healthHeartRateCard")
+        VStack(spacing: 12) {
+            card("Effort", \.effort, unit: "/ 10", decimals: 1, caption: "App estimate", id: "healthEffortCard")
+            // Not a lazy grid: it clips its cards when the text size changes while they're on screen.
+            let row = textSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+            row {
+                card("Calories", \.calories, unit: "kcal", id: "healthCaloriesCard")
+                card("Avg heart rate", \.averageHeartRate, unit: "bpm", id: "healthAverageHeartRateCard")
+            }.fixedSize(horizontal: false, vertical: true)
+            row {
+                card("Max heart rate", \.maximumHeartRate, unit: "bpm", id: "healthMaximumHeartRateCard")
+                card("Duration", \.durationMinutes, unit: "min", id: "healthDurationCard")
+            }.fixedSize(horizontal: false, vertical: true)
+            if !insight.samples.isEmpty { HeartRateChart(insight: insight) }
         }
     }
 }
 
-private struct HealthInsightCard<Content: View>: View {
-    @ViewBuilder let content: Content
+private struct HealthStatisticCard: View {
+    let title: String
+    let value: Double?
+    let unit: String
+    let decimals: Int
+    let caption: String?
+    let average: Double?
+    private func format(_ number: Double) -> String { number.formatted(.number.precision(.fractionLength(decimals))) }
+    /// The difference as shown, so a card never claims a change its rounded numbers don't show.
+    private var difference: Double? {
+        guard let value, let average else { return nil }
+        let scale = pow(10, Double(decimals))
+        return (value * scale).rounded() / scale - (average * scale).rounded() / scale
+    }
+    private var spokenValue: String {
+        guard let value else { return "No data" }
+        var words = "\(format(value)) \(unit)"
+        if let caption { words += ", \(caption)" }
+        if let difference {
+            words += difference == 0 ? ", same as your 30-day average" : ", \(format(abs(difference))) \(difference > 0 ? "above" : "below") your 30-day average"
+        }
+        return words
+    }
     var body: some View {
-        content.frame(maxWidth: .infinity, alignment: .leading).padding(20)
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
-            .overlay(RoundedRectangle(cornerRadius: 20).stroke(.primary.opacity(0.12)))
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(value.map(format) ?? "—").font(.system(.title, design: .rounded, weight: .bold)).monospacedDigit()
+                if value != nil { Text(unit).font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
+            }
+            if value != nil, let caption { Text(caption).font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
+            if let difference {
+                HStack(spacing: 4) {
+                    if difference != 0 { Image(systemName: difference > 0 ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill").font(.caption2) }
+                    Text(difference == 0 ? "Same" : format(abs(difference))).font(.caption.weight(.semibold)).monospacedDigit()
+                }
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(.primary.opacity(0.08), in: Capsule())
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(spokenValue)
     }
 }
-private struct HealthTrendPoint: Identifiable { let date: Date; let value: Double; var id: Date { date } }
-private struct HealthTrendCard: View {
-    let title: String
-    let unit: String
-    let points: [HealthTrendPoint]
+
+private struct HeartRateChart: View {
+    let insight: HealthSessionInsight
+    private var floor: Double { (insight.samples.map(\.beatsPerMinute).min() ?? 0) - 10 }
+    private var ceiling: Double { (insight.samples.map(\.beatsPerMinute).max() ?? 0) + 10 }
+    private var fill: LinearGradient { LinearGradient(colors: [ClimbTheme.accent.opacity(0.35), ClimbTheme.accent.opacity(0)], startPoint: .top, endPoint: .bottom) }
     var body: some View {
-        HealthInsightCard {
+        Surface {
             VStack(alignment: .leading, spacing: 12) {
-                Text(title).font(.headline)
-                if points.isEmpty { Text("No data").font(.title.bold()) }
-                else {
-                    Text("\(metric(points.last?.value, decimals: 1)) \(unit)").font(.title.bold()).monospacedDigit()
-                    Text("Latest week with data").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-                    Chart(points) { point in
-                        BarMark(x: .value("Week", point.date, unit: .weekOfYear), y: .value(unit, point.value)).foregroundStyle(Color.primary).cornerRadius(4)
-                    }.frame(height: 140).accessibilityElement(children: .ignore).accessibilityLabel("Weekly \(title.lowercased())")
-                    .accessibilityValue(points.map { "\($0.date.formatted(date: .abbreviated, time: .omitted)): \(metric($0.value, decimals: 1)) \(unit)" }.joined(separator: "; "))
+                Text("Heart rate").font(.headline)
+                Chart {
+                    ForEach(Array(insight.heartRateSegments.enumerated()), id: \.offset) { index, segment in
+                        ForEach(segment) { sample in
+                            AreaMark(x: .value("Time", sample.date), yStart: .value("Floor", floor), yEnd: .value("Heart rate", sample.beatsPerMinute), series: .value("Segment", index))
+                                .foregroundStyle(fill).interpolationMethod(.monotone)
+                            LineMark(x: .value("Time", sample.date), y: .value("Heart rate", sample.beatsPerMinute), series: .value("Segment", index))
+                                .foregroundStyle(ClimbTheme.accent).interpolationMethod(.monotone)
+                            // A lone reading has no line to sit on.
+                            if segment.count == 1 { PointMark(x: .value("Time", sample.date), y: .value("Heart rate", sample.beatsPerMinute)).foregroundStyle(ClimbTheme.accent) }
+                        }
+                    }
                 }
+                .chartYScale(domain: floor...ceiling)
+                .chartXScale(domain: insight.workout.start...insight.workout.end)
+                .chartXAxis(.hidden)
+                .frame(height: 140)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Heart rate over time")
+                .accessibilityValue("\(insight.samples.count) readings, from \(Int(floor + 10)) to \(Int(ceiling - 10)) beats per minute.")
+                .accessibilityIdentifier("healthHeartRateChart")
+                HStack {
+                    Text(insight.workout.start, format: .dateTime.hour().minute())
+                    Spacer()
+                    Text(insight.workout.end, format: .dateTime.hour().minute())
+                }.font(.caption).foregroundStyle(ClimbTheme.secondaryText)
             }
         }
     }
-}
-private func metric(_ value: Double?, decimals: Int = 0) -> String {
-    value.map { $0.formatted(.number.precision(.fractionLength(decimals))) } ?? "No data"
 }

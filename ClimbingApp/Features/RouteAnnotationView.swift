@@ -43,7 +43,7 @@ struct RouteAnnotationView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment:.leading,spacing:16) {
-                    Text("Circle a hold or draw a path with your finger. Markup stays private and the original photo is preserved.").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
+                    Text("Circle a hold or draw a path.").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                     Picker("Pen color",selection:$color) { Text("Orange").tag("orange");Text("Blue").tag("blue");Text("White").tag("white") }.pickerStyle(.segmented)
                     if let image {
                         RouteMarkupImage(image:image,strokes:strokes + (current.isEmpty ? [] : [RouteStroke(color:color,points:current)]))

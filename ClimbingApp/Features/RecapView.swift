@@ -23,16 +23,14 @@ struct AggregateEditorView: View {
             Form {
                 Section {
                     Picker("Coverage", selection: $coverage) { ForEach(ActivityCoverage.allCases) { Text($0.title).tag($0) } }.accessibilityIdentifier("recapCoverage")
-                    Text(coverage == .additional ? "Only activity beyond your individual entries and other batches. Each batch must cover distinct activity." : "Describes the entire session. This replaces each supplied metric’s detailed total; it is never added to it.")
+                    Text(coverage == .additional ? "Added on top of what’s logged." : "Replaces the logged totals.")
                         .font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                 }
                 Section(header: Text("What do you remember?").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     TextField("Attempts — unknown if blank", text: $attempts).keyboardType(.numberPad).accessibilityIdentifier("recapAttempts")
                     TextField("Sends — unknown if blank", text: $sends).keyboardType(.numberPad).accessibilityIdentifier("recapSends")
                     TextField("Batch description (optional)", text: $label)
-                    Text("Sends do not imply attempts, unique climbs, or flashes. Recalled totals never create individual attempts.").font(.caption)
                 }
-                Section(header: Text("Recorded evidence").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) { Text("\(session.recordedAttempts.count) individual attempts · \(session.recordedAttempts.filter(\.sent).count) sends") }
                 if !validation.isEmpty { Section(header: Text("Resolve before saving").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) { ForEach(validation, id: \.self) { Text($0).foregroundStyle(ClimbTheme.error) } } }
                 if let existing {
                     Section { Button("Delete recalled entry", role: .destructive) {
@@ -71,7 +69,6 @@ struct AttemptEditorView: View {
                 DatePicker("Occurrence day", selection: $date, in: ...Date.now, displayedComponents: .date)
                 Stepper("Order on this climb: \(order)", value: $order, in: 1...100000)
                 Picker("Time precision", selection: $precision) { Text("Day only").tag("day"); Text("Unknown").tag("unknown"); Text("Recorded timestamp").tag("exact") }
-                Text("Changing day or order recalculates flash history. The linked session stays the same. Exact time is only known when recorded live.").font(.caption)
                 if let data = attempt.gradeSnapshot.data(using: .utf8), let descriptor = try? JSONDecoder().decode(GradeDescriptor.self, from: data) {
                     Text("Difficulty when logged: \(descriptor.label)").font(.subheadline)
                 }
@@ -87,7 +84,7 @@ struct AttemptEditorView: View {
             .onAppear { sent = attempt.sent; date = SessionDay.date(for: attempt.sessionDay) ?? .now; order = attempt.sequence; precision = attempt.timePrecision }
             .confirmationDialog("Delete this attempt?", isPresented: $delete, titleVisibility: .visible) {
                 Button("Delete attempt", role: .destructive) { if store.removeAttempt(attempt) { dismiss() } }
-            } message: { Text("History will be marked incomplete. A remaining first send will not become a confirmed flash just because an earlier record was deleted.") }
+            } message: { Text("History will be marked incomplete.") }
         }.safeAreaInset(edge: .top) { SaveErrorBanner() }
     }
 }
@@ -103,13 +100,11 @@ struct FinishReviewView: View {
             Form {
                 Section(header: Text("Review").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     Text("\(session.recordedAttempts.count.counted("recorded attempt")) · \(session.completedClimbs.counted("distinct climb")) sent")
-                    Text(session.totals.label)
                     Text("Attempts: \(session.totals.attempts.map(String.init) ?? "Unknown") · Sends: \(session.totals.sends.map(String.init) ?? "Unknown")")
                 }
                 Section {
                     Button("Add missing remembered activity") { recalling = true }
                     Button("Edit times and notes") { editing = true }
-                    Text("You can correct individual entries from session details after finishing.").font(.caption)
                 }
                 Button("Finish and save") {
                     store.finish(session)
@@ -142,10 +137,8 @@ struct ManualAttemptView: View {
                 Button("Choose another saved climb") { choosing = true }
                 Button("Create a new climb") { creating = true }
                 Picker("Outcome", selection: $outcome) { Text("Choose an outcome").tag(""); Text("Failed").tag("failed"); Text("Sent").tag("sent") }
-                Text("This creates one individual attempt on the session day with unknown exact time. Use remembered totals instead when you do not know individual results.").font(.caption)
                 if !session.aggregates.isEmpty {
                     Toggle("This is beyond recalled activity, or I reduced its batch first", isOn: $disjoint)
-                    Text("Edit recalled entries before converting any of their activity into individual attempts. Whole-session totals must still cover all detailed evidence.").font(.caption)
                 }
             }.navigationTitle("Add remembered attempt")
             .toolbar {

@@ -7,57 +7,53 @@ final class HealthInsightsModel {
     private var generation = 0
     private(set) var loading = false
     private(set) var sessions: [HealthSessionInsight] = []
-    private(set) var recovery = HealthRecoveryContext()
     private(set) var message: String?
     private(set) var access = HealthReadAccessState.needsRequest
-    private(set) var unavailableWorkouts = 0
 
     init(reader: any HealthWorkoutReading) { self.reader = reader; access = reader.available ? .needsRequest : .unavailable }
     func clear() {
-        generation += 1; loading = false; sessions = []; recovery = .init(); message = nil; unavailableWorkouts = 0
+        generation += 1; loading = false; sessions = []; message = nil
     }
-    func load(ids: [UUID], requestAccess: Bool, includeRecovery: Bool) async {
+    /// Comparison workouts need only their summaries, so `samplesFor` limits the costly heart-rate read to one workout.
+    func load(ids: [UUID], requestAccess: Bool, samplesFor: UUID? = nil) async {
         clear(); let revision = generation; loading = true
         defer { if generation == revision { loading = false } }
         do {
             guard reader.available else { access = .unavailable; message = "Apple Health is unavailable on this device."; return }
-            if requestAccess { try await reader.requestReadAccess(includeRecovery: includeRecovery) }
+            if requestAccess { try await reader.requestReadAccess() }
             try Task.checkCancellation()
-            let state = try await reader.readAccessState(includeRecovery: includeRecovery)
+            let state = try await reader.readAccessState()
             guard generation == revision else { return }
             access = state
             guard state == .requested else {
-                message = state == .unavailable ? "Apple Health is unavailable on this device." : "Choose Connect Health to review read access. Nothing is requested automatically."
+                if state == .unavailable { message = "Apple Health is unavailable on this device." }
                 return
             }
-            var loaded: [HealthSessionInsight] = [], missing = 0, partial = false
+            var loaded: [HealthSessionInsight] = [], partial = false
             for id in Set(ids) {
                 try Task.checkCancellation()
                 do {
-                    guard let workout = try await reader.workout(id: id), workout.id == id else { missing += 1; continue }
+                    guard let workout = try await reader.workout(id: id), workout.id == id else { continue }
                     guard generation == revision, !Task.isCancelled else { return }
                     var samples: [HealthHeartRateSample] = []
-                    do { samples = try await reader.heartRates(workoutID: id) } catch is CancellationError { throw CancellationError() }
-                    catch { partial = true }
+                    if samplesFor == nil || samplesFor == id {
+                        do { samples = try await reader.heartRates(workoutID: id) } catch is CancellationError { throw CancellationError() }
+                        catch { partial = true }
+                    }
                     loaded.append(HealthSessionInsight(workout: workout, samples: samples))
                 } catch is CancellationError { throw CancellationError() }
-                catch { missing += 1; partial = true }
-            }
-            guard generation == revision, !Task.isCancelled else { return }
-            var context = HealthRecoveryContext()
-            if includeRecovery {
-                do { context = try await reader.recoveryContext().sanitized } catch is CancellationError { throw CancellationError() }
                 catch { partial = true }
             }
+            guard generation == revision, !Task.isCancelled else { return }
             try Task.checkCancellation()
             guard generation == revision else { return }
-            sessions = loaded.sorted { $0.workout.start < $1.workout.start }; recovery = context; unavailableWorkouts = missing
-            if partial { message = "Some Health data couldn’t refresh. Available measurements are shown; retry when the device is unlocked." }
-            else if loaded.isEmpty { message = ids.isEmpty ? "No linked workouts in this journal range. Link a workout from a session to see its insights." : "No accessible data found. Read access decisions are private to Apple Health; data may also be missing or delayed." }
+            sessions = loaded.sorted { $0.workout.start < $1.workout.start }
+            if partial { message = "Some Health data couldn’t load." }
+            else if !loaded.contains(where: { samplesFor == nil || $0.id == samplesFor }) { message = "No accessible data found." }
         } catch is CancellationError { }
         catch {
             guard generation == revision else { return }
-            message = "Couldn’t read accessible Health data. Retry when the device is unlocked, or review access in Apple Health."
+            message = "Couldn’t read Apple Health."
         }
     }
 }

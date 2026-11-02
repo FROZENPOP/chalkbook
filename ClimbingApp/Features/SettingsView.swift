@@ -48,7 +48,7 @@ struct SettingsView: View {
                         for link in try store.context.fetch(FetchDescriptor<HealthWorkoutLink>()) { store.context.delete(link) }
                     }) { healthEnabled = false }
                 }))
-                Text("Read access is requested only from a session’s Link Apple Health workout action. Turning this off removes local links. Measurements are never included in journal backups, and no workouts are exported.").font(.caption)
+                Text("Read-only. Never shared or backed up. Turning this off removes your links.").font(.caption)
             }
             Section(header: Text("Appearance").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                 Picker("Theme", selection: $appearance) {
@@ -59,13 +59,12 @@ struct SettingsView: View {
                 Picker("Default grade scale", selection: $defaultScale) {
                     ForEach(GradeScale.allCases.filter { $0 != .custom }) { Text($0.rawValue).tag($0.rawValue) }
                 }
-                Label("Bouldering", systemImage: "figure.climbing")
             }
             Section {
                 Button("Export backup", systemImage: "square.and.arrow.up", action: export)
                 Button("Restore backup", systemImage: "square.and.arrow.down") { importing = true }
             } header: { Text("Your data").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true) } footer: {
-                Text("Your log stays on this device and works offline. Export backups to Files regularly; deleting the app can delete its local data.").font(.caption).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true)
+                Text("Your log stays on this device. Deleting the app can delete it, so export backups.").font(.caption).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true)
             }
             if let pendingBackup {
                 Section(header: Text("Backup ready to restore").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
@@ -78,9 +77,7 @@ struct SettingsView: View {
                 }
             }
             Section {
-                LabeledContent("Sessions", value: "\(sessions.count)")
                 LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
-                Text("Made for your next move.").foregroundStyle(ClimbTheme.secondaryText)
             }
             if auth.account != nil {
                 Section {
@@ -101,12 +98,12 @@ struct SettingsView: View {
         .sheet(isPresented: $showLogin) { LoginPortalView() }
         .confirmationDialog("Sign out of your account?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Sign out", role: .destructive) { auth.signOut() }
-        } message: { Text("Your account’s log stays on this iPhone. You’ll return to the separate guest log.") }
+        } message: { Text("Your log stays on this iPhone.") }
         .confirmationDialog("Delete your account?", isPresented: $confirmDeleteAccount, titleVisibility: .visible) {
             Button("Delete account", role: .destructive) {
                 Task { await deleteAccount() }
             }
-        } message: { Text("This permanently deletes your Sendr account, Friends profile, connections, shared entries and reactions from our servers, then signs you out. Your private journal stays on this iPhone until you delete the app. This can’t be undone.") }
+        } message: { Text("Permanently deletes your account, Friends profile and shared entries. Your journal stays on this iPhone. This can’t be undone.") }
         .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .json,
                       defaultFilename: "Sendr-\(SessionDay.key(for: .now))") { result in
             if case let .failure(error) = result { message = error.localizedDescription }
@@ -129,7 +126,7 @@ struct SettingsView: View {
                     pendingBackup = nil
                 }
             }
-        } message: { Text("Current sessions will be replaced. Export a backup first if you want to keep them.") }
+        } message: { Text("Current sessions will be replaced.") }
         .alert("Backup", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") { message = nil }
         } message: { Text(message ?? "") }

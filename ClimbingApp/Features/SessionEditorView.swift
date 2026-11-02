@@ -10,9 +10,9 @@ struct SessionEditorView: View {
     @State private var initialized = false
     var session: ClimbingSession?
     var isRecap = false
+    var onStart: (ClimbingSession) -> Void = { _ in }
     @State private var startTime = Date.now
     @State private var endTime = Date.now
-    @State private var durationKnown = false
     @State private var minutes = ""
     @State private var created: ClimbingSession?
     @State private var date = Date.now
@@ -28,21 +28,24 @@ struct SessionEditorView: View {
                         TextField("Other location (optional)", text: $location, axis: .vertical).lineLimit(1...3).textInputAutocapitalization(.words)
                             .accessibilityIdentifier("sessionLocation").frame(minHeight: 44)
                     }
-                    if session == nil { DatePicker("Date", selection: $date, in: ...Date.now, displayedComponents: .date) }
+                    if isRecap { DatePicker("Date", selection: $date, in: ...Date.now, displayedComponents: .date) }
                 }
-                Section(header: Text("Time (optional for a recap)").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
-                    if session != nil {
+                if session != nil {
+                    Section(header: Text("Time").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         DatePicker("Started", selection: $startTime, in: ...Date.now, displayedComponents: [.date, .hourAndMinute])
-                        if session?.isComplete == true { DatePicker("Ended", selection: $endTime, in: ...Date.now, displayedComponents: [.date, .hourAndMinute]) }
+                        if session?.isComplete == true {
+                            DatePicker("Ended", selection: $endTime, in: ...Date.now, displayedComponents: [.date, .hourAndMinute])
+                            LabeledContent("Duration", value: durationLabel)
+                            if let session, session.pausedSeconds >= 60 { LabeledContent("Paused", value: Int(session.pausedSeconds / 60).counted("minute")) }
+                        }
                     }
-                    Toggle("Duration is known", isOn: $durationKnown)
-                    if isRecap { TextField("Minutes", text: $minutes).keyboardType(.numberPad) }
+                } else if isRecap {
+                    Section(header: Text("Duration").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
+                        TextField("Minutes (optional)", text: $minutes).keyboardType(.numberPad)
+                    }
                 }
                 Section(header: Text("Notes").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     TextField("How are you feeling?", text: $notes, axis: .vertical).lineLimit(3...6)
-                }
-                if session == nil {
-                    Section { Text("Everything saves on your device. You can resume this session anytime.").foregroundStyle(ClimbTheme.secondaryText) }
                 }
             }
             .id(textSize)
@@ -62,7 +65,7 @@ struct SessionEditorView: View {
                     date = SessionDay.date(for: session.day) ?? .now
                     location = session.location
                     notes = session.notes
-                    startTime = session.startedAt; endTime = session.endedAt ?? .now; durationKnown = session.durationKnown
+                    startTime = session.startedAt; endTime = session.endedAt ?? .now
                 } else { selectedGymID = gyms.first(where: \.isDefault)?.id ?? gyms.first?.id }
             }
         }
@@ -71,24 +74,36 @@ struct SessionEditorView: View {
         .safeAreaInset(edge: .top) { SaveErrorBanner() }
     }
 
+    private func timesChanged(_ session: ClimbingSession) -> Bool {
+        startTime != session.startedAt || (session.isComplete && endTime != session.endedAt)
+    }
+
+    private var durationLabel: String {
+        guard let session, session.durationKnown || timesChanged(session) else { return "Not recorded" }
+        return max(0, Int((endTime.timeIntervalSince(startTime) - session.pausedSeconds) / 60)).counted("minute")
+    }
+
     private func submit() {
         let gym = gyms.first { $0.id == selectedGymID }
         if let session {
             if store.save({
                 let oldDay = session.day
+                if timesChanged(session) { session.durationKnown = true }
                 session.day = SessionDay.key(for: startTime, in: TimeZone(identifier: session.timeZoneID) ?? .current)
                 session.location = gym?.name ?? location.trimmingCharacters(in: .whitespacesAndNewlines)
                 session.gymID = gym?.id
                 guard session.isComplete == false || endTime >= startTime else { throw BackupError.invalid("End time must follow start time.") }
                 session.startedAt = startTime; if session.isComplete { session.endedAt = endTime }
-                session.durationKnown = durationKnown; session.updatedAt = .now
+                session.updatedAt = .now
                 for attempt in session.recordedAttempts where attempt.daySnapshot == oldDay || attempt.daySnapshot.isEmpty { attempt.daySnapshot = session.day; attempt.timePrecision = "day" }
                 session.notes = notes
             }) { dismiss() }
         } else if isRecap {
-            if durationKnown && (Int(minutes) == nil || (Int(minutes) ?? -1) < 0) { store.errorMessage = "Enter a duration in whole minutes or mark it unknown."; return }
-            created = store.createRecap(date: date, gym: gym, location: location, notes: notes, minutes: durationKnown ? Int(minutes) : nil)
-        } else if store.start(date: date, location: location, notes: notes, gym: gym) != nil {
+            let entered = minutes.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !entered.isEmpty && (Int(entered) ?? -1) < 0 { store.errorMessage = "Enter a duration in whole minutes or leave it blank."; return }
+            created = store.createRecap(date: date, gym: gym, location: location, notes: notes, minutes: Int(entered))
+        } else if let started = store.start(date: .now, location: location, notes: notes, gym: gym) {
+            onStart(started)
             dismiss()
         }
     }

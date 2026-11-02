@@ -130,7 +130,7 @@ final class JournalPersistenceTests: XCTestCase {
             session.climbs.append(climb);climb.attempts.append(attempt);climb.media.append(photo)
             try container.mainContext.save()
         }
-        let schema = Schema(versionedSchema:ClimbingSchemaV6.self)
+        let schema = Schema(versionedSchema:ClimbingSchemaV7.self)
         let container = try ModelContainer(for:schema,migrationPlan:ClimbingMigrationPlan.self,configurations:[ModelConfiguration(schema:schema,url:url,cloudKitDatabase:.none)])
         let climb = try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<ClimbEntry>()).first)
         XCTAssertEqual(climb.id,climbID); XCTAssertEqual(climb.session?.id,sessionID)

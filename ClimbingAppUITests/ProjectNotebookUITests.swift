@@ -21,7 +21,7 @@ final class ProjectNotebookUITests:XCTestCase {
         let url=try XCTUnwrap(bundle.url(forResource:"route-photo",withExtension:"png") ?? bundle.url(forResource:"route-photo",withExtension:"png",subdirectory:"Fixtures"))
         app.launchEnvironment["CLIMB_TEST_PHOTO"]=try Data(contentsOf:url).base64EncodedString()
         app.launch();XCTAssertTrue(app.buttons["startSession"].waitForExistence(timeout:15))
-        tap(app,"startSession");tap(app,"saveSession");tap(app,"resumeSession");tap(app,"addClimb")
+        tap(app,"startSession");tap(app,"saveSession");tap(app,"addClimb")
         tap(app,"addRouteMediaFromFiles")
         let item=app.cells.matching(NSPredicate(format:"label BEGINSWITH %@","route-photo")).firstMatch
         if !item.isHittable {
@@ -31,7 +31,7 @@ final class ProjectNotebookUITests:XCTestCase {
         }
         XCTAssertTrue(item.waitForExistence(timeout:10));item.tap()
         if app.buttons["Open"].waitForExistence(timeout:2) { app.buttons["Open"].tap() }
-        tap(app,"saveClimb");tap(app,"Notebook and complete history")
+        tap(app,"saveClimb");tap(app,"Notebook")
         tap(app,"Add note")
         let note=app.descendants(matching:.any)["notebookText"].firstMatch
         XCTAssertTrue(note.waitForExistence(timeout:5))
@@ -54,7 +54,7 @@ final class ProjectNotebookUITests:XCTestCase {
         tap(app,"resumeSession")
         XCTAssertTrue(app.staticTexts["Next move"].waitForExistence(timeout:5))
         XCTAssertTrue(app.staticTexts["Left foot high"].exists)
-        tap(app,"Notebook and complete history")
+        tap(app,"Notebook")
         tap(app,"annotateRoutePhoto")
         XCTAssertTrue(app.buttons["Undo stroke"].waitForExistence(timeout:5));XCTAssertTrue(app.buttons["Undo stroke"].isEnabled)
         let shot=XCTAttachment(screenshot:app.screenshot());shot.name="Restored private route markup";shot.lifetime = .keepAlways;add(shot)
@@ -80,7 +80,7 @@ final class ProjectNotebookUITests:XCTestCase {
         let url=try XCTUnwrap(bundle.url(forResource:"route-photo",withExtension:"png") ?? bundle.url(forResource:"route-photo",withExtension:"png",subdirectory:"Fixtures"))
         app.launchEnvironment["CLIMB_TEST_PHOTO"]=try Data(contentsOf:url).base64EncodedString()
         app.launch();XCTAssertTrue(app.buttons["startSession"].waitForExistence(timeout:15))
-        tap(app,"startSession");tap(app,"saveSession");tap(app,"resumeSession");tap(app,"addClimb")
+        tap(app,"startSession");tap(app,"saveSession");tap(app,"addClimb")
         tap(app,"addRouteMediaFromFiles")
         let item=app.cells.matching(NSPredicate(format:"label BEGINSWITH %@","route-photo")).firstMatch
         if !item.isHittable {
@@ -90,7 +90,7 @@ final class ProjectNotebookUITests:XCTestCase {
         }
         XCTAssertTrue(item.waitForExistence(timeout:10));item.tap()
         if app.buttons["Open"].waitForExistence(timeout:2) { app.buttons["Open"].tap() }
-        tap(app,"saveClimb");tap(app,"Notebook and complete history")
+        tap(app,"saveClimb");tap(app,"Notebook")
         for _ in 0..<5 { if app.buttons["View route photo"].firstMatch.isHittable { break }; app.swipeDown() }
         tap(app,"View route photo")
         XCTAssertTrue(app.otherElements["routePhotoPreview"].exists || app.images["routePhotoPreview"].exists || app.descendants(matching:.any)["routePhotoPreview"].firstMatch.exists)
