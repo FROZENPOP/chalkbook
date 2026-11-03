@@ -4,6 +4,7 @@ import SwiftUI
 /// Tapping the year zooms into a week; tapping a day in that week shows what was climbed.
 struct ConsistencyCalendarView: View {
     let calendar: ConsistencyCalendar
+    var openDay: (String) -> Void = { _ in }
     @AppStorage("consistencyCalendarExpanded") private var expanded = true
     @State private var focusedWeek: ConsistencyCalendar.Week?
     @State private var selected: ConsistencyCalendar.Day?
@@ -37,10 +38,11 @@ struct ConsistencyCalendarView: View {
                            third: "\(calendar.longestWeekStreak)", thirdLabel: "best week streak")
             if expanded {
                 if let week = focusedWeek { weekView(week) } else { yearView }
-                Text(selected.map(detail) ?? focusedWeek.map(summary) ?? "Tap a week to see its days. Streaks count weeks with at least one session, so rest days never break them.")
-                    .font(.subheadline).foregroundStyle(selected == nil && focusedWeek == nil ? ClimbTheme.secondaryText : .primary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("consistencyDetail")
+                if let text = selected.map(detail) {
+                    Text(text).font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("consistencyDetail")
+                }
             }
         }
     }
@@ -82,13 +84,6 @@ struct ConsistencyCalendarView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
-            HStack(spacing: gap) {
-                Text("Less").padding(.trailing, 4)
-                ForEach(0..<5) { level in RoundedRectangle(cornerRadius: cell / 4).fill(shade(level)).frame(width: cell, height: cell).accessibilityHidden(true) }
-                Text("More").padding(.leading, 4)
-                Spacer()
-            }
-            .font(.caption).foregroundStyle(ClimbTheme.secondaryText)
         }
     }
 
@@ -109,7 +104,7 @@ struct ConsistencyCalendarView: View {
             }
             HStack(spacing: 6) {
                 ForEach(week.days) { day in
-                    Button { selected = day } label: {
+                    Button { if day.sessions > 0 { openDay(day.key) } else { selected = day } } label: {
                         // A light tint plus a shaded bar: text on the full shade fails contrast at the middle levels.
                         VStack(spacing: 4) {
                             Text(day.date.formatted(.dateTime.weekday(.narrow))).font(.caption).foregroundStyle(ClimbTheme.secondaryText)

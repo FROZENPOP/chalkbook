@@ -29,7 +29,7 @@ struct GymsView: View {
                 }
                 Button { sheet = .new } label: { HStack { Image(systemName: "plus").accessibilityHidden(true); Text("Add gym").fixedSize(horizontal: false, vertical: true) } }
                     .frame(minHeight: 44).accessibilityIdentifier("addSavedGym")
-            } footer: { Text("Your default gym is preselected for new sessions. Each climb starts with its session’s gym and grading scale.").font(.caption).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true) }
+            }
         }
         .navigationTitle("My gyms")
         .confirmationDialog("Remove this saved gym?", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }), titleVisibility: .visible, presenting: removing) { gym in
@@ -120,11 +120,10 @@ struct GymEditorView: View {
                             .lineLimit(2...5).accessibilityIdentifier("customGradeOrder")
                     }
                 } header: { Text("How does this gym grade climbs?").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true) } footer: {
-                    Text(scale == .custom ? "Optionally list grades from easiest to hardest, separated by commas. You can also type any grade when logging a climb." : "We’ll preselect this scale whenever you log a climb at this gym.")
+                    if scale == .custom { Text("Easiest to hardest, separated by commas.") }
                 }
                 Section(header: Text("Local color guide (optional)").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     TextField("e.g. Blue: V2–V4, Red: V4–V6", text: $colorGuide, axis: .vertical).lineLimit(2...5)
-                    Text("Your descriptions are notes, not grade conversions. They are copied into new climbs so later changes do not rewrite history.").font(.caption)
                 }
                 if gym != nil {
                     Section { Button("Remove saved gym", role: .destructive) { confirmDelete = true } }

@@ -7,8 +7,6 @@ struct SessionDetailView: View {
     @Environment(AccountSession.self) private var auth
     @Environment(\.dismiss) private var dismiss
     let session: ClimbingSession
-    @Query private var healthLinks: [HealthWorkoutLink]
-    @AppStorage("healthEnabled") private var healthEnabled = false
     @State private var sheet: SessionSheet?
     @State private var confirmDelete = false
     @State private var chooseExisting = false
@@ -16,7 +14,6 @@ struct SessionDetailView: View {
     @State private var editingAggregate: AggregateEntry?
     @State private var editingAttempt: ClimbAttempt?
     @State private var reviewing = false
-    @State private var health = false
     @State private var manualAttempt = false
     @State private var sharing = false
     private var selected: ClimbEntry? { session.allClimbs.first { $0.id == session.selectedClimbID } ?? session.orderedClimbs.last }
@@ -27,11 +24,23 @@ struct SessionDetailView: View {
                 Text(SessionDay.label(for: session.day)).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                 Surface {
                     VStack(alignment: .leading, spacing: 16) {
-                        Label(session.isComplete ? "Session complete" : "In progress", systemImage: session.isComplete ? "checkmark.circle.fill" : "circle.dotted")
+                        Label(session.isComplete ? "Session complete" : session.isPaused ? "Paused" : "In progress", systemImage: session.isComplete ? "checkmark.circle.fill" : session.isPaused ? "pause.circle" : "circle.dotted")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(ClimbTheme.accent)
-                        JournalMetrics(first: session.totals.attempts.map(String.init) ?? "Unknown", firstLabel: "attempts", second: session.totals.sends.map(String.init) ?? "Unknown", secondLabel: "sends", third: "\(session.completedClimbs)", thirdLabel: "identified climbs sent")
-                        Text(session.totals.label).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-                        if let minutes = session.durationMinutes { Text("Recorded duration: \(minutes.counted("minute"))").font(.caption) }
+                        JournalMetrics(first: session.totals.attempts.map(String.init) ?? "Unknown", firstLabel: "attempts", second: session.totals.sends.map(String.init) ?? "Unknown", secondLabel: "sends", third: "\(session.completedClimbs)", thirdLabel: "climbs sent")
+                        if !session.isComplete {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Session time").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
+                                Text(timerInterval: session.stopwatchStart...Date.distantFuture, pauseTime: session.pausedAt, countsDown: false)
+                                    .font(.system(.largeTitle, design: .rounded, weight: .bold)).monospacedDigit()
+                            }
+                            .accessibilityElement(children: .combine).accessibilityIdentifier("sessionStopwatch")
+                            Button {
+                                if session.isPaused { store.resume(session) } else { store.pause(session) }
+                            } label: {
+                                Label(session.isPaused ? "Resume" : "Pause", systemImage: session.isPaused ? "play.fill" : "pause.fill").frame(minHeight: 32)
+                            }
+                            .buttonStyle(.bordered).accessibilityIdentifier("pauseSession")
+                        } else if let minutes = session.durationMinutes { Text("Recorded duration: \(minutes.counted("minute"))").font(.caption) }
                         else { Text("Session duration not recorded").font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
                         if !session.notes.isEmpty { Text(session.notes).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText) }
                     }
@@ -50,20 +59,15 @@ struct SessionDetailView: View {
                 if session.allClimbs.isEmpty {
                     EmptyState(title: "Find your first boulder", symbol: "figure.climbing", message: "Add a climb and record each try along the way.")
                 }
-                if session.isComplete, healthEnabled, let link = healthLinks.first(where: { $0.sessionID == session.id }) {
-                    SessionHealthSection(workoutID: link.workoutID)
-                }
                 if let selected { ClimbCard(climb: selected, canLog: !session.isComplete, loggingSession: session) }
                 if !session.isComplete, !session.recordedAttempts.isEmpty {
                     Button { store.undoLatest(in: session) } label: { Label("Undo latest logged attempt", systemImage: "arrow.uturn.backward").frame(minHeight: 44) }.accessibilityIdentifier("undoLatestAttempt")
                 }
                 ForEach(session.orderedClimbs.filter { $0.id != selected?.id }) { climb in
                     Button { _ = store.select(climb, in: session) } label: {
-                        Surface { VStack(alignment: .leading) { Text(climb.title).font(.headline); Text(climb.descriptor.label).font(.subheadline); Text("Select to log").font(.caption).foregroundStyle(ClimbTheme.secondaryText) } }
+                        Surface { VStack(alignment: .leading) { Text(climb.title).font(.headline); Text(climb.descriptor.label).font(.subheadline) } }
                     }.buttonStyle(.plain)
                 }
-                Text("Recalled activity").font(.title2.bold())
-                Text("Additional batches cover distinct unlogged activity. Whole-session totals replace detailed totals. Reduce or remove a batch explicitly before replacing it with individual entries.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                 ForEach(session.aggregates) { entry in
                     Button { editingAggregate = entry } label: {
                         Surface { VStack(alignment: .leading) {
@@ -73,13 +77,16 @@ struct SessionDetailView: View {
                         } }
                     }.buttonStyle(.plain)
                 }
-                Button("Add remembered totals", systemImage: "plus.rectangle.on.folder") { addingRecap = true }.frame(minHeight: 44).accessibilityIdentifier("addRecap")
-                Button("Link Apple Health workout", systemImage: "heart.text.square") { health = true }.frame(minHeight: 44)
-                Button("Add an individual attempt from memory") { manualAttempt = true }.frame(minHeight: 44)
-                DisclosureGroup("Recorded attempts — tap to correct") {
-                    ForEach(session.recordedAttempts.sorted { $0.recordedAt < $1.recordedAt }) { attempt in
-                        Button { editingAttempt = attempt } label: {
-                            Label("\(attempt.climb?.title ?? "Boulder") · \(attempt.sent ? "Sent" : "Failed") · \(attempt.sessionDay)", systemImage: attempt.sent ? "checkmark.circle" : "xmark.circle").frame(minHeight: 44)
+                Menu {
+                    Button("Remembered totals", systemImage: "plus.rectangle.on.folder") { addingRecap = true }.accessibilityIdentifier("addRecap")
+                    Button("Single attempt", systemImage: "plus.circle") { manualAttempt = true }.accessibilityIdentifier("addManualAttempt")
+                } label: { Label("Add from memory", systemImage: "clock.arrow.circlepath").frame(minHeight: 44) }.accessibilityIdentifier("addFromMemory")
+                if !session.recordedAttempts.isEmpty {
+                    DisclosureGroup("Recorded attempts") {
+                        ForEach(session.recordedAttempts.sorted { $0.recordedAt < $1.recordedAt }) { attempt in
+                            Button { editingAttempt = attempt } label: {
+                                Label("\(attempt.climb?.title ?? "Boulder") · \(attempt.sent ? "Sent" : "Failed") · \(attempt.sessionDay)", systemImage: attempt.sent ? "checkmark.circle" : "xmark.circle").frame(minHeight: 44)
+                            }
                         }
                     }
                 }
@@ -113,14 +120,13 @@ struct SessionDetailView: View {
         .sheet(item: $editingAggregate) { AggregateEditorView(session: session, existing: $0) }
         .sheet(item: $editingAttempt) { AttemptEditorView(attempt: $0) }
         .sheet(isPresented: $manualAttempt) { ManualAttemptView(session: session) }
-        .sheet(isPresented: $health) { HealthLinkView(session: session) }
         .sheet(isPresented: $reviewing) { FinishReviewView(session: session) }
         .sheet(isPresented: $sharing) { ShareSessionView(session: session) }
         .confirmationDialog("Delete this session and its recorded activity?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete session", role: .destructive) {
                 if social.deleteSession(session, store: store, auth: auth) { dismiss() }
             }
-        } message: { Text("Its attempts, recalled entries, and any shared recap will be removed. Shared recap removal is queued safely on this device. Friends may still see it until it syncs. Climbs, projects, notebooks, media, and other sessions stay in your journal.") }
+        } message: { Text("Its attempts and any shared recap are removed. Climbs and projects stay.") }
     }
 }
 
@@ -160,7 +166,7 @@ struct ClimbCard: View {
                 ForEach(climb.media) { media in
                     Button { mediaPreview = media.draft } label: { MediaLabel(kind: media.kind, filename: media.filename) }
                 }
-                NavigationLink("Notebook and complete history") { ProjectDetailView(climb: climb) }.frame(minHeight: 44)
+                NavigationLink("Notebook") { ProjectDetailView(climb: climb) }.frame(minHeight: 44)
                 if !climb.styles.isEmpty {
                     Text(climb.styles.joined(separator: " · ")).font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                 }

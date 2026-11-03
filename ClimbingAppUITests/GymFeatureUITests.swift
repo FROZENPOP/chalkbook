@@ -44,7 +44,6 @@ final class GymFeatureUITests: XCTestCase {
         addGym(app, name: "Circuit Works", custom: true)
         XCTAssertTrue(app.staticTexts["Circuit Works"].exists)
         app.buttons["saveSession"].tap()
-        app.buttons["resumeSession"].tap()
         app.buttons["addClimb"].tap()
         XCTAssertTrue(app.staticTexts["Circuit Works"].exists)
         let grade = app.textFields["customGrade"]
@@ -92,7 +91,6 @@ final class GymFeatureUITests: XCTestCase {
         let app = launch()
         app.buttons["startSession"].tap()
         app.buttons["saveSession"].tap()
-        app.buttons["resumeSession"].tap()
         app.buttons["addClimb"].tap()
         let media = app.buttons["addRouteMedia"]
         for _ in 0..<8 { if media.isHittable { break }; app.swipeUp() }
@@ -141,7 +139,6 @@ final class GymFeatureUITests: XCTestCase {
         let app = launch()
         app.buttons["startSession"].tap()
         app.buttons["saveSession"].tap()
-        app.buttons["resumeSession"].tap()
         app.buttons["addClimb"].tap()
         chooseRouteFile(app, name: "route-photo")
         XCTAssertTrue(app.buttons["View route photo"].waitForExistence(timeout: 10))

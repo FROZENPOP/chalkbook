@@ -5,7 +5,7 @@ struct HistoryView: View {
     @Environment(ClimbingStore.self) private var store
     @Environment(SocialStore.self) private var social
     @Environment(AccountSession.self) private var auth
-    @Query(sort: \ClimbingSession.day, order: .reverse) private var sessions: [ClimbingSession]
+    @Query(sort: [SortDescriptor(\ClimbingSession.day, order: .reverse), SortDescriptor(\ClimbingSession.startedAt, order: .reverse)]) private var sessions: [ClimbingSession]
     @State private var deleting: ClimbingSession?
     @State private var search = ""
     @State private var completedOnly = false
@@ -44,6 +44,6 @@ struct HistoryView: View {
         .navigationTitle("History")
         .confirmationDialog("Delete this session and its recorded activity?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible, presenting: deleting) { session in
             Button("Delete session", role: .destructive) { _ = social.deleteSession(session, store: store, auth: auth) }
-        } message: { _ in Text("Its attempts, recalled entries, and any shared recap will be removed. Climbs, projects, notebooks, media, and other sessions stay in your journal.") }
+        } message: { _ in Text("Its attempts and any shared recap are removed. Climbs and projects stay.") }
     }
 }

@@ -46,7 +46,7 @@
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Read the climbing workouts you choose, energy, heart rate, and optional resting heart rate and HRV for private Health insights. Manual logging works without Health access.</string>
+	<string>Read the climbing workouts you link, their energy, and heart rate, to show them in your private session logs. Logging works without Health access.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

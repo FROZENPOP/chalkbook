@@ -110,4 +110,83 @@ final class FriendsUITests: XCTestCase {
         shot.name = "Journal remains available with Friends unconfigured"; shot.lifetime = .keepAlways
         add(shot)
     }
+
+    @MainActor private func launchSocialSample(_ extra:[String]=[]) -> XCUIApplication {
+        let app=XCUIApplication();app.launchArguments=["--ui-testing","--reset-test-data","--accessibility-audit","friends","--audit-social-sample"]+extra
+        app.launch();XCTAssertTrue(app.staticTexts["Alex Rivera"].waitForExistence(timeout:15))
+        return app
+    }
+
+    @MainActor func testPostHidesMissingDurationAndCommentsCanBeAddedAndDeleted() {
+        continueAfterFailure=false
+        let app=launchSocialSample()
+        XCTAssertTrue(app.descendants(matching:.any).matching(NSPredicate(format:"label CONTAINS '1h 35m'")).firstMatch.exists)
+        reveal(app.buttons["commentPreview"].firstMatch,in:app)
+        XCTAssertTrue(app.buttons["commentPreview"].firstMatch.label.contains("What was the beta on the top move?"),"Recent comments show on the post")
+        for _ in 0..<4 { if app.staticTexts["Sam Okafor"].exists { break };app.swipeUp() }
+        XCTAssertTrue(app.staticTexts["Quick board session after work."].waitForExistence(timeout:5))
+        XCTAssertFalse(app.staticTexts["Duration not recorded"].exists)
+        for _ in 0..<4 { if app.staticTexts["Finally sent the blue slab project!"].isHittable { break };app.swipeDown() }
+        let open=app.buttons["Comments, 2"].firstMatch
+        XCTAssertTrue(open.waitForExistence(timeout:5));reveal(open,in:app);open.tap()
+        XCTAssertTrue(app.staticTexts["What was the beta on the top move?"].waitForExistence(timeout:5))
+        let send=app.buttons["postComment"]
+        XCTAssertFalse(send.isEnabled,"An empty comment can't be posted")
+        let field=app.textFields["commentField"].firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout:5));field.tap();field.typeText("Send it again")
+        send.tap()
+        XCTAssertTrue(app.staticTexts["Send it again"].waitForExistence(timeout:5))
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.buttons["Comments, 3"].firstMatch.waitForExistence(timeout:5))
+        reveal(app.buttons["Comments, 3"].firstMatch,in:app)
+        XCTAssertTrue(app.buttons["commentPreview"].firstMatch.label.contains("Send it again"),"A new comment appears on the post")
+        XCTAssertTrue(app.buttons["commentPreview"].firstMatch.label.contains("View all 3 comments"))
+        app.buttons["Comments, 3"].firstMatch.tap()
+        let options=app.buttons.matching(identifier:"commentOptions").element(boundBy:2)
+        XCTAssertTrue(options.waitForExistence(timeout:5));options.tap()
+        XCTAssertFalse(app.buttons["Block climber"].exists,"You can't block yourself")
+        app.buttons["Delete comment"].firstMatch.tap()
+        let confirm=app.sheets.buttons["Delete comment"].firstMatch
+        if confirm.waitForExistence(timeout:3) { confirm.tap() } else { app.buttons["Delete comment"].firstMatch.tap() }
+        let gone=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:app.staticTexts["Send it again"])
+        XCTAssertEqual(XCTWaiter.wait(for:[gone],timeout:5),.completed)
+    }
+
+    /// Scrolls a short way at a time so a post's controls end up clear of the tab bar.
+    @MainActor private func reveal(_ element:XCUIElement,in app:XCUIApplication) {
+        for _ in 0..<8 where !(element.isHittable && element.frame.maxY < app.frame.maxY-120) {
+            app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.7)).press(forDuration:0.05,thenDragTo:app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.45)))
+        }
+    }
+
+    @MainActor func testPostShowsItsPhotoAndOpensThemAll() {
+        continueAfterFailure=false
+        let app=launchSocialSample()
+        let photo=app.buttons["viewSharedRoutePhotos"].firstMatch
+        XCTAssertTrue(photo.waitForExistence(timeout:5))
+        XCTAssertEqual(photo.label,"View 3 climb photos")
+        reveal(photo,in:app);photo.tap()
+        XCTAssertTrue(app.staticTexts["Route photo 3"].waitForExistence(timeout:5))
+    }
+
+    @MainActor func testFailedCommentKeepsTheDraft() {
+        continueAfterFailure=false
+        let app=launchSocialSample(["--test-comment-error"])
+        let open=app.buttons["Comments, 2"].firstMatch
+        XCTAssertTrue(open.waitForExistence(timeout:5));reveal(open,in:app);open.tap()
+        let field=app.textFields["commentField"].firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout:5));field.tap();field.typeText("Keep this draft")
+        app.buttons["postComment"].tap()
+        XCTAssertTrue(app.staticTexts["commentError"].waitForExistence(timeout:5))
+        XCTAssertEqual(field.value as? String,"Keep this draft")
+    }
+
+    @MainActor func testRequestsShowAcceptDeclineAndSentState() {
+        continueAfterFailure=false
+        let app=launchSocialSample()
+        app.buttons["Requests (2)"].tap()
+        XCTAssertTrue(app.staticTexts["Jordan Lee"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.buttons["Accept"].exists);XCTAssertTrue(app.buttons["Decline"].exists)
+        XCTAssertTrue(app.staticTexts["Priya Varma"].exists);XCTAssertTrue(app.staticTexts["Request sent"].exists)
+    }
 }

@@ -9,7 +9,60 @@ enum ProgressRange: String, CaseIterable, Identifiable {
 }
 
 struct ProgressViewScreen: View {
-    @Query(sort: \ClimbingSession.day, order: .reverse) private var sessions: [ClimbingSession]
+    @Query(sort: [SortDescriptor(\ClimbingSession.day, order: .reverse), SortDescriptor(\ClimbingSession.startedAt, order: .reverse)]) private var sessions: [ClimbingSession]
+    @State private var opened: ClimbingSession?
+    @State private var dayChoices: [ClimbingSession] = []
+    @State private var shownLogs = 30
+
+    var body: some View {
+        ScrollView {
+            // Paged instead of lazy: a LazyVStack left rows it built while scrolling out of the accessibility tree, so VoiceOver couldn't reach them.
+            VStack(alignment: .leading, spacing: 16) {
+                if sessions.isEmpty {
+                    EmptyState(title: "Progress takes practice", symbol: "chart.bar.xaxis", message: "Your sessions will show up here.")
+                } else {
+                    // Attempts only shade the visible year; streaks need just the days, so older sessions skip the costly count.
+                    let since = SessionDay.key(for: .now.addingTimeInterval(-380 * 86_400))
+                    Surface { ConsistencyCalendarView(calendar: ConsistencyCalendar(sessions: sessions.map { ($0.day, $0.day >= since ? $0.attemptCount : 0) }), openDay: open) }
+                    Text("Logs").font(.title3.bold()).id("progressLogs")
+                    ForEach(sessions.prefix(shownLogs)) { session in
+                        NavigationLink { log(session) } label: { Surface { SessionRow(session: session) } }.buttonStyle(.plain)
+                    }
+                    if sessions.count > shownLogs {
+                        Button("Show older sessions") { shownLogs += 30 }
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .accessibilityIdentifier("showOlderLogs")
+                    }
+                }
+            }.padding(20)
+        }
+        .background(ClimbTheme.background)
+        .navigationTitle("Progress")
+        .toolbar {
+            if !sessions.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) { NavigationLink { ProgressStatsView() } label: { Label("Stats", systemImage: "chart.line.uptrend.xyaxis") }.accessibleToolbarAction().accessibilityIdentifier("openStats") }
+            }
+        }
+        .navigationDestination(item: $opened) { log($0) }
+        .confirmationDialog("Which session?", isPresented: Binding(get: { !dayChoices.isEmpty }, set: { if !$0 { dayChoices = [] } }), titleVisibility: .visible) {
+            ForEach(dayChoices) { session in
+                Button("\(session.title) · \(session.startedAt.formatted(date: .omitted, time: .shortened))") { opened = session }
+            }
+        }
+    }
+
+    @ViewBuilder private func log(_ session: ClimbingSession) -> some View {
+        if session.isComplete { SessionLogView(session: session) } else { SessionDetailView(session: session) }
+    }
+
+    private func open(day: String) {
+        let matches = sessions.filter { $0.day == day }
+        if matches.count == 1 { opened = matches[0] } else { dayChoices = matches }
+    }
+}
+
+struct ProgressStatsView: View {
+    @Query(sort: [SortDescriptor(\ClimbingSession.day, order: .reverse), SortDescriptor(\ClimbingSession.startedAt, order: .reverse)]) private var sessions: [ClimbingSession]
     @State private var range = ProgressRange.month
     @State private var scale = GradeScale.vScale
 
@@ -26,96 +79,57 @@ struct ProgressViewScreen: View {
                   let start = Calendar.current.dateInterval(of: .weekOfYear, for: date)?.start else { return session.day }
             return SessionDay.key(for: start)
         }
-        return grouped.keys.sorted().map { WeekActivity(day: $0, sessions: grouped[$0]!.count, minutes: grouped[$0]!.compactMap(\.durationMinutes).reduce(0,+), durationCount: grouped[$0]!.filter { $0.durationMinutes != nil }.count) }
+        return grouped.keys.sorted().map { WeekActivity(day: $0, sessions: grouped[$0]!.count) }
     }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // The calendar always shows the past year, so it sits above the range picker it ignores.
-                if !sessions.isEmpty {
-                    // Attempts only shade the visible year; streaks need just the days, so older sessions skip the costly count.
-                    let since = SessionDay.key(for: .now.addingTimeInterval(-380 * 86_400))
-                    Surface { ConsistencyCalendarView(calendar: ConsistencyCalendar(sessions: sessions.map { ($0.day, $0.day >= since ? $0.attemptCount : 0) })) }
-                }
+            VStack(alignment: .leading, spacing: 16) {
                 Picker("Time range", selection: $range) { ForEach(ProgressRange.allCases) { Text($0.rawValue).tag($0) } }
                     .pickerStyle(.segmented)
-                ProgressHealthSection(sessionIDs: Set(filtered.map(\.id)))
                 if filtered.isEmpty {
-                    EmptyState(title: "Progress takes practice", symbol: "chart.bar.xaxis", message: "Your sessions and sends will show up here as you climb.")
+                    Text("No sessions in this range.").foregroundStyle(ClimbTheme.secondaryText)
                 } else {
-                    Text("Every attempt counts.").font(.title2.bold())
                     Surface {
-                        JournalMetrics(first: "\(filtered.count)", firstLabel: "sessions", second: statistics.knownAttempts.map(String.init) ?? "Unknown", secondLabel: "attempts", third: statistics.knownSends.map(String.init) ?? "Unknown", thirdLabel: "sends")
-                    }
-                    Surface {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Climbs completed").font(.headline)
-                            Text("\(statistics.distinctClimbsSent)")
-                                .font(.system(.largeTitle, design: .rounded, weight: .bold)).foregroundStyle(ClimbTheme.accent)
-                            Text("\(statistics.distinctClimbsSent) of \(statistics.distinctClimbsAttempted) identified climbs. Recalled sends cannot establish distinct climb identities.")
-                                .font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
+                        VStack(alignment: .leading, spacing: 16) {
+                            JournalMetrics(first: "\(filtered.count)", firstLabel: "sessions", second: statistics.knownAttempts.map(String.init) ?? "Unknown", secondLabel: "attempts", third: statistics.knownSends.map(String.init) ?? "Unknown", thirdLabel: "sends")
+                            JournalMetrics(first: "\(statistics.distinctClimbsSent)", firstLabel: "climbs sent", second: "\(statistics.confirmedFlashes)", secondLabel: "flashes", third: "\(statistics.recordedMinutes)", thirdLabel: "minutes")
                         }
                     }
                     Surface {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Completeness and time").font(.headline)
-                            Text("\(statistics.recalledSessions.counted("session")) \(statistics.recalledSessions == 1 ? "includes" : "include") recalled activity. Other values count recorded activity only; unlogged activity remains unknown.")
-                            Text("\(statistics.recordedMinutes.counted("recorded minute")) across \(statistics.durationCount.counted("session")) with known duration.")
-                            Text("Confirmed flashes: \(statistics.confirmedFlashes) / \(statistics.knownFlashDenominator) sent climbs with known history; \(statistics.unknownFlashCount) unknown.")
-                            Text("Flash classification uses the complete journal history even when this date filter covers fewer sessions.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-                        }.accessibilityElement(children: .combine)
-                    }
-                    Surface {
                         VStack(alignment: .leading, spacing: 16) {
-                            Text("Sessions per week").font(.headline).id("progressWeeklyActivity")
+                            Text("Sessions per week").font(.headline)
                             Chart(weeks) { week in
                                 BarMark(x: .value("Week", SessionDay.date(for: week.day) ?? .now, unit: .weekOfYear), y: .value("Sessions", week.sessions))
                                     .foregroundStyle(ClimbTheme.accent).cornerRadius(5)
-                            }.frame(height: 160)
+                            }.frame(height: 140)
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel("Weekly activity")
-                            .accessibilityValue("\(filtered.count.counted("session")) across \(weeks.count.counted("week")) with activity")
-                            ForEach(weeks) { week in Text("\(SessionDay.label(for: week.day)): \(week.sessions.counted("session"))").font(.caption) }
-                            if weeks.contains(where: { $0.durationCount > 0 }) {
-                                Text("Recorded duration per week").font(.headline)
-                                Chart(weeks.filter { $0.durationCount > 0 }) { week in
-                                    BarMark(x: .value("Week", SessionDay.date(for: week.day) ?? .now, unit: .weekOfYear), y: .value("Recorded minutes", week.minutes)).foregroundStyle(ClimbTheme.accent)
-                                }.frame(height: 160).accessibilityElement(children: .ignore).accessibilityLabel("Weekly recorded duration")
-                                .accessibilityValue(weeks.filter { $0.durationCount > 0 }.map { "\(SessionDay.label(for: $0.day)): \($0.minutes.counted("recorded minute")) in \($0.durationCount.counted("session"))" }.joined(separator: "; "))
-                                ForEach(weeks.filter { $0.durationCount > 0 }) { week in Text("\(SessionDay.label(for: week.day)): \(week.minutes.counted("recorded minute")) in \(week.durationCount.counted("session"))").font(.caption) }
-                            }
-                            Text("Weeks begin on your calendar’s first weekday.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
+                            .accessibilityValue(weeks.map { "\(SessionDay.label(for: $0.day)): \($0.sessions.counted("session"))" }.joined(separator: "; "))
                         }
                     }
                     Surface {
-                        VStack(alignment: .leading, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 12) {
                             Picker("Grade scale", selection: $scale) { ForEach(GradeScale.allCases) { Text($0.rawValue).tag($0) } }
                                 .pickerStyle(.menu)
                             let distribution = statistics.distributions(in: scale)
-                            if distribution.isEmpty { Text("No individual attempts in this grading system yet. Recalled totals do not establish grade-level evidence.").foregroundStyle(ClimbTheme.secondaryText) }
+                            if distribution.isEmpty { Text("No attempts in this scale.").foregroundStyle(ClimbTheme.secondaryText) }
                             ForEach(distribution) { item in
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text(item.label).font(.headline)
-                                    Text("\(item.attempts.counted("recorded attempt")) · \(item.sends.counted("send"))").font(.subheadline)
-                                }.accessibilityElement(children: .combine)
+                                LabeledContent(item.label, value: "\(item.attempts.counted("attempt")) · \(item.sends.counted("send"))")
                             }
-                            Text("Gym scales stay separate. Custom labels are shown in your gym’s saved order when available, and never converted into V grades.")
-                                .font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                         }
                     }
                 }
             }.padding(20)
         }
         .background(ClimbTheme.background)
-        .navigationTitle("Progress")
+        .navigationTitle("Stats")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
 private struct WeekActivity: Identifiable {
     let day: String
     let sessions: Int
-    let minutes: Int
-    let durationCount: Int
     var id: String { day }
 }

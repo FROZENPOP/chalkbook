@@ -30,7 +30,7 @@ final class GymAddressTests: XCTestCase {
             let gym = ClimbingSchemaV4.SavedGym(id:id,name:"Saved before search",scale:.custom,customScaleName:"Colors",customGrades:["Blue"],isDefault:true)
             old.mainContext.insert(gym);try old.mainContext.save()
         }
-        let schema = Schema(versionedSchema:ClimbingSchemaV6.self)
+        let schema = Schema(versionedSchema:ClimbingSchemaV7.self)
         let migrated = try ModelContainer(for:schema,migrationPlan:ClimbingMigrationPlan.self,configurations:[ModelConfiguration(schema:schema,url:url,cloudKitDatabase:.none)])
         let gym = try XCTUnwrap(migrated.mainContext.fetch(FetchDescriptor<SavedGym>()).first)
         XCTAssertEqual(gym.id,id);XCTAssertEqual(gym.address,"");XCTAssertEqual(gym.customGrades,["Blue"]);XCTAssertTrue(gym.isDefault)

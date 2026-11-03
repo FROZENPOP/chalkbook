@@ -107,6 +107,38 @@ final class ClimbingStoreTests: XCTestCase {
         XCTAssertNotEqual(store.start(date: .now, location: "", notes: "")?.id, session.id)
     }
 
+    func testPausedTimeIsLeftOutOfDurationAndSurvivesBackup() throws {
+        let store = try makeStore()
+        let session = try XCTUnwrap(store.start(date: .now, location: "", notes: ""))
+        session.startedAt = .now.addingTimeInterval(-3600)
+        store.pause(session)
+        XCTAssertTrue(session.isPaused)
+        session.pausedAt = .now.addingTimeInterval(-600)
+        store.resume(session)
+        XCTAssertFalse(session.isPaused)
+        XCTAssertEqual(session.pausedSeconds, 600, accuracy: 5)
+        XCTAssertEqual(session.stopwatchStart.timeIntervalSince(session.startedAt), session.pausedSeconds)
+        // Finishing while paused also leaves out the open pause.
+        store.pause(session)
+        session.pausedAt = .now.addingTimeInterval(-600)
+        store.finish(session)
+        XCTAssertFalse(session.isPaused)
+        XCTAssertEqual(session.durationMinutes, 40)
+        let seconds = session.pausedSeconds
+        let backup = try ClimbingBackup.decode(ClimbingBackup(sessions: [session], defaultScale: .vScale, climbs: []).encoded())
+        XCTAssertTrue(store.restore(backup), store.errorMessage ?? "")
+        XCTAssertEqual(try store.context.fetch(FetchDescriptor<ClimbingSession>()).first?.pausedSeconds, seconds)
+    }
+
+    func testFinishRecordsDurationEvenIfPreviouslyMarkedUnknown() throws {
+        let store = try makeStore()
+        let session = try XCTUnwrap(store.start(date: .now, location: "", notes: ""))
+        session.durationKnown = false
+        session.startedAt = .now.addingTimeInterval(-3600)
+        store.finish(session)
+        XCTAssertEqual(session.durationMinutes, 60)
+    }
+
     func testDeletingSessionPreservesIndependentClimbAndDeletesAttempts() throws {
         let store = try makeStore()
         let session = try XCTUnwrap(store.start(date: .now, location: "", notes: ""))
@@ -187,7 +219,7 @@ final class ClimbingStoreTests: XCTestCase {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let schema = Schema(versionedSchema: ClimbingSchemaV6.self)
+        let schema = Schema(versionedSchema: ClimbingSchemaV7.self)
         let config = ModelConfiguration(schema: schema, url: directory.appending(path: "test.store"), cloudKitDatabase: .none)
         let first = try ModelContainer(for: schema, migrationPlan: ClimbingMigrationPlan.self, configurations: [config])
         let store = ClimbingStore(context: first.mainContext)

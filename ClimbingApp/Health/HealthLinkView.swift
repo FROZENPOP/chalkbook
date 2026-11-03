@@ -19,14 +19,10 @@ struct HealthLinkView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    Text("Choose an existing workout explicitly. Linking never creates a session, changes your attempts, or sums overlapping workouts.")
-                    Text("Health measurements stay outside journal backups. No workout writing or export is performed.").font(.caption)
-                }
                 if let link {
                     Section(header: Text("Linked workout").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         if let linkedWorkout { workoutRow(linkedWorkout) }
-                        else { Text("Unavailable or no accessible data found. Your manual journal is intact. Refresh or unlink to try again.") }
+                        else { Text("Workout not available.") }
                         Text("Source: \(link.sourceName)").font(.caption)
                         Button("Unlink", role: .destructive) { if store.save({ store.context.delete(link) }) { linkedWorkout = nil } }
                     }
@@ -36,16 +32,16 @@ struct HealthLinkView: View {
                 } else {
                     Button("Refresh nearby workouts") { Task { await load(request: true) } }.disabled(loading || !reader.available)
                 }
-                if loading { SwiftUI.ProgressView("Looking for accessible climbing workouts…") }
+                if loading { SwiftUI.ProgressView("Looking for workouts…") }
                 if let message { Text(message).foregroundStyle(ClimbTheme.secondaryText) }
-                if loaded && candidates.isEmpty { Text("No accessible data found. Data may arrive later from a watch or another app; refresh again after it syncs. Read access decisions are private to Apple Health.") }
-                Section(header: Text("Nearby climbing workouts — choose one").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
+                if loaded && candidates.isEmpty { Text("No workouts found.") }
+                Section(header: Text("Nearby workouts").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     ForEach(candidates) { workout in
                         Button { selected = workout } label: {
                             VStack(alignment: .leading, spacing: 8) {
                                 workoutRow(workout)
                                 Text("Overlap with session: \(Int(HealthLinkRules.overlap(workout,start:session.startedAt,end:session.endedAt ?? .now)/60)) minutes").font(.caption)
-                                if HealthLinkRules.hasSimilarCandidate(workout,among:candidates) { Label("Similar or overlapping workout found. Review the source before selecting.", systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(ClimbTheme.accent) }
+                                if HealthLinkRules.hasSimilarCandidate(workout,among:candidates) { Label("Similar workout found.", systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(ClimbTheme.accent) }
                                 if links.contains(where: { $0.workoutID == workout.id && $0.sessionID != session.id }) { Text("Already linked to another session").font(.caption) }
                             }
                         }.disabled(!HealthLinkRules.canLink(workoutID:workout.id,to:session.id,existing:links.map { ($0.sessionID,$0.workoutID) }))
@@ -77,7 +73,7 @@ struct HealthLinkView: View {
             if request { try await reader.requestReadAccess() }
             candidates = HealthLinkRules.deduplicated(try await reader.nearby(start:session.startedAt,end:session.endedAt ?? .now))
             if let link { linkedWorkout = try await reader.workout(id:link.workoutID) }
-        } catch { candidates = []; linkedWorkout = nil; message = "Couldn’t refresh accessible Health data. Retry when the device is unlocked and data has synced." }
+        } catch { candidates = []; linkedWorkout = nil; message = "Couldn’t read Apple Health." }
     }
     private func attach(_ workout: HealthWorkout) {
         guard HealthLinkRules.canLink(workoutID:workout.id,to:session.id,existing:links.map { ($0.sessionID,$0.workoutID) }) else { return }

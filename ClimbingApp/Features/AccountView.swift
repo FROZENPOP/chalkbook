@@ -32,10 +32,10 @@ struct AccountSection: View {
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("You’re using Sendr as a guest").font(.headline)
-                    Text("Sign in with Apple or Google to join Friends and share the sessions you choose. Your guest log stays on this iPhone.")
+                    Text("Sign in to join Friends.")
                         .font(.subheadline).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true)
                     Button(action: openPortal) {
-                        Label("Sign in or create an account", systemImage: "person.crop.circle").frame(maxWidth: .infinity, minHeight: 44)
+                        Text("Sign in or create an account").frame(maxWidth: .infinity, minHeight: 44)
                     }.buttonStyle(.borderedProminent).accessibilityIdentifier("openLogin")
                 }.padding(.vertical, 4)
             }
@@ -59,7 +59,7 @@ struct LoginPortalView: View {
                         VStack(spacing: 16) {
                             AscentIcon(size: 96)
                             Text(onFinish == nil ? "Your climbing,\nyour account." : "Welcome to\nSendr.").font(.system(.largeTitle, design: .rounded, weight: .bold))
-                            Text("Sign in with your existing Apple or Google account to connect with friends. No new password to remember.").foregroundStyle(ClimbTheme.secondaryText)
+                            Text("Sign in to connect with friends.").foregroundStyle(ClimbTheme.secondaryText)
                         }
                         .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
@@ -117,7 +117,7 @@ struct LoginPortalView: View {
                             Text(message).font(.subheadline).foregroundStyle(ClimbTheme.error).fixedSize(horizontal: false, vertical: true)
                             Button("Dismiss message") { auth.errorMessage = nil }
                         }
-                        Text("Your log and route media stay on this iPhone. Sign-in doesn’t turn on cloud sync. Your guest log remains separate; use backup and restore to move it into your account.")
+                        Text("Your log stays on this iPhone.")
                             .font(.footnote).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true)
                     }
                     .multilineTextAlignment(.center)

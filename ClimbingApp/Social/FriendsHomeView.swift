@@ -31,12 +31,11 @@ struct FriendsView: View {
                     RemovalStatusView(outbox: social.removals) { await social.retryRemovals(auth, force: true) }
                 }
                 if social.configuration == nil && !auditConnected {
-                    EmptyState(title: "Friends is coming next", symbol: "person.2", message: "Supabase setup is pending. Your journal stays private and works offline.")
+                    EmptyState(title: "Friends is coming next", symbol: "person.2", message: "Your journal still works offline.")
                 } else if auth.account == nil && !auditConnected {
                     Surface {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Climbing is better together.").font(.title2.bold())
-                            Text("Connect with your people and share the sessions you choose.").foregroundStyle(ClimbTheme.secondaryText)
                             Button("Sign in to find friends") { login = true }.buttonStyle(.borderedProminent).frame(minHeight: 44)
                         }
                     }
@@ -45,7 +44,7 @@ struct FriendsView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             Image(systemName: "person.2.fill").font(.largeTitle).foregroundStyle(ClimbTheme.accent)
                             Text("Find your climbing people.").font(.title2.bold())
-                            Text("Choose a username so friends can find you. You decide which sessions to share.").foregroundStyle(ClimbTheme.secondaryText)
+                            Text("Choose a username so friends can find you.").foregroundStyle(ClimbTheme.secondaryText)
                             Button("Set up Friends") { profile = true }.buttonStyle(.borderedProminent).disabled(social.userID == nil || social.busy)
                             if !social.busy { Button("Connect / Retry") { Task { await social.refresh(auth) } } }
                         }
@@ -126,18 +125,21 @@ struct FriendsView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack(spacing: 12) {
                             SocialAvatar(id:entry.owner_id,name:person(entry.owner_id)?.display_name ?? "Climber")
-                            Text(person(entry.owner_id)?.display_name ?? "Climber").font(.headline)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(person(entry.owner_id)?.display_name ?? "Climber").font(.headline)
+                                Text(SessionDay.label(for: entry.session_day)).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
+                            }
                             Spacer()
                             Image(systemName: entry.visibility == .public ? "globe" : "person.2").foregroundStyle(ClimbTheme.secondaryText).accessibilityLabel(entry.visibility.title)
                         }
-                        SharedSessionPreview(entry: entry)
+                        SharedSessionPreview(entry: entry, showsDate: false)
                         SessionReactionBar(entry:entry)
                     }
                 }
             }
         case .friends:
             if friends.isEmpty {
-                FriendsEmptyCard(symbol: "person.2", title: "Your next climbing buddy is out there.", message: "Search their username and send a request. Once they accept, you’re friends.") {
+                FriendsEmptyCard(symbol: "person.2", title: "Your next climbing buddy is out there.", message: "Search their username and send a request.") {
                     Button("Find friends") { finding = true }.buttonStyle(.borderedProminent)
                 }
             }
@@ -151,15 +153,18 @@ struct FriendsView: View {
             }
         case .requests:
             if requests.isEmpty {
-                FriendsEmptyCard(symbol: "tray", title: "All caught up.", message: "Incoming and sent friend requests will show up here.") { EmptyView() }
+                FriendsEmptyCard(symbol: "tray", title: "All caught up.", message: "Requests show up here.") { EmptyView() }
             }
-            ForEach(requests) { link in if let id = social.userID { FriendPersonRow(person: person(link.other(than: id)), personID: link.other(than: id)) } }
+            VStack(spacing: 24) {
+                ForEach(requests) { link in if let id = social.userID { FriendPersonRow(person: person(link.other(than: id)), personID: link.other(than: id)) } }
+            }
         }
     }
 
     private func person(_ id: UUID) -> SocialProfile? { social.people.first { $0.id == id } }
     private func refresh() async {
         #if DEBUG
+        if SocialAuditSample.enabled { social.loadAuditSample(); await social.feed.refresh(SocialAuditSampleFeed()); return }
         if auditConnected { await social.feed.refresh(AccessibilityAuditEmptyFeed()); return }
         #endif
         guard social.configuration != nil, auth.account != nil else { social.suggestions.reset(); return }
@@ -177,7 +182,7 @@ struct FriendInitials: View {
     var body: some View {
         Text(initials.isEmpty ? "?" : initials).font(.system(.headline, design: .rounded, weight: .bold))
             .foregroundStyle(ClimbTheme.accent).frame(width: size, height: size)
-            .background(ClimbTheme.accent.opacity(0.1), in: Circle()).accessibilityHidden(true)
+            .background(ClimbTheme.accent.opacity(0.1), in: Circle())
     }
 }
 

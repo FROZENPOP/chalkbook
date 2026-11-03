@@ -49,7 +49,6 @@ struct AddFriendsView: View {
                                 Spacer()
                 NavigationLink { FriendInviteView(profile:me) } label: { Image(systemName:"qrcode").frame(width:44,height:44) }.accessibilityLabel("Your friend QR code and invite link")
                             }
-                            Text("Share your username with a climbing buddy.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                         }
                     }
                 }
@@ -122,7 +121,7 @@ struct FriendPersonRow: View {
                             NavigationLink("View progress") { FriendProgressView(climberID: personID, name: person?.display_name ?? "Climber") }.buttonStyle(.bordered).frame(minHeight: 44)
                         } else if link.recipient == social.userID {
                             Button("Accept") { act("accept") }.buttonStyle(.borderedProminent).frame(minHeight: 44)
-                            Button("Decline") { act("decline") }.buttonStyle(.bordered).frame(minHeight: 44)
+                            Button("Decline") { act("decline") }.buttonStyle(.bordered).tint(.primary).frame(minHeight: 44)
                         } else {
                             Label("Request sent", systemImage: "clock").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText)
                         }

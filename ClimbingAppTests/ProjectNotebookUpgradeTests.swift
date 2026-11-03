@@ -42,12 +42,29 @@ import SwiftData
             climb.media=[ClimbingSchemaV5.RouteMedia(kind:.photo,filename:"kept.png",contentType:"public.png",data:Data([1,2,3]))]
             container.mainContext.insert(climb);try container.mainContext.save()
         }
-        let schema=Schema(versionedSchema:ClimbingSchemaV6.self)
+        let schema=Schema(versionedSchema:ClimbingSchemaV7.self)
         let container=try ModelContainer(for:schema,migrationPlan:ClimbingMigrationPlan.self,configurations:[ModelConfiguration(schema:schema,url:url,cloudKitDatabase:.none)])
         let climb=try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<ClimbEntry>()).first)
         XCTAssertEqual(climb.id,id);XCTAssertEqual(climb.notebook.first?.text,"Saved next move")
         XCTAssertNil(climb.pinnedNoteID);XCTAssertEqual(climb.media.first?.annotationJSON,"")
         XCTAssertEqual(climb.media.first?.data,Data([1,2,3]))
+    }
+
+    func testV6DiskMigrationKeepsSessionsWithNoPausedTime() throws {
+        let root=FileManager.default.temporaryDirectory.appending(path:UUID().uuidString)
+        try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:root) }
+        let url=root.appending(path:"journal.store"),id=UUID()
+        try autoreleasepool {
+            let schema=Schema(versionedSchema:ClimbingSchemaV6.self)
+            let container=try ModelContainer(for:schema,configurations:[ModelConfiguration(schema:schema,url:url,cloudKitDatabase:.none)])
+            container.mainContext.insert(ClimbingSchemaV6.ClimbingSession(id:id,location:"Kept gym"));try container.mainContext.save()
+        }
+        let schema=Schema(versionedSchema:ClimbingSchemaV7.self)
+        let container=try ModelContainer(for:schema,migrationPlan:ClimbingMigrationPlan.self,configurations:[ModelConfiguration(schema:schema,url:url,cloudKitDatabase:.none)])
+        let session=try XCTUnwrap(container.mainContext.fetch(FetchDescriptor<ClimbingSession>()).first)
+        XCTAssertEqual(session.id,id);XCTAssertEqual(session.location,"Kept gym")
+        XCTAssertNil(session.pausedAt);XCTAssertEqual(session.pausedSeconds,0)
     }
 
     func testPinAndMarkupSurviveBackupRestoreWithoutChangingOriginalPhoto() throws {

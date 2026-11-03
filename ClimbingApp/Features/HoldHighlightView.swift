@@ -67,12 +67,10 @@ struct HoldHighlightView: View {
                         .accessibilityIdentifier("highlightTolerance")
                         .disabled(selection == nil)
                         .onChange(of: tolerance) { _, value in selection?.tolerance = value }
-                    Text("\(Int(tolerance * 100))% · Include fewer or more shades.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
+                    Text("\(Int(tolerance * 100))%").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                     Button("Reset to original", systemImage: "arrow.counterclockwise") {
                         selection = nil; includeMore = false; showOriginal = false
                     }.frame(minHeight: 44).disabled(selection == nil).accessibilityIdentifier("resetHoldHighlight")
-                    Text("For a cleaner match, tap colored material away from chalk or glare.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-                    Text("The original photo and private markup are preserved. Done saves this view; Cancel keeps your previous settings.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                 }.padding(20)
             }
             .background(ClimbTheme.background)

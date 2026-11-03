@@ -6,22 +6,6 @@ struct HealthHeartRateSample: Identifiable, Equatable {
     let beatsPerMinute: Double
 }
 
-struct HealthQuantityReading: Equatable {
-    let value: Double
-    let date: Date
-    let source: String
-}
-
-struct HealthRecoveryContext: Equatable {
-    var restingHeartRate: HealthQuantityReading?
-    var hrvMilliseconds: HealthQuantityReading?
-    var hasData: Bool { restingHeartRate != nil || hrvMilliseconds != nil }
-    var sanitized: Self {
-        Self(restingHeartRate: restingHeartRate.flatMap { HealthInsights.heartRate($0.value) == nil ? nil : $0 },
-             hrvMilliseconds: hrvMilliseconds.flatMap { HealthInsights.nonnegative($0.value).map { $0 > 0 } == true ? $0 : nil })
-    }
-}
-
 /// Request status describes whether a permission sheet is needed, never whether read access was granted.
 enum HealthReadAccessState: Equatable { case unavailable, needsRequest, requested }
 
@@ -65,33 +49,18 @@ struct HealthSessionInsight: Identifiable {
     var calories: Double? { HealthInsights.nonnegative(workout.energyKilocalories) }
     var averageHeartRate: Double? { HealthInsights.heartRate(workout.meanHeartRate) ?? HealthInsights.mean(samples.map(\.beatsPerMinute)) }
     var maximumHeartRate: Double? { HealthInsights.heartRate(workout.maximumHeartRate) ?? samples.map(\.beatsPerMinute).max() }
-    var maximumFromSamples: Bool { HealthInsights.heartRate(workout.maximumHeartRate) == nil && !samples.isEmpty }
-    var averageFromSamples: Bool { HealthInsights.heartRate(workout.meanHeartRate) == nil && !samples.isEmpty }
     var effort: Double? { HealthInsights.effort(duration: workout.duration, averageHeartRate: averageHeartRate, activeCalories: calories) }
-    var inputs: String {
-        var labels = ["duration"]
-        if averageHeartRate != nil { labels.append("average heart rate") }
-        if calories != nil { labels.append("active energy") }
-        return labels.joined(separator: " + ")
+    var durationMinutes: Double? { HealthInsights.nonnegative(workout.duration / 60) }
+    /// Mean of a metric across other workouts in the 30 days before this one; nil when none has it.
+    func thirtyDayAverage(of metric: KeyPath<Self, Double?>, among others: [Self]) -> Double? {
+        let since = workout.start.addingTimeInterval(-30 * 86_400)
+        return HealthInsights.mean(others.filter { $0.id != id && $0.workout.start >= since && $0.workout.start < workout.start }.compactMap { $0[keyPath: metric] })
     }
-}
-
-struct HealthInsightWeek: Identifiable {
-    let start: Date
-    let sessions: [HealthSessionInsight]
-    var id: Date { start }
-    var calorieCount: Int { sessions.compactMap(\.calories).count }
-    var effortCount: Int { sessions.compactMap(\.effort).count }
-    var heartRateCount: Int { sessions.compactMap(\.averageHeartRate).count }
-    var calories: Double? {
-        let values = sessions.compactMap(\.calories)
-        guard !values.isEmpty else { return nil }
-        let sum = values.reduce(0,+); return sum.isFinite ? sum : nil
-    }
-    var effort: Double? { HealthInsights.mean(sessions.compactMap(\.effort)) }
-    var heartRate: Double? { HealthInsights.mean(sessions.compactMap(\.averageHeartRate)) }
-    static func grouped(_ sessions: [HealthSessionInsight], calendar: Calendar = .current) -> [Self] {
-        let groups = Dictionary(grouping: sessions) { calendar.dateInterval(of: .weekOfYear, for: $0.workout.start)?.start ?? $0.workout.start }
-        return groups.map { Self(start: $0.key, sessions: $0.value) }.sorted { $0.start < $1.start }
+    /// Runs of samples with no gap over 10 minutes, so the chart never draws across missing data.
+    var heartRateSegments: [[HealthHeartRateSample]] {
+        samples.reduce(into: []) { segments, sample in
+            if let last = segments.last?.last, sample.date.timeIntervalSince(last.date) <= 600 { segments[segments.count - 1].append(sample) }
+            else { segments.append([sample]) }
+        }
     }
 }

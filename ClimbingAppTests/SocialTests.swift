@@ -46,4 +46,13 @@ import XCTest
         XCTAssertFalse(success)
         XCTAssertEqual(store.errorMessage, SocialError.invalidProfile.localizedDescription)
     }
+
+    func testCommentDecodesServerRowWithAndWithoutAuthor() throws {
+        let row=#"{"id":"00000000-0000-0000-0000-000000000001","entry_id":"00000000-0000-0000-0000-000000000002","user_id":"00000000-0000-0000-0000-000000000003","body":"Nice send","created_at":"2026-11-02T04:12:33+00:00""#
+        let saved=try SessionComment.decoder.decode(SessionComment.self,from:Data((row+"}").utf8))
+        XCTAssertEqual(saved.body,"Nice send");XCTAssertNil(saved.author)
+        XCTAssertEqual(saved.created_at,Date(timeIntervalSince1970:1_793_592_753))
+        let listed=try SessionComment.decoder.decode(SessionComment.self,from:Data((row+#","author":{"id":"00000000-0000-0000-0000-000000000003","username":"alex","display_name":"Alex","is_private":true}}"#).utf8))
+        XCTAssertEqual(listed.author?.display_name,"Alex")
+    }
 }

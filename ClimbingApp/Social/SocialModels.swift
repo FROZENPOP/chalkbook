@@ -42,6 +42,16 @@ struct ReactionSummary: Decodable {
     var mine: Bool
 }
 
+struct SessionComment: Decodable, Identifiable, Equatable {
+    let id: UUID
+    let entry_id: UUID
+    let user_id: UUID
+    let body: String
+    let created_at: Date
+    var author: SocialProfile?
+    static var decoder: JSONDecoder { let decoder=JSONDecoder();decoder.dateDecodingStrategy = .iso8601;return decoder }
+}
+
 struct Friendship: Codable, Identifiable {
     let requester: UUID
     let recipient: UUID

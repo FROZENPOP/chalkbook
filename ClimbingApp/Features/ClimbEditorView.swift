@@ -17,7 +17,7 @@ struct ClimbEditorView: View {
     var session: ClimbingSession? = nil
     var climb: ClimbEntry?
     var initialProject = false
-    @State private var gradeKind = GradeKind.unknown
+    @State private var gradeKind = GradeKind.exact
     @State private var gradeUpper = "V1"
     @State private var isProject = false
     @State private var confirmHistory = false
@@ -78,7 +78,7 @@ struct ClimbEditorView: View {
                 Section {
                     RouteMediaEditor(attachments: $attachments, isLoading: $mediaLoading)
                 } header: { Text("Route photos & videos (optional)").font(.subheadline).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true) } footer: {
-                    Text("Add up to 3 photos or short clips, 25 MB each. Media is saved with this climb on your iPhone.").font(.caption).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true)
+                    Text("Up to 3 photos or clips, 25 MB each.").font(.caption).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true)
                 }
                 Section {
                     Picker("Before the first journal attempt", selection: $prior) {
@@ -86,9 +86,8 @@ struct ClimbEditorView: View {
                     }
                     if climb?.historyIncomplete == true {
                         Toggle("I reviewed the missing history; this journal is complete", isOn: $confirmHistory)
-                        Text("Removed records leave history unknown until you explicitly confirm completeness.").font(.caption)
                     }
-                } footer: { Text("A first-try send counts as a flash only if you’ve never tried this climb before.").font(.caption).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true) }
+                }
                 Section {
                     DisclosureGroup("Style (optional)") {
                     ForEach(ClimbStyle.allCases) { style in
@@ -104,11 +103,10 @@ struct ClimbEditorView: View {
                 if let climb, !climb.attempts.isEmpty {
                     Section {
                         Toggle("Correct difficulty on existing attempts too", isOn: $correctPastGrades)
-                        Text("Leave off to retain the difficulty recorded at the time. Turning this on explicitly corrects all this climb’s saved attempt descriptors.").font(.caption)
                     }
                 }
                 if climb != nil {
-                    Section { Button("Delete climb", role: .destructive) { confirmDelete = true } }
+                    Section { Button("Delete climb", role: .destructive) { confirmDelete = true }.foregroundStyle(ClimbTheme.error) }
                 }
             }
             .id(textSize)
@@ -157,7 +155,7 @@ struct ClimbEditorView: View {
                     if let climb, store.delete(climb) { dismiss() }
                 }
             } message: {
-                Text("This removes \((climb?.attempts.count ?? 0).counted("attempt")) and \((climb?.media.count ?? 0).counted("attachment")) across every session, plus its notebook. Original Photos and Files items stay intact.")
+                Text("This removes \((climb?.attempts.count ?? 0).counted("attempt")) and \((climb?.media.count ?? 0).counted("attachment")) across every session, plus its notebook.")
             }
         }
         .safeAreaInset(edge: .top) { SaveErrorBanner() }

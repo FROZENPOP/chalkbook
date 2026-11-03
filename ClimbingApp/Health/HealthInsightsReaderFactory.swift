@@ -21,7 +21,7 @@ import Foundation
     let empty: Bool
     init(populated: Bool, empty: Bool = false) { self.populated = populated; self.empty = empty }
     func requestReadAccess() async throws {}
-    func readAccessState(includeRecovery: Bool) async throws -> HealthReadAccessState { populated ? .requested : .unavailable }
+    func readAccessState() async throws -> HealthReadAccessState { populated ? .requested : .unavailable }
     func nearby(start: Date, end: Date) async throws -> [HealthWorkout] { [] }
     func workout(id: UUID) async throws -> HealthWorkout? {
         guard populated, !empty, id == Self.workoutID else { return nil }
@@ -31,10 +31,6 @@ import Foundation
     func heartRates(workoutID: UUID) async throws -> [HealthHeartRateSample] {
         let start = Date.now.addingTimeInterval(-7200)
         return (0..<8).map { HealthHeartRateSample(id: UUID(), date: start.addingTimeInterval(Double($0) * 400 + 10), beatsPerMinute: Double(110 + $0 * 8)) }
-    }
-    func recoveryContext() async throws -> HealthRecoveryContext {
-        if empty { return .init() }
-        return .init(restingHeartRate: .init(value: 58, date: .now, source: "UI test watch"), hrvMilliseconds: .init(value: 54, date: .now, source: "UI test watch"))
     }
 }
 #endif

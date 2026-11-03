@@ -32,16 +32,16 @@ import XCTest
         return entry
     }
     func testQueryUsesDateAndUUIDCursorBoundedLimitAndNoOffset() throws {
-        let first=try XCTUnwrap(URLComponents(string:FriendsFeedCursor.path(viewer:owner,after:nil)))
+        let first=try XCTUnwrap(URLComponents(string:FriendsFeedCursor.path(after:nil)))
         let values=Dictionary(first.queryItems!.map { ($0.name,$0.value!) },uniquingKeysWith:{ _,new in new })
         XCTAssertEqual(first.path,"/rest/v1/shared_sessions");XCTAssertEqual(values["order"],"session_day.desc,id.desc")
-        XCTAssertEqual(values["limit"],"20");XCTAssertEqual(values["owner_id"],"neq.\(owner.uuidString)")
+        XCTAssertEqual(values["limit"],"20");XCTAssertEqual(values["visibility"],"neq.private");XCTAssertNil(values["owner_id"])
         XCTAssertNil(values["or"]);XCTAssertNil(values["offset"])
         let cursor=FriendsFeedCursor(day:"2026-10-30",id:row(10).id)
-        let next=try XCTUnwrap(URLComponents(string:FriendsFeedCursor.path(viewer:owner,after:cursor,limit:999)))
+        let next=try XCTUnwrap(URLComponents(string:FriendsFeedCursor.path(after:cursor,limit:999)))
         XCTAssertEqual(next.queryItems?.first { $0.name == "or" }?.value,"(session_day.lt.2026-10-30,and(session_day.eq.2026-10-30,id.lt.\(row(10).id.uuidString)))")
         XCTAssertEqual(next.queryItems?.first { $0.name == "limit" }?.value,"20")
-        XCTAssertThrowsError(try FriendsFeedCursor.path(viewer:owner,after:.init(day:"2026-10-30),id.gt.0",id:owner)))
+        XCTAssertThrowsError(try FriendsFeedCursor.path(after:.init(day:"2026-10-30),id.gt.0",id:owner)))
     }
     func testFirstAndNextPageUseRawLastCursorAndMergeReferencedProfiles() async {
         let reader=FeedTestReader();reader.rows=(1...40).map { row($0) }

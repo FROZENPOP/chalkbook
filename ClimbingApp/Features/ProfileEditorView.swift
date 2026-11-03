@@ -47,20 +47,17 @@ struct ProfileEditorView: View {
                     }
                     if importing { SwiftUI.ProgressView("Preparing your photo…") }
                     if let importError { Text(importError).font(.subheadline).foregroundStyle(ClimbTheme.error) }
-                } footer: { Text("A photo is optional. You can change or remove it later.").font(.caption).foregroundStyle(ClimbTheme.secondaryText).fixedSize(horizontal: false, vertical: true) }
+                }
                 Section(header: Text("About you").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     TextField("Display name", text: $name).textContentType(.name).textInputAutocapitalization(.words).accessibilityIdentifier("profileName")
                     TextField("A little about your climbing (optional)", text: $bio, axis: .vertical).lineLimit(3...6).accessibilityIdentifier("profileBio")
-                    Text("Display name: 1–60 characters. Bio: up to 500 characters.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                 }
                 if let account = auth.account {
                     Section(header: Text("Sign-in account").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         LabeledContent("Provider", value: account.provider == .google ? "Google" : "Apple")
                         if let email = account.email { LabeledContent("Email", value: email) }
-                        Text("To change your sign-in email, update it with your sign-in provider. Editing your display name here does not change that account.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                     }
                 }
-                Section { Text("Your profile is saved on this iPhone. It stays private and does not turn on sharing or cloud sync.").font(.footnote).foregroundStyle(ClimbTheme.secondaryText) }
                 if let message = profiles.errorMessage {
                     Section(header: Text("Couldn’t save profile").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         Text(message).foregroundStyle(ClimbTheme.error)

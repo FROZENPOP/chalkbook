@@ -36,86 +36,92 @@ final class HealthInsightsMathTests: XCTestCase {
         let insight = HealthSessionInsight(workout:workout,samples:samples)
         XCTAssertEqual(insight.samples.count,2)
         XCTAssertEqual(insight.averageHeartRate,140);XCTAssertEqual(insight.maximumHeartRate,160)
-        XCTAssertTrue(insight.averageFromSamples);XCTAssertTrue(insight.maximumFromSamples);XCTAssertNil(insight.calories)
+        XCTAssertNil(insight.calories)
     }
-    func testWeeklyAggregationKeepsMissingDataAndCoverageHonest() {
-        var calendar = Calendar(identifier:.gregorian);calendar.timeZone=TimeZone(secondsFromGMT:0)!
-        let start = Date(timeIntervalSince1970: 1700000000)
-        func insight(_ calories:Double?, _ heart:Double?) -> HealthSessionInsight {
-            .init(workout:.init(id:UUID(),start:start,end:start.addingTimeInterval(3600),duration:3600,sourceName:"Test",sourceBundle:"test",energyKilocalories:calories,meanHeartRate:heart),samples:[])
-        }
-        let weeks = HealthInsightWeek.grouped([insight(nil,nil),insight(200,120),insight(300,160)],calendar:calendar)
-        XCTAssertEqual(weeks.count,1);XCTAssertEqual(weeks[0].sessions.count,3)
-        XCTAssertEqual(weeks[0].calories,500);XCTAssertEqual(weeks[0].calorieCount,2)
-        XCTAssertEqual(weeks[0].heartRate,140);XCTAssertEqual(weeks[0].heartRateCount,2)
-        XCTAssertNil(HealthInsightWeek.grouped([insight(nil,nil)],calendar:calendar).first?.effort)
-        XCTAssertNil(HealthInsightWeek.grouped([insight(nil,nil)],calendar:calendar).first?.calories)
-        XCTAssertTrue(HealthInsightWeek.grouped([]).isEmpty)
+    private func insight(daysAgo: Double, calories: Double? = nil, heart: Double? = nil, from now: Date) -> HealthSessionInsight {
+        let start = now.addingTimeInterval(-daysAgo * 86_400)
+        return .init(workout: .init(id: UUID(), start: start, end: start.addingTimeInterval(3600), duration: 3600, sourceName: "Test", sourceBundle: "test", energyKilocalories: calories, meanHeartRate: heart), samples: [])
     }
-    func testRecoveryContextRejectsInvalidReadingsAndNeverCreatesAScore() {
-        let invalid = HealthRecoveryContext(restingHeartRate:.init(value:0,date:.now,source:"Test"),hrvMilliseconds:.init(value:.nan,date:.now,source:"Test"))
-        XCTAssertFalse(invalid.sanitized.hasData)
-        let partial = HealthRecoveryContext(restingHeartRate:nil,hrvMilliseconds:.init(value:42,date:.now,source:"Test"))
-        XCTAssertTrue(partial.sanitized.hasData);XCTAssertNil(partial.sanitized.restingHeartRate)
+    func testThirtyDayAverageUsesOnlyEarlierWorkoutsInTheWindowAndSkipsMissingValues() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let current = insight(daysAgo: 0, calories: 500, from: now)
+        let others = [insight(daysAgo: 10, calories: 200, from: now), insight(daysAgo: 29, calories: 400, from: now), insight(daysAgo: 5, from: now),
+                      insight(daysAgo: 31, calories: 9000, from: now), insight(daysAgo: -3, calories: 9000, from: now), current]
+        XCTAssertEqual(current.thirtyDayAverage(of: \.calories, among: others), 300)
+        XCTAssertNil(current.thirtyDayAverage(of: \.averageHeartRate, among: others), "No workout has this value, so nothing is compared")
+        XCTAssertNil(current.thirtyDayAverage(of: \.calories, among: [current]), "A workout is never compared with itself")
+    }
+    func testHeartRateSegmentsBreakOnlyAcrossGapsOverTenMinutes() {
+        let start = Date(timeIntervalSince1970: 100000)
+        let workout = HealthWorkout(id:UUID(),start:start,end:start.addingTimeInterval(7200),duration:7200,sourceName:"Test",sourceBundle:"test",energyKilocalories:nil,meanHeartRate:nil)
+        let samples = [0.0, 600, 1201, 1300, 6000].map { HealthHeartRateSample(id:UUID(),date:start.addingTimeInterval($0),beatsPerMinute:120) }
+        XCTAssertEqual(HealthSessionInsight(workout:workout,samples:samples).heartRateSegments.map(\.count), [2,2,1])
+        XCTAssertTrue(HealthSessionInsight(workout:workout,samples:[]).heartRateSegments.isEmpty)
     }
 }
 
 @MainActor final class HealthInsightsReaderTests: XCTestCase {
     func testNotDeterminedNeverRequestsOrQueriesWithoutExplicitAction() async {
         let reader = InsightsTestReader(), model = HealthInsightsModel(reader:reader)
-        await model.load(ids:[reader.id],requestAccess:false,includeRecovery:true)
+        await model.load(ids:[reader.id],requestAccess:false)
         XCTAssertEqual(model.access,.needsRequest);XCTAssertEqual(reader.requests,0);XCTAssertEqual(reader.queries,0)
         XCTAssertTrue(model.sessions.isEmpty)
-        await model.load(ids:[reader.id],requestAccess:true,includeRecovery:true)
-        XCTAssertEqual(reader.requests,1);XCTAssertTrue(reader.requestedRecovery)
+        await model.load(ids:[reader.id],requestAccess:true)
+        XCTAssertEqual(reader.requests,1)
         XCTAssertEqual(model.sessions.count,1)
     }
     func testDeniedReadIsIndistinguishableFromNoAccessibleData() async {
         let reader = InsightsTestReader();reader.state = .requested;reader.denied = true
         let model = HealthInsightsModel(reader:reader)
-        await model.load(ids:[reader.id],requestAccess:false,includeRecovery:true)
-        XCTAssertTrue(model.sessions.isEmpty);XCTAssertFalse(model.recovery.hasData)
+        await model.load(ids:[reader.id],requestAccess:false)
+        XCTAssertTrue(model.sessions.isEmpty)
         XCTAssertTrue(model.message?.contains("No accessible data found") == true)
         XCTAssertFalse(model.message?.contains("Permission denied") == true)
     }
     func testUnavailableDoesNotRequestOrQuery() async {
         let reader = InsightsTestReader();reader.available=false
         let model=HealthInsightsModel(reader:reader)
-        await model.load(ids:[reader.id],requestAccess:true,includeRecovery:true)
+        await model.load(ids:[reader.id],requestAccess:true)
         XCTAssertEqual(model.access,.unavailable);XCTAssertEqual(reader.requests,0);XCTAssertEqual(reader.queries,0)
         XCTAssertTrue(model.sessions.isEmpty)
     }
     func testPartialFailureKeepsWorkoutMetricsAndRefreshDoesNotDuplicate() async {
         let reader = InsightsTestReader();reader.state = .requested;reader.failSamples = true
         let model=HealthInsightsModel(reader:reader)
-        await model.load(ids:[reader.id,reader.id],requestAccess:false,includeRecovery:true)
+        await model.load(ids:[reader.id,reader.id],requestAccess:false)
         XCTAssertEqual(model.sessions.count,1);XCTAssertEqual(model.sessions.first?.calories,432)
         XCTAssertNotNil(model.message)
         reader.failSamples=false
-        await model.load(ids:[reader.id],requestAccess:false,includeRecovery:true)
+        await model.load(ids:[reader.id],requestAccess:false)
         XCTAssertEqual(model.sessions.count,1);XCTAssertNil(model.message)
         reader.denied=true
-        await model.load(ids:[reader.id],requestAccess:false,includeRecovery:true)
-        XCTAssertTrue(model.sessions.isEmpty);XCTAssertFalse(model.recovery.hasData)
+        await model.load(ids:[reader.id],requestAccess:false)
+        XCTAssertTrue(model.sessions.isEmpty)
     }
     func testRequestErrorDoesNotClaimAccessAndCanRetry() async {
         let reader = InsightsTestReader();reader.failRequest=true
         let model=HealthInsightsModel(reader:reader)
-        await model.load(ids:[reader.id],requestAccess:true,includeRecovery:false)
+        await model.load(ids:[reader.id],requestAccess:true)
         XCTAssertNotNil(model.message);XCTAssertTrue(model.sessions.isEmpty)
         reader.failRequest=false
-        await model.load(ids:[reader.id],requestAccess:true,includeRecovery:false)
-        XCTAssertEqual(model.sessions.count,1);XCTAssertFalse(reader.requestedRecovery)
-        model.clear();XCTAssertTrue(model.sessions.isEmpty);XCTAssertFalse(model.recovery.hasData)
+        await model.load(ids:[reader.id],requestAccess:true)
+        XCTAssertEqual(model.sessions.count,1)
+        model.clear();XCTAssertTrue(model.sessions.isEmpty)
     }
     func testClearingDuringReadPreventsLateDataFromReappearing() async {
         let reader=InsightsTestReader();reader.state = .requested;reader.delay=true
         let model=HealthInsightsModel(reader:reader)
-        let task=Task { await model.load(ids:[reader.id],requestAccess:false,includeRecovery:true) }
+        let task=Task { await model.load(ids:[reader.id],requestAccess:false) }
         while reader.pending == nil { await Task.yield() }
         model.clear();reader.pending?.resume();reader.pending=nil
         await task.value
-        XCTAssertTrue(model.sessions.isEmpty);XCTAssertFalse(model.recovery.hasData);XCTAssertFalse(model.loading)
+        XCTAssertTrue(model.sessions.isEmpty);XCTAssertFalse(model.loading)
+    }
+    func testComparisonWorkoutsSkipTheHeartRateRead() async {
+        let reader = InsightsTestReader();reader.state = .requested
+        let model=HealthInsightsModel(reader:reader), other=UUID()
+        await model.load(ids:[reader.id,other],requestAccess:false,samplesFor:reader.id)
+        XCTAssertEqual(model.sessions.count,2);XCTAssertEqual(reader.sampleReads,[reader.id])
     }
     func testHealthMetricsAndLinksNeverEnterSocialSnapshotOrBackup() async throws {
         let container=try Persistence.container(inMemory:true)
@@ -126,7 +132,7 @@ final class HealthInsightsMathTests: XCTestCase {
         try container.mainContext.save()
         let before=SharedSession(session:session,owner:UUID()).rpcValues
         let model=HealthInsightsModel(reader:reader)
-        await model.load(ids:[reader.id],requestAccess:false,includeRecovery:true)
+        await model.load(ids:[reader.id],requestAccess:false)
         XCTAssertNotNil(model.sessions.first?.effort)
         let after=SharedSession(session:session,owner:UUID()).rpcValues
         XCTAssertEqual(Set(after.keys),["source_session_id","visibility","caption","session_day","attempts","sends","duration_minutes","completeness"])
@@ -146,16 +152,15 @@ final class HealthInsightsMathTests: XCTestCase {
     var state=HealthReadAccessState.needsRequest
     var denied=false, failSamples=false, failRequest=false, delay=false
     var requests=0, queries=0
-    var requestedRecovery=false
+    var sampleReads:[UUID]=[]
     let id=UUID()
     var pending: CheckedContinuation<Void,Never>?
-    func requestReadAccess() async throws { try await requestReadAccess(includeRecovery:false) }
-    func requestReadAccess(includeRecovery:Bool) async throws {
-        requests += 1;requestedRecovery=includeRecovery
+    func requestReadAccess() async throws {
+        requests += 1
         if failRequest { throw BackupError.invalid("Test request error") }
         state = .requested
     }
-    func readAccessState(includeRecovery:Bool) async throws -> HealthReadAccessState { state }
+    func readAccessState() async throws -> HealthReadAccessState { state }
     func nearby(start:Date,end:Date) async throws -> [HealthWorkout] { [] }
     func workout(id:UUID) async throws -> HealthWorkout? {
         queries += 1
@@ -164,9 +169,7 @@ final class HealthInsightsMathTests: XCTestCase {
         return HealthWorkout(id:id,start:.now.addingTimeInterval(-3600),end:.now,duration:3600,sourceName:"PRIVATE_HEALTH_SOURCE",sourceBundle:"private.health.source",energyKilocalories:432,meanHeartRate:144,maximumHeartRate:176)
     }
     func heartRates(workoutID:UUID) async throws -> [HealthHeartRateSample] {
+        sampleReads.append(workoutID)
         if failSamples { throw BackupError.invalid("Test samples error") }; return []
-    }
-    func recoveryContext() async throws -> HealthRecoveryContext {
-        denied ? .init() : .init(restingHeartRate:.init(value:58,date:.now,source:"PRIVATE_HEALTH_SOURCE"),hrvMilliseconds:nil)
     }
 }

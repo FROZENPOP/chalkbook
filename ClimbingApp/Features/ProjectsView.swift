@@ -10,14 +10,14 @@ struct ProjectsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Picker("Project status", selection: $filter) { Text("Active").tag("active"); Text("Sent").tag("sent"); Text("Archived").tag("archived"); Text("All").tag("all") }.pickerStyle(.menu).accessibilityIdentifier("projectStatusFilter")
+                if listState.emptyAction != .addProject { Picker("Project status", selection: $filter) { Text("Active").tag("active"); Text("Sent").tag("sent"); Text("Archived").tag("archived"); Text("All").tag("all") }.pickerStyle(.menu).accessibilityIdentifier("projectStatusFilter") }
                 if let action = listState.emptyAction {
                     ContentUnavailableView {
                         Label(action == .addProject ? "Save your first project" : "No projects in this filter", systemImage: "figure.climbing")
                     } description: {
                         Text(action == .addProject
-                             ? "A project is a climb you want to keep working on. Add one to keep its photos, notes, and attempts together across sessions."
-                             : "Your saved projects are still here. View all projects or choose another status above.")
+                             ? "Keep a climb’s photos, notes, and attempts together."
+                             : "Choose another status above.")
                     } actions: {
                         Button {
                             if action == .addProject { adding = true }
@@ -35,7 +35,7 @@ struct ProjectsView: View {
                                 if let photo = climb.media.first(where: { $0.kind == .photo }) { RouteThumbnail(data: photo.data,annotationJSON:photo.annotationJSON) }
                                 Text(climb.title).font(.title3.bold())
                                 Text("\(climb.descriptor.label) · \(climb.gymName)").font(.subheadline)
-                                Text("\(climb.attempts.count.counted("recorded attempt")) · \(climb.projectStatus.capitalized)").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
+                                Text("\(climb.attempts.count.counted("attempt")) · \(climb.projectStatus.capitalized)").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                             }
                         }
                     }.buttonStyle(.plain)
@@ -87,7 +87,7 @@ struct ProjectDetailView: View {
                 if let photo = climb.media.first(where: { $0.kind == .photo }) { RouteThumbnail(data: photo.data,annotationJSON:photo.annotationJSON) }
                 Text(climb.descriptor.label).font(.title.bold())
                 Text(climb.gymName).foregroundStyle(ClimbTheme.secondaryText)
-                Text(climb.isSent ? "Completion observed in recorded attempts" : (climb.prior == .sent ? "Historical completion declared before the journal" : "No recorded completion"))
+                Text(climb.isSent ? "Sent" : (climb.prior == .sent ? "Sent before this journal" : "Not sent yet"))
                 if !climb.notes.isEmpty { Surface { Text(climb.notes) } }
                 ForEach(climb.media) { media in
                     Button { preview = media.draft } label: { MediaLabel(kind: media.kind, filename: media.filename) }
@@ -103,8 +103,7 @@ struct ProjectDetailView: View {
                     Button("Archive") { _ = store.setProject(climb, status: "archived") }
                     Button("Remove project status") { _ = store.setProject(climb, status: "") }
                 }
-                Text("Removing status keeps the climb, notebook, and history. A recorded or declared completion appears in Sent; repeating it keeps this same climb.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
-                HStack { Text("Private notebook").font(.title2.bold()); Spacer(); Button("Add note") { notebookEditor=NotebookDestination(note:nil) }.frame(minHeight: 44) }
+                HStack { Text("Notebook").font(.title2.bold()); Spacer(); Button("Add note") { notebookEditor=NotebookDestination(note:nil) }.frame(minHeight: 44) }
                 ForEach(climb.notebook.sorted { $0.createdAt > $1.createdAt }) { note in
                     Button { notebookEditor=NotebookDestination(note:note) } label: {
                         Surface { VStack(alignment: .leading) { if climb.pinnedNoteID == note.id { Label("Pinned next move",systemImage:"pin.fill").font(.caption.bold()) };Text(note.text); Text(note.updatedAt, format: .dateTime.month().day().hour().minute()).font(.caption).foregroundStyle(ClimbTheme.secondaryText) } }
@@ -112,11 +111,11 @@ struct ProjectDetailView: View {
                 }
                 if let firstSend = climb.orderedAttempts.firstIndex(where: \.sent) {
                     let before = Array(climb.orderedAttempts.prefix(firstSend + 1))
-                    Text("Before first recorded send: \(before.count.counted("recorded attempt")) across \(Set(before.compactMap(\.effectiveSessionID)).count.counted("session")). Earlier unrecorded activity is unknown.").font(.subheadline)
+                    Text("Before first send: \(before.count.counted("attempt")) across \(Set(before.compactMap(\.effectiveSessionID)).count.counted("session"))").font(.subheadline)
                 }
-                Text("Complete recorded history").font(.title2.bold())
+                Text("History").font(.title2.bold())
                 Text("\(climb.attempts.count.counted("attempt")) across \(historySessions.counted("session"))").font(.subheadline)
-                Text("Flash: \(climb.flash.state == .confirmed ? "confirmed" : climb.flash.state == .notFlash ? "not flash" : "unknown"). \(climb.flash.reason)").font(.caption)
+                Text("Flash: \(climb.flash.state == .confirmed ? "confirmed" : climb.flash.state == .notFlash ? "not flash" : "unknown")").font(.caption)
                 ForEach(climb.orderedAttempts) { item in
                     Button { attempt = item } label: {
                         Label("\(SessionDay.label(for: item.sessionDay)) · Try \(item.sequence) · \(item.sent ? "Sent" : "Failed")", systemImage: item.sent ? "checkmark.circle" : "xmark.circle").frame(minHeight: 44)
