@@ -1,6 +1,6 @@
 {
   "private": true,
   "type": "module",
-  "scripts": { "test": "node friends.mjs && node suggested_friends.mjs && node journal.mjs && node account_deletion.mjs && node moderation.mjs && node functions.mjs" },
+  "scripts": { "test": "node friends.mjs && node suggested_friends.mjs && node journal.mjs && node account_deletion.mjs && node blocks.mjs && node moderation.mjs && node functions.mjs" },
   "devDependencies": { "@electric-sql/pglite": "0.5.11" }
 }

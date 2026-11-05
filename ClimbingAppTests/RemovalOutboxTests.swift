@@ -89,6 +89,16 @@ private final class OutboxURLProtocol: URLProtocol {
         XCTAssertTrue(deleted); XCTAssertNil(auth.account)
         XCTAssertTrue(paths.contains("/rest/v1/rpc/delete_account"))
     }
+    func testSigningInAgainAfterAccountDeletionGetsTheNewUserID() async throws {
+        let queue = try queue()
+        try queue.enqueue(contentID: UUID(), kind: .sessionSnapshot)
+        let social = store(queue) { request in (200, request.url!.path.hasPrefix("/auth/") ? self.token() : Data()) }
+        let deleted = await social.deleteAccount(auth())
+        XCTAssertTrue(deleted); XCTAssertNil(queue.ownerID); XCTAssertTrue(queue.entries.isEmpty)
+        // Supabase gives the same Apple or Google identity a new user ID after deletion.
+        let reopened = RemovalOutbox(accountKey: account.storageKey, directory: directories.last!)
+        XCTAssertNoThrow(try reopened.bind(owner: UUID(), accountKey: account.storageKey))
+    }
     func testFailedAccountDeletionKeepsYouSignedIn() async throws {
         let auth = auth()
         let social = store(try queue()) { _ in throw URLError(.notConnectedToInternet) }

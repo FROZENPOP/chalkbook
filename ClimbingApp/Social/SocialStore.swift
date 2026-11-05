@@ -323,6 +323,7 @@ final class SocialStore {
                 if let appleCode { revoked = (try? await self.request("/functions/v1/revoke-apple", method: "POST", values: ["authorization_code": appleCode])) != nil }
                 _ = try await self.request("/rest/v1/rpc/delete_account", method: "POST", values: [:])
             }) else { return false }
+            removals.clearAfterAccountDeletion()
             appleGrantRemains = isApple && !revoked
         }
         suggestions.reset(); me = nil; feed.reset(); friendships = []; peopleRecords = []; blocks = []
