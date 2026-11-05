@@ -48,7 +48,7 @@ struct SessionCommentsView: View {
                     if comment.user_id == social.userID || entry.owner_id == social.userID { Button("Delete comment", role: .destructive) { deleting = comment } }
                     if comment.user_id != social.userID {
                         Button("Block climber", role: .destructive) { Task { await block(comment.user_id) } }
-                        NavigationLink("Report climber") { ReportClimberView(target: comment.user_id) }
+                        NavigationLink("Report comment") { ReportClimberView(target: comment.user_id, comment: comment.id) }
                     }
                 } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
                     .accessibilityLabel("Options for comment by \(name)").accessibilityIdentifier("commentOptions")

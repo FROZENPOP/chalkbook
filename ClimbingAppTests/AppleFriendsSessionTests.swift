@@ -13,6 +13,7 @@ private final class TokenURLProtocol: URLProtocol {
     static let lock = NSLock()
     static var handler: ((URLRequest, [String: Any]) throws -> (Int, Data))?
     nonisolated(unsafe) static var calls: [(grant: String, values: [String: Any])] = []
+    nonisolated(unsafe) static var paths: [String] = []
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
@@ -44,13 +45,15 @@ private final class TokenURLProtocol: URLProtocol {
     private func auth(_ account: ClimberAccount) -> AccountSession {
         AccountSession(vault: FixedVault(value: account), googleSignOut: {}, friendsSessions: sessions)
     }
-    private func store(_ account: ClimberAccount, identityToken: ((AccountSession) async throws -> String)? = nil,
+    private func store(_ account: ClimberAccount, identityToken: ((AccountSession) async throws -> String)? = nil, failing: String? = nil,
                        respond: @escaping @Sendable (String) throws -> (Int, Data)) -> SocialStore {
         TokenURLProtocol.lock.lock()
         TokenURLProtocol.calls = []
+        TokenURLProtocol.paths = []
         TokenURLProtocol.handler = { request, values in
             let grant = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "grant_type" }?.value ?? ""
-            TokenURLProtocol.lock.withLock { TokenURLProtocol.calls.append((grant, values)) }
+            TokenURLProtocol.lock.withLock { TokenURLProtocol.calls.append((grant, values)); TokenURLProtocol.paths.append(request.url!.path) }
+            if let failing, request.url!.path.contains(failing) { return (500, Data()) }
             return try respond(grant)
         }
         TokenURLProtocol.lock.unlock()
@@ -135,5 +138,54 @@ private final class TokenURLProtocol: URLProtocol {
         let deleted = await social.deleteAccount(auth)
         XCTAssertTrue(deleted); XCTAssertNil(auth.account); XCTAssertNil(sessions.load(apple.storageKey))
         XCTAssertEqual(calls.map(\.grant), ["id_token", ""])
+    }
+
+    func testAppleDeletionRevokesTheGrantBeforeDeletingTheAccount() async {
+        let auth = auth(apple)
+        let social = store(apple) { grant in grant.isEmpty ? (200, Data()) : self.token("refresh-1") }
+        auth.completeApple(subject: apple.subject, name: nil, email: nil, identityToken: "apple-jwt", authorizationCode: "apple-code")
+        let deleted = await social.deleteAccount(auth)
+        XCTAssertTrue(deleted); XCTAssertNil(auth.account); XCTAssertNil(auth.errorMessage)
+        XCTAssertEqual(TokenURLProtocol.lock.withLock { TokenURLProtocol.paths }, ["/auth/v1/token", "/functions/v1/revoke-apple", "/rest/v1/rpc/delete_account"])
+        XCTAssertEqual(calls[1].values["authorization_code"] as? String, "apple-code")
+    }
+
+    func testFailedAppleRevokeStillDeletesTheAccountAndSaysWhatRemains() async {
+        let auth = auth(apple)
+        let social = store(apple, failing: "revoke-apple") { grant in grant.isEmpty ? (200, Data()) : self.token("refresh-1") }
+        auth.completeApple(subject: apple.subject, name: nil, email: nil, identityToken: "apple-jwt", authorizationCode: "apple-code")
+        let deleted = await social.deleteAccount(auth)
+        XCTAssertTrue(deleted); XCTAssertNil(auth.account)
+        XCTAssertTrue(TokenURLProtocol.lock.withLock { TokenURLProtocol.paths }.contains("/rest/v1/rpc/delete_account"))
+        XCTAssertEqual(auth.errorMessage?.contains("Sign in with Apple"), true)
+    }
+
+    func testFailedDeletionNeedsAFreshAppleCode() async {
+        let auth = auth(apple)
+        let social = store(apple, failing: "delete_account") { grant in grant.isEmpty ? (200, Data()) : self.token("refresh-1") }
+        auth.completeApple(subject: apple.subject, name: nil, email: nil, identityToken: "apple-jwt", authorizationCode: "apple-code")
+        let deleted = await social.deleteAccount(auth)
+        XCTAssertFalse(deleted); XCTAssertNotNil(auth.account)
+        XCTAssertNil(auth.takeAppleAuthorizationCode(), "Apple codes are single use")
+    }
+
+    func testReportSendsTheCommentAndPingsTheModerator() async {
+        let auth = auth(apple), target = UUID(), comment = UUID()
+        auth.completeApple(subject: apple.subject, name: nil, email: nil, identityToken: "apple-jwt")
+        // The refresh after a report needs real rows, so it fails here; only what was sent matters.
+        let social = store(apple) { grant in grant.isEmpty ? (200, Data("[]".utf8)) : self.token("refresh-1") }
+        await social.safetyAction(auth, target: target, block: false, reason: "Rude", comment: comment)
+        XCTAssertEqual(calls[1].values["target"] as? String, target.uuidString)
+        XCTAssertEqual(calls[1].values["comment"] as? String, comment.uuidString)
+        XCTAssertNil(calls[1].values["entry"])
+        XCTAssertEqual(TokenURLProtocol.lock.withLock { TokenURLProtocol.paths }.prefix(3), ["/auth/v1/token", "/rest/v1/rpc/report_climber", "/functions/v1/report-alert"])
+    }
+
+    func testBlockedWordsExplainThemselves() async {
+        let auth = auth(apple)
+        auth.completeApple(subject: apple.subject, name: nil, email: nil, identityToken: "apple-jwt")
+        let social = store(apple) { grant in grant.isEmpty ? (400, Data("{\"code\":\"SN001\"}".utf8)) : self.token("refresh-1") }
+        let ok = await social.perform(auth) { _ = try await social.request("/rest/v1/rpc/add_session_comment", method: "POST", values: [:]) }
+        XCTAssertFalse(ok); XCTAssertEqual(social.errorMessage, SocialError.contentRejected.localizedDescription)
     }
 }
