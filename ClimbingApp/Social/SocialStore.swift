@@ -209,7 +209,11 @@ final class SocialStore {
             try await self.reload()
         }
         // perform already reset the feed and token, so the next load fetches everything again.
-        if stored && !refreshed { errorMessage = "Your post was saved, but Friends couldn’t refresh. Check your connection and pull to refresh." }
+        if stored && !refreshed {
+            let refresh = "Your post was saved, but Friends couldn’t refresh. Check your connection and pull to refresh."
+            photoNotice = photoNotice.map { "\($0) \(refresh)" } ?? refresh
+            errorMessage = nil // perform's message says nothing was saved, which is false here.
+        }
         return stored
     }
 
