@@ -3,16 +3,16 @@
 begin;
 -- NOT VALID: new and edited rows are checked; rows saved before this migration are left alone.
 alter table public.climber_profiles
- add constraint display_name_visible check (display_name ~ '[^[:space:] ​-‍⁠﻿]') not valid,
+ add constraint display_name_visible check (display_name ~ '[^[:space:]\u00a0\u200b-\u200d\u2060\ufeff]') not valid,
  -- Control, zero-width and text-direction characters can hide or spoof a name.
- add constraint display_name_plain check (display_name !~ '[[:cntrl:]​-‏‪-‮⁠⁦-⁩﻿]') not valid,
+ add constraint display_name_plain check (display_name !~ '[[:cntrl:]\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]') not valid,
  add constraint display_name_not_staff check (display_name !~* 'chalkbook') not valid,
  add constraint username_not_reserved check (username !~ 'chalkbook' and username not in
   ('admin','administrator','moderator','mod','support','help','official','staff','team','security','apple')) not valid;
 alter table public.session_comments
- add constraint body_visible check (body ~ '[^[:space:] ​-‍⁠﻿]') not valid;
+ add constraint body_visible check (body ~ '[^[:space:]\u00a0\u200b-\u200d\u2060\ufeff]') not valid;
 alter table public.social_reports
- add constraint reason_visible check (reason ~ '[^[:space:] ​-‍⁠﻿]') not valid;
+ add constraint reason_visible check (reason ~ '[^[:space:]\u00a0\u200b-\u200d\u2060\ufeff]') not valid;
 -- The app only uploads JPEG avatars.
 alter table public.climber_profile_details
  add constraint avatar_is_jpeg check (avatar_base64 is null or substring(decode(avatar_base64,'base64') from 1 for 3)=decode('ffd8ff','hex')) not valid;
