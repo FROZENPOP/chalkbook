@@ -119,6 +119,13 @@ struct PendingRemoval: Codable, Identifiable, Equatable {
         try save(next)
     }
 
+    /// The server account is gone, so its removals are moot, and its old user ID must not
+    /// block the next sign-in, which gets a new one.
+    func clearAfterAccountDeletion() {
+        try? FileManager.default.removeItem(at: file)
+        archive = Archive(accountKey: accountKey); storageError = nil
+    }
+
     func enqueue(contentID: UUID, kind: PendingRemoval.Kind, now: Date = .now) throws {
         guard !entries.contains(where: { ($0.contentID == contentID || kind == .socialProfile) && $0.kind == kind }) else { return }
         var next = archive

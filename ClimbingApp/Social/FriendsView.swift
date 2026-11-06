@@ -61,6 +61,7 @@ struct SocialProfileEditor: View {
                     Section(header: Text("Community rules").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         Text("No objectionable, hateful, sexual or harassing content, and no abuse of other climbers. Report or block anyone who breaks these rules. We review reports and remove content and accounts that break them.").font(.caption)
                         Toggle("I agree to the community rules", isOn: $agreed).accessibilityIdentifier("agreeCommunityRules")
+                        NavigationLink("Privacy Policy") { PrivacyPolicyView() }
                     }
                 }
                 if let message = social.errorMessage { Text(message).foregroundStyle(ClimbTheme.error) }
@@ -71,7 +72,7 @@ struct SocialProfileEditor: View {
                 if social.me != nil {
                     Section {
                         Button("Delete social profile", role: .destructive) { confirmDelete = true }.disabled(social.busy)
-                        Text("Removes your friends, requests and shared entries. Your journal stays.").font(.caption)
+                        Text("Removes your friends, requests and shared entries. If you’re offline, this finishes when you reconnect, and friends may still see them until then. Your journal stays.").font(.caption)
                     }
                 }
             }.navigationTitle(social.me == nil ? "Join Friends" : "Social profile")
@@ -107,6 +108,8 @@ struct ReportClimberView: View {
     @Environment(SocialStore.self) private var social
     @Environment(AccountSession.self) private var auth
     let target: UUID
+    var comment: UUID? = nil
+    var entry: UUID? = nil
     @State private var reason = ""
     @State private var submitted = false
     var body: some View {
@@ -114,11 +117,11 @@ struct ReportClimberView: View {
             if submitted { Text("Report submitted for review.") }
             else {
                 TextField("Describe the concern", text: $reason, axis: .vertical).lineLimit(4...8)
-                Button("Submit report") { Task { submitted = await social.safetyAction(auth, target: target, block: false, reason: reason) } }
+                Button("Submit report") { Task { submitted = await social.safetyAction(auth, target: target, block: false, reason: reason, comment: comment, entry: entry) } }
                     .disabled(reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || reason.count > 1000 || social.busy)
                 if let message = social.errorMessage { Text(message).foregroundStyle(ClimbTheme.error) }
             }
-        }.navigationTitle("Report climber")
+        }.navigationTitle(comment != nil ? "Report comment" : entry != nil ? "Report post" : "Report climber")
     }
 }
 

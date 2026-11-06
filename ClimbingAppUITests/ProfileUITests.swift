@@ -2,6 +2,18 @@ import XCTest
 
 final class ProfileUITests: XCTestCase {
     override func setUp() { continueAfterFailure = false }
+    @MainActor func testPrivacyPolicyOpensFromSettings() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing","--reset-test-data"]
+        app.launch()
+        XCTAssertTrue(app.profileButton.waitForExistence(timeout:15))
+        app.profileButton.tap()
+        let link = app.buttons["privacyPolicy"]
+        for _ in 0..<6 { if link.exists && link.isHittable { break };app.swipeUp() }
+        link.tap()
+        XCTAssertTrue(app.webViews.staticTexts["The short version"].waitForExistence(timeout:10))
+        XCTAssertTrue(app.webViews.staticTexts["Keeping and deleting your data"].exists)
+    }
     @MainActor func testProfileNameBioPhotoEditAndRelaunch() throws {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing","--reset-test-data"]

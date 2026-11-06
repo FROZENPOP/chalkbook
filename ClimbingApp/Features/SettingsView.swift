@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var confirmSignOut = false
     @State private var confirmDeleteAccount = false
     @State private var deleteError: String?
+    @State private var confirmWithApple = false
     @Environment(ClimbingStore.self) private var store
     @Query(sort: \SavedGym.name) private var gyms: [SavedGym]
     @Query private var allClimbs: [ClimbEntry]
@@ -27,7 +28,9 @@ struct SettingsView: View {
     @State private var message: String?
 
     private func deleteAccount() async {
-        deleteError = await social.deleteAccount(auth) ? nil : social.errorMessage ?? auth.errorMessage
+        let deleted = await social.deleteAccount(auth)
+        deleteError = deleted ? nil : social.errorMessage ?? auth.errorMessage
+        if deleted { confirmWithApple = false }
     }
 
     var body: some View {
@@ -78,6 +81,7 @@ struct SettingsView: View {
             }
             Section {
                 LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
+                NavigationLink("Privacy Policy") { PrivacyPolicyView() }.accessibilityIdentifier("privacyPolicy")
             }
             if auth.account != nil {
                 Section {
@@ -85,7 +89,8 @@ struct SettingsView: View {
                         .frame(minHeight: 44).accessibilityIdentifier("signOut")
                     Button("Delete account", role: .destructive) { confirmDeleteAccount = true }
                         .frame(minHeight: 44).disabled(social.busy).accessibilityIdentifier("deleteAccount")
-                    if social.needsAppleSignIn && deleteError != nil {
+                    if confirmWithApple || (social.needsAppleSignIn && deleteError != nil) {
+                        if let deleteError, !social.needsAppleSignIn { Text(deleteError).font(.caption).foregroundStyle(ClimbTheme.error) }
                         Text("Apple needs to confirm it’s you before your account can be deleted.").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                         AppleConfirmButton { await deleteAccount() }
                     } else if let deleteError { Text(deleteError).font(.caption).foregroundStyle(ClimbTheme.error) }
@@ -101,7 +106,9 @@ struct SettingsView: View {
         } message: { Text("Your log stays on this iPhone.") }
         .confirmationDialog("Delete your account?", isPresented: $confirmDeleteAccount, titleVisibility: .visible) {
             Button("Delete account", role: .destructive) {
-                Task { await deleteAccount() }
+                // Apple's revoke API needs a fresh code, which only this confirmation can give.
+                if auth.account?.provider == .apple && social.configuration != nil { confirmWithApple = true }
+                else { Task { await deleteAccount() } }
             }
         } message: { Text("Permanently deletes your account, Friends profile and shared entries. Your journal stays on this iPhone. This can’t be undone.") }
         .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .json,

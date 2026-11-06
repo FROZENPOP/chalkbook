@@ -91,6 +91,12 @@ struct SessionReactionBar: View {
                 Text(comments.map { "💬 \($0.count)" } ?? "💬").font(.subheadline.weight(.semibold)).padding(.horizontal,12).frame(minHeight:44)
                     .background(Color.secondary.opacity(0.08),in:Capsule())
             }.buttonStyle(.plain).accessibilityLabel("Comments\(comments.map { ", \($0.count)" } ?? "")").accessibilityIdentifier("openComments")
+            if social.me != nil && social.userID != entry.owner_id {
+                Menu {
+                    NavigationLink("Report post") { ReportClimberView(target:entry.owner_id,entry:entry.id) }
+                } label: { Image(systemName:"ellipsis").frame(width:44,height:44) }
+                    .accessibilityLabel("Post options").accessibilityIdentifier("postOptions")
+            }
         }
     }
     private func commentPreview(_ rows:[SessionComment]) -> some View {

@@ -59,11 +59,28 @@ Run `npm install && npm test` in `supabase/tests` with Node available. The pinne
 Reports are stored in `public.social_reports`, unreadable to app users. Assign a moderator before making the feature available to external testers. In the Supabase dashboard, an authorized moderator can use:
 
 ```sql
-select id, reporter, target_id, reason, created_at
-from public.social_reports order by created_at;
+select id, target_username, reason, comment_id, entry_id, content, created_at
+from public.social_reports where reviewed_at is null order by created_at;
+
+-- Remove what breaks the rules, then close the report.
+delete from public.session_comments where id = '<comment_id>';
+delete from public.shared_sessions where id = '<entry_id>';
+delete from auth.users where id = '<target_id>'; -- removes the whole account
+update public.social_reports set reviewed_at = now() where id = '<report id>';
 ```
 
-No automated moderation, email alerts, or service-role dashboard is shipped in the iOS app. Review reports and take account action through the secured backend. Do not expose this table or administrative credentials to clients.
+Review new reports within a day. Reports keep a copy of the reported text and outlive both accounts for up to 12 months, as the privacy policy says. A database trigger rejects a short list of objectionable words in comments, captions, names and bios (`social_private.reject_objectionable`); edit the list there. Do not expose this table or administrative credentials to clients.
+
+### Edge functions
+
+Deploy `supabase/functions/revoke-apple` and `supabase/functions/report-alert`, keeping JWT verification on, then set these secrets in the Supabase dashboard. Never commit them.
+
+- `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (the full `.p8` file from a Sign in with Apple key) and `APPLE_CLIENT_ID` (`com.frozenpop.ClimbingApp`). Without these, Apple accounts still delete, but the app tells the person to remove Sendr from their Apple Account themselves.
+- `REPORT_ALERT_WEBHOOK_URL`, a Discord or Slack webhook. Without it, new reports raise no alert.
+
+### Privacy policy
+
+The policy is `ClimbingApp/App/privacy.html`, shown in the app from Settings and Join Friends. Host the same file at an HTTPS address for App Store Connect, and update both when it changes.
 
 Current verification: native simulator builds, isolated PostgreSQL permission fixtures, and Google-to-Supabase connection and live username search with the configured account have been verified. Two-account friendship/sharing integration and physical-device verification remain pending.
 

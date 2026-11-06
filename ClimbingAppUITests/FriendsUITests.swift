@@ -152,6 +152,22 @@ final class FriendsUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for:[gone],timeout:5),.completed)
     }
 
+    @MainActor func testCommentsAndPostsCanEachBeReported() {
+        continueAfterFailure=false
+        let app=launchSocialSample()
+        let options=app.buttons["postOptions"].firstMatch
+        XCTAssertTrue(options.waitForExistence(timeout:5));reveal(options,in:app);options.tap()
+        app.buttons["Report post"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Report post"].waitForExistence(timeout:5))
+        app.navigationBars.buttons.firstMatch.tap()
+        let open=app.buttons.matching(identifier:"openComments").firstMatch
+        XCTAssertTrue(open.waitForExistence(timeout:5));reveal(open,in:app);open.tap()
+        let comment=app.buttons.matching(identifier:"commentOptions").firstMatch
+        XCTAssertTrue(comment.waitForExistence(timeout:5));comment.tap()
+        app.buttons["Report comment"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["Report comment"].waitForExistence(timeout:5))
+    }
+
     /// Scrolls a short way at a time so a post's controls end up clear of the tab bar.
     @MainActor private func reveal(_ element:XCUIElement,in app:XCUIApplication) {
         for _ in 0..<8 where !(element.isHittable && element.frame.maxY < app.frame.maxY-120) {

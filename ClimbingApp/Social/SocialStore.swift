@@ -64,6 +64,7 @@ final class SocialStore {
         guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
             let code = (try? JSONSerialization.jsonObject(with:data) as? [String:Any])?["code"] as? String
             if ["PGRST202","PGRST205","42P01"].contains(code ?? "") { throw SocialError.migrationNeeded }
+            if code == "SN001" { throw SocialError.contentRejected }
             throw RemovalHTTPError(status: (response as? HTTPURLResponse)?.statusCode ?? 0,
                                    missingContent: (response as? HTTPURLResponse)?.statusCode == 410 ||
                                    ((response as? HTTPURLResponse)?.statusCode == 404 && code == "PGRST116"))
@@ -283,10 +284,15 @@ final class SocialStore {
     }
 
     @discardableResult
-    func safetyAction(_ auth: AccountSession, target: UUID, block: Bool, reason: String = "") async -> Bool {
+    func safetyAction(_ auth: AccountSession, target: UUID, block: Bool, reason: String = "", comment: UUID? = nil, entry: UUID? = nil) async -> Bool {
         if block { suggestions.reset() }
         return await perform(auth) {
-            _ = try await self.request("/rest/v1/rpc/\(block ? "block_climber" : "report_climber")", method: "POST", values: block ? ["target": target.uuidString] : ["target": target.uuidString, "reason": reason])
+            var values = block ? ["target": target.uuidString] : ["target": target.uuidString, "reason": reason]
+            if let comment { values["comment"] = comment.uuidString }
+            if let entry { values["entry"] = entry.uuidString }
+            _ = try await self.request("/rest/v1/rpc/\(block ? "block_climber" : "report_climber")", method: "POST", values: values)
+            // The report is already saved, so a failed ping to the moderator must not fail it.
+            if !block { _ = try? await self.request("/functions/v1/report-alert", method: "POST", values: [:]) }
             try await self.reload()
         }
     }
@@ -307,11 +313,22 @@ final class SocialStore {
 
     /// Deletes the server account, which cascades to everything social, then signs out.
     func deleteAccount(_ auth: AccountSession) async -> Bool {
+        var appleGrantRemains = false
         if configuration != nil {
-            guard await perform(auth, operation: { _ = try await self.request("/rest/v1/rpc/delete_account", method: "POST", values: [:]) }) else { return false }
+            let isApple = auth.account?.provider == .apple
+            let appleCode = auth.takeAppleAuthorizationCode()
+            var revoked = false
+            guard await perform(auth, operation: {
+                // Apple requires this, but a failure must never keep someone's data on the server.
+                if let appleCode { revoked = (try? await self.request("/functions/v1/revoke-apple", method: "POST", values: ["authorization_code": appleCode])) != nil }
+                _ = try await self.request("/rest/v1/rpc/delete_account", method: "POST", values: [:])
+            }) else { return false }
+            removals.clearAfterAccountDeletion()
+            appleGrantRemains = isApple && !revoked
         }
         suggestions.reset(); me = nil; feed.reset(); friendships = []; peopleRecords = []; blocks = []
         auth.signOut()
+        if appleGrantRemains { auth.errorMessage = "Your account is deleted. To remove Sendr from your Apple Account too, go to iPhone Settings > your name > Sign-In & Security > Sign in with Apple." }
         return auth.account == nil
     }
 

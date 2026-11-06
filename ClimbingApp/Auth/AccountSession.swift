@@ -130,6 +130,8 @@ final class AccountSession {
     private let friendsSessions: FriendsSessionVault
     // Apple identity tokens expire in minutes and can't be fetched silently, so only the latest one is kept, in memory.
     private var appleIdentityToken: String?
+    // Single use and valid for minutes. Apple's revoke API needs it when the account is deleted.
+    private var appleAuthorizationCode: String?
     private var revision = 0
     private var restored = false
 
@@ -147,19 +149,25 @@ final class AccountSession {
             guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
                   !credential.user.isEmpty else { errorMessage = AccountError.missingIdentity.localizedDescription; return }
             completeApple(subject: credential.user, name: credential.fullName.map { PersonNameComponentsFormatter().string(from: $0) },
-                          email: credential.email, identityToken: credential.identityToken.flatMap { String(data: $0, encoding: .utf8) })
+                          email: credential.email, identityToken: credential.identityToken.flatMap { String(data: $0, encoding: .utf8) },
+                          authorizationCode: credential.authorizationCode.flatMap { String(data: $0, encoding: .utf8) })
         case let .failure(error):
             if (error as NSError).code != ASAuthorizationError.canceled.rawValue { errorMessage = error.localizedDescription }
         }
     }
 
     /// Apple shares the name and email only on the first authorization, so confirming the same Apple ID again keeps the saved ones.
-    func completeApple(subject: String, name: String?, email: String?, identityToken: String?) {
+    func completeApple(subject: String, name: String?, email: String?, identityToken: String?, authorizationCode: String? = nil) {
         let existing = account?.provider == .apple && account?.subject == subject ? account : nil
         let name = name ?? ""
         activate(ClimberAccount(provider: .apple, subject: subject,
                                 name: name.isEmpty ? existing?.name ?? "Climber" : name, email: email ?? existing?.email))
-        if account?.subject == subject { appleIdentityToken = identityToken }
+        if account?.subject == subject { appleIdentityToken = identityToken; appleAuthorizationCode = authorizationCode }
+    }
+
+    func takeAppleAuthorizationCode() -> String? {
+        defer { appleAuthorizationCode = nil }
+        return appleAuthorizationCode
     }
 
     func signInWithGoogle(presenting controller: UIViewController) async {
@@ -199,6 +207,7 @@ final class AccountSession {
             try vault.clear()
             friendsSessions.clear()
             appleIdentityToken = nil
+            appleAuthorizationCode = nil
             revision += 1
             googleSignOut()
             account = nil
