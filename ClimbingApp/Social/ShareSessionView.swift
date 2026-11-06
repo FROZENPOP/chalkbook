@@ -62,11 +62,11 @@ struct ShareSessionView: View {
                     }
                     Section(header: Text("Exact preview").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         if let preview { SharedSessionPreview(entry: preview,routePhotos:reviewedPhotos) }
-                        Text("Only what’s shown here is sent. Notes, gym details, videos, markup and Health data stay private.").font(.caption)
+                        Text("Only what’s shown here is sent. Notes, gym details, videos, markup and Health data stay private. Route photos are removed from Friends after 30 days.").font(.caption)
                     }
                     Section {
                         Button("Save reviewed entry") { Task { if let preview, await social.publish(auth, entry: preview, photos:reviewedPhotos) { dismiss() } } }
-                            .disabled(social.busy || preparingPhoto || !photosLoaded || draft.caption.count > 1000)
+                            .disabled(social.busy || preparingPhoto || !photosLoaded || draft.caption.unicodeScalars.count > 1000)
                     }
                 } else if social.configuration != nil && auth.account == nil {
                     Section {

@@ -113,6 +113,15 @@ await db.query('select public.block_climber($1)',[b]);
 await as(b); equal(await count('select * from public.sessions') + await count('select * from public.follows'), 0, 'blocking hides sessions and removes follows');
 await as(a); equal(await count('select * from public.kudos'), 0, 'blocked climbers\' kudos are hidden');
 
+// Input limits: nobody can claim another climber's shared session id, and values stay sane.
+const shared = '40000000-0000-0000-0000-000000000001';
+await as(a); await db.query("select public.save_shared_session($1,'friends','',to_char(current_date,'YYYY-MM-DD'),null,1,null,'Sends only')",[shared]);
+await as(d); await denied(`insert into public.sessions(id,owner_id,started_at,tz) values('${shared}','${d}',now(),'UTC')`, 'cannot claim a friend\'s shared session id');
+await as(a); await db.query(`insert into public.sessions(id,owner_id,started_at,tz) values($1,$2,now(),'UTC')`,[shared,a]);
+await denied(`insert into public.sessions(id,owner_id,started_at,tz) values(gen_random_uuid(),'${a}','9999-01-01','UTC')`, 'session start stays in range');
+await denied(`insert into public.sessions(id,owner_id,started_at,tz) values(gen_random_uuid(),'${a}',now(),'UTC; drop')`, 'time zone is a plain identifier');
+await denied(`insert into public.media(id,owner_id,session_id,kind,storage_path) values(gen_random_uuid(),'${a}','${s1}','photo','${a}/../${b}/x.jpg')`, 'media paths cannot climb out of the owner folder');
+
 await db.exec('reset role; set role anon');
 await denied('select * from public.sessions', 'signed-out clients read nothing');
 await db.close();

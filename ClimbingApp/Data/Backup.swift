@@ -216,6 +216,7 @@ struct ClimbingBackup: Codable {
                   journal.sessions.count == sessionIDs.count, journal.climbs.count == climbIDs.count else { throw BackupError.invalid("Incomplete journal metadata.") }
             for item in journal.sessions {
                 guard item.linkedClimbIDs.allSatisfy({ climbIDs.contains($0) }), item.selectedClimbID.map({ climbIDs.contains($0) }) ?? true else { throw BackupError.invalid("A session refers to a missing climb.") }
+                guard item.pausedSeconds.map({ $0.isFinite && (0...31_536_000).contains($0) }) ?? true else { throw BackupError.invalid("A session has an invalid paused time.") }
             }
             for item in journal.climbs {
                 guard ["", "active", "sent", "archived"].contains(item.projectRaw), GradeKind(rawValue: item.gradeKind) != nil else { throw BackupError.invalid("Invalid project or grade descriptor.") }

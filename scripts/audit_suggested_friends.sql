@@ -12,7 +12,7 @@ insert into auth.users(id) select unnest(ids) from suggestion_audit;
 insert into public.climber_profiles(id,username,display_name,is_private)
 select id,'sugg_'||left(replace(id::text,'-',''),18),case n when 2 then 'Mutual One' when 3 then 'Mutual Two' else 'Suggestion audit '||n end,n<>5
 from suggestion_audit cross join lateral unnest(ids) with ordinality u(id,n);
-insert into public.climber_profile_details(id,avatar_base64) select ids[4],'YWJj' from suggestion_audit union all select ids[5],'YWJj' from suggestion_audit;
+insert into public.climber_profile_details(id,avatar_base64) select ids[4],'/9j/' from suggestion_audit union all select ids[5],'/9j/' from suggestion_audit;
 insert into public.friendships(requester,recipient,status)
 select ids[a],ids[b],status from suggestion_audit cross join (values
  (1,2,'accepted'),(3,1,'accepted'),(2,4,'accepted'),(4,3,'accepted'),(2,5,'accepted'),
@@ -34,7 +34,7 @@ select pg_temp.suggestion_assert(not exists(select 1 from public.friendships f w
 select pg_temp.suggestion_assert((select count(*)=2 from public.suggested_friends()),'self/friends/pending/opt-out/blocked/dismissed excluded');
 select pg_temp.suggestion_assert((select id=(select ids[4] from suggestion_audit) and mutual_count=2 and mutual_names=array['Mutual One','Mutual Two']
  and avatar_base64 is null from public.suggested_friends(1,0)),'rank/count/known mutuals and private avatar');
-select pg_temp.suggestion_assert((select id=(select ids[5] from suggestion_audit) and avatar_base64='YWJj' from public.suggested_friends(1,1)),'pagination and public avatar');
+select pg_temp.suggestion_assert((select id=(select ids[5] from suggestion_audit) and avatar_base64='/9j/' from public.suggested_friends(1,1)),'pagination and public avatar');
 select pg_temp.suggestion_assert(not exists(select 1 from public.suggested_friends() s cross join lateral jsonb_object_keys(to_jsonb(s)) k
  where k not in ('id','display_name','avatar_base64','mutual_count','mutual_names')),'RPC fields allowlist');
 select pg_temp.suggestion_assert(not exists(select 1 from public.friend_discovery_settings),'cannot read another owner opt-out');

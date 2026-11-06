@@ -33,7 +33,7 @@ struct SocialProfileEditor: View {
                     if let local=profiles.profile?.photo { Button("Use my local profile photo") { do { photo=try SocialPhoto.prepare(local) } catch { loadError=error.localizedDescription } } }
                     if photo != nil { Button("Remove shared photo",role:.destructive) { photo=nil } }
                     TextField("A little about your climbing",text:$bio,axis:.vertical).lineLimit(3...5)
-                    Text("\(bio.count)/240 characters").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
+                    Text("\(bio.unicodeScalars.count)/240 characters").font(.caption).foregroundStyle(ClimbTheme.secondaryText)
                     if let local=profiles.profile?.bio,!local.isEmpty { Button("Copy my local bio into this draft") { bio=String(local.prefix(240)) } }
                     Text("Only what’s shown here is published.").font(.caption)
                 }.disabled(!ready || social.busy || importing)
@@ -67,7 +67,7 @@ struct SocialProfileEditor: View {
                 if let message = social.errorMessage { Text(message).foregroundStyle(ClimbTheme.error) }
                 Button("Save social profile") {
                     Task { if await social.saveProfile(auth, username: username, name: name, isPrivate: isPrivate,bio:bio,photo:photo) { dismiss() } }
-                }.disabled(social.busy || !ready || importing || bio.count>240 || (social.me == nil && !agreed))
+                }.disabled(social.busy || !ready || importing || bio.unicodeScalars.count>240 || (social.me == nil && !agreed))
                 if let loadError { Text(loadError).foregroundStyle(ClimbTheme.error);if !ready { Button("Retry loading profile") { Task { await loadDetails() } } } }
                 if social.me != nil {
                     Section {
@@ -118,7 +118,7 @@ struct ReportClimberView: View {
             else {
                 TextField("Describe the concern", text: $reason, axis: .vertical).lineLimit(4...8)
                 Button("Submit report") { Task { submitted = await social.safetyAction(auth, target: target, block: false, reason: reason, comment: comment, entry: entry) } }
-                    .disabled(reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || reason.count > 1000 || social.busy)
+                    .disabled(reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || reason.unicodeScalars.count > 1000 || social.busy)
                 if let message = social.errorMessage { Text(message).foregroundStyle(ClimbTheme.error) }
             }
         }.navigationTitle(comment != nil ? "Report comment" : entry != nil ? "Report post" : "Report climber")

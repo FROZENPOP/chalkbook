@@ -62,12 +62,12 @@ struct SessionCommentsView: View {
                 .padding(.horizontal, 14).padding(.vertical, 10).frame(minHeight: 44)
                 .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
                 .accessibilityIdentifier("commentField")
-            if text.count > 450 { Text("\(text.count)/500").font(.caption).foregroundStyle(text.count > 500 ? ClimbTheme.error : ClimbTheme.secondaryText).frame(minHeight: 44) }
+            if text.unicodeScalars.count > 450 { Text("\(text.unicodeScalars.count)/500").font(.caption).foregroundStyle(text.unicodeScalars.count > 500 ? ClimbTheme.error : ClimbTheme.secondaryText).frame(minHeight: 44) }
             Button { Task { await send() } } label: {
                 if sending { SwiftUI.ProgressView().frame(width: 44, height: 44) }
                 else { Image(systemName: "arrow.up.circle.fill").font(.title).frame(width: 44, height: 44) }
             }
-            .disabled(trimmed.isEmpty || text.count > 500 || sending)
+            .disabled(trimmed.isEmpty || text.unicodeScalars.count > 500 || sending)
             .accessibilityLabel("Post comment").accessibilityIdentifier("postComment")
         }.padding(.horizontal, 16).padding(.vertical, 8).background(.bar)
     }
