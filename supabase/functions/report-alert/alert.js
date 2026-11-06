@@ -3,7 +3,7 @@
 export async function reportAlert(request, env, send = fetch) {
   if (request.method !== 'POST') return new Response(null, { status: 405 });
   if (!env.REPORT_ALERT_WEBHOOK_URL) return new Response(null, { status: 503 });
-  const message = 'Sendr has a new report waiting for review.';
+  const message = 'Chalkbook has a new report waiting for review.';
   try {
     // Discord reads "content" and Slack reads "text".
     const sent = await send(env.REPORT_ALERT_WEBHOOK_URL, {

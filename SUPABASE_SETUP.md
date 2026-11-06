@@ -75,7 +75,7 @@ Review new reports within a day. Reports keep a copy of the reported text and ou
 
 Deploy `supabase/functions/revoke-apple` and `supabase/functions/report-alert`, keeping JWT verification on, then set these secrets in the Supabase dashboard. Never commit them.
 
-- `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (the full `.p8` file from a Sign in with Apple key) and `APPLE_CLIENT_ID` (`com.frozenpop.ClimbingApp`). Without these, Apple accounts still delete, but the app tells the person to remove Sendr from their Apple Account themselves.
+- `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (the full `.p8` file from a Sign in with Apple key) and `APPLE_CLIENT_ID` (`com.frozenpop.ClimbingApp`). Without these, Apple accounts still delete, but the app tells the person to remove Chalkbook from their Apple Account themselves.
 - `REPORT_ALERT_WEBHOOK_URL`, a Discord or Slack webhook. Without it, new reports raise no alert.
 
 ### Privacy policy
