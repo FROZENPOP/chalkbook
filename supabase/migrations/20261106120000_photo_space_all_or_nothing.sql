@@ -1,5 +1,5 @@
 -- Photo space is all or nothing: older photos are trimmed only when that makes enough room,
--- otherwise the post is saved without photos and nothing else is deleted. Photos are validated
+-- otherwise the post is saved without photos and only 30-day-old photos expire. Photos are validated
 -- before anything changes, so bad photos raise an error even when storage is full.
 begin;
 
@@ -27,17 +27,18 @@ begin
  with gone as (delete from public.shared_route_photos p where p.created_at < now() - interval '30 days' returning p.entry_id)
  update public.shared_sessions s set route_photo_count=0 where s.id in (select g.entry_id from gone g);
 
- with extra as (
-  select p.entry_id from public.shared_route_photos p join public.shared_sessions s on s.id=p.entry_id
-  where s.owner_id=auth.uid() and p.entry_id<>entry group by p.entry_id order by max(p.created_at) desc, p.entry_id offset 9
- ), gone as (delete from public.shared_route_photos p where p.entry_id in (select e.entry_id from extra e) returning p.entry_id)
- update public.shared_sessions s set route_photo_count=0 where s.id in (select g.entry_id from gone g);
-
  -- Trim only if removing all of the poster's other photos would make room; otherwise keep them.
  if incoming>0 and social_private.route_photo_bytes()+incoming-(
    select coalesce(sum(octet_length(p.original_base64)+coalesce(octet_length(p.highlighted_base64),0)),0) from public.shared_route_photos p
    join public.shared_sessions s on s.id=p.entry_id where s.owner_id=auth.uid() and p.entry_id<>entry) > social_private.photo_space_budget() then
   outcome:='no_space';
+ elsif incoming>0 then
+  -- The 10-post cap runs only when this save stores photos.
+  with extra as (
+   select p.entry_id from public.shared_route_photos p join public.shared_sessions s on s.id=p.entry_id
+   where s.owner_id=auth.uid() and p.entry_id<>entry group by p.entry_id order by max(p.created_at) desc, p.entry_id offset 9
+  ), gone as (delete from public.shared_route_photos p where p.entry_id in (select e.entry_id from extra e) returning p.entry_id)
+  update public.shared_sessions s set route_photo_count=0 where s.id in (select g.entry_id from gone g);
  end if;
 
  -- shortcut: concurrent saves can each see the same free space and overshoot the budget a little; it is set well below the real limit for that.
