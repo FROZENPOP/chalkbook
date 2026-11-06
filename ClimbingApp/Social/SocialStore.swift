@@ -39,6 +39,9 @@ final class SocialStore {
         let outbox = removals ?? RemovalOutbox(accountKey: accountKey)
         self.removals = outbox
         self.feed = FriendsFeed(isHidden: { outbox.hides($0) })
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--test-stale-photo-notice") { photoNotice = "Stale notice from an earlier share" }
+        #endif
     }
 
     private struct TokenResponse: Decodable {
@@ -192,7 +195,8 @@ final class SocialStore {
             errorMessage = "This entry is waiting to be removed. Retry removals before publishing it again."
             return false
         }
-        return await perform(auth) {
+        var stored = false
+        let refreshed = await perform(auth) {
             guard !self.removals.contains(sessionID: entry.source_session_id) else { throw SocialError.server }
             var values = entry.rpcValues
             if let photos {
@@ -201,15 +205,23 @@ final class SocialStore {
             }
             let saved = try await self.request(photos == nil ? "/rest/v1/rpc/save_shared_session" : "/rest/v1/rpc/save_shared_session_with_photos", method: "POST", values: values)
             if photos != nil { self.photoNotice = Self.photoNotice(saved) }
+            stored = true
             try await self.reload()
         }
+        // perform already reset the feed and token, so the next load fetches everything again.
+        if stored && !refreshed {
+            let refresh = "Your post was saved, but Friends couldn’t refresh. Check your connection and pull to refresh."
+            photoNotice = photoNotice.map { "\($0) \(refresh)" } ?? refresh
+            errorMessage = nil // perform's message says nothing was saved, which is false here.
+        }
+        return stored
     }
 
     /// The server reports how a photo post fit in Friends photo storage.
     nonisolated static func photoNotice(_ response: Data) -> String? {
         switch try? JSONDecoder().decode(String.self, from: response) {
         case "trimmed": "Friends photo storage is full, so photos were removed from your older Friends posts to make room. They’re still saved in your log on this iPhone."
-        case "no_space": "Friends photo storage is full, so this post was shared without photos while Chalkbook is in beta. Your photos are still saved in your log on this iPhone."
+        case "no_space": "Friends photo storage is full, so this post was shared without photos. Your photos are still saved in your log on this iPhone."
         default: nil
         }
     }

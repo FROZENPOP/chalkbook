@@ -92,7 +92,7 @@ struct ShareSessionView: View {
             .id(textSize)
             .navigationTitle("Share session")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() }.accessibleToolbarAction() } }
-            .task { await load() }
+            .task { social.photoNotice = nil; await load() } // A notice from an earlier, closed sheet isn't about this one.
             .sheet(isPresented: $login) { LoginPortalView() }
             .alert("Shared", isPresented: Binding(get: { social.photoNotice != nil }, set: { if !$0 { social.photoNotice = nil; dismiss() } })) {
                 Button("OK") {}

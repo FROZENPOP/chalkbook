@@ -57,9 +57,56 @@ final class SharedRoutePhotoTests: XCTestCase {
         let trimmed = SocialStore.photoNotice(Data(#""trimmed""#.utf8))
         let noSpace = SocialStore.photoNotice(Data(#""no_space""#.utf8))
         XCTAssertTrue(trimmed?.contains("removed from your older Friends posts") == true)
-        XCTAssertTrue(noSpace?.contains("without photos while Chalkbook is in beta") == true)
+        XCTAssertEqual(noSpace,"Friends photo storage is full, so this post was shared without photos. Your photos are still saved in your log on this iPhone.")
+        XCTAssertFalse(noSpace?.localizedCaseInsensitiveContains("beta") ?? true)
         for notice in [trimmed, noSpace] { XCTAssertTrue(notice?.contains("still saved in your log") == true) }
         XCTAssertNil(SocialStore.photoNotice(Data(#""saved""#.utf8)))
         XCTAssertNil(SocialStore.photoNotice(Data())) // older servers return nothing
     }
+
+    @MainActor func testSavedPostReportsSuccessWhenTheRefreshFails() async throws {
+        let account = ClimberAccount(provider:.google,subject:"publish-test-account",name:"Test",email:nil)
+        let owner = UUID(), sessions = FriendsSessionVault(service:"com.frozenpop.ClimbingApp.tests.\(UUID().uuidString)")
+        let directory = URL.temporaryDirectory.appending(path:"PublishTests-\(UUID().uuidString)")
+        defer { sessions.clear(); try? FileManager.default.removeItem(at:directory) }
+        let refresh = "Your post was saved, but Friends couldn’t refresh. Check your connection and pull to refresh."
+        let noSpace = try XCTUnwrap(SocialStore.photoNotice(Data(#""no_space""#.utf8)))
+        for (outcome,expected) in [("saved",refresh),("no_space","\(noSpace) \(refresh)")] {
+            var paths: [String] = []
+            PublishURLProtocol.handler = { request in
+                let path = request.url!.path; paths.append(path)
+                if path.hasPrefix("/auth/") { return (200,Data(#"{"access_token":"t","expires_in":3600,"user":{"id":"\#(owner)"}}"#.utf8)) }
+                if path == "/rest/v1/rpc/save_shared_session_with_photos" { return (200,Data("\"\(outcome)\"".utf8)) }
+                return (500,Data()) // the refresh after saving fails
+            }
+            let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [PublishURLProtocol.self]
+            let social = SocialStore(configuration:.init(projectURL:URL(string:"https://test.invalid")!,publishableKey:"test"),network:URLSession(configuration:config),
+                accountKey:account.storageKey,removals:RemovalOutbox(accountKey:account.storageKey,directory:directory),sessions:sessions,identityToken:{ _ in "id-token" })
+            let auth = AccountSession(vault:PublishAccountVault(value:account),googleSignOut:{},friendsSessions:sessions)
+            let published = await social.publish(auth,entry:SharedSession(session:ClimbingSession(),owner:owner),photos:[])
+            XCTAssertTrue(published,"\(outcome): the save succeeded, so the post must not be reported as failed")
+            XCTAssertTrue(paths.contains("/rest/v1/friendships"),"\(outcome): the refresh was attempted")
+            XCTAssertEqual(social.photoNotice,expected,"\(outcome): the Shared alert explains the failed refresh")
+            XCTAssertNil(social.errorMessage,"\(outcome): nothing claims the save failed")
+        }
+    }
+}
+
+private struct PublishAccountVault: AccountVault {
+    let value: ClimberAccount
+    func load() throws -> ClimberAccount? { value }
+    func save(_ account: ClimberAccount) throws {}
+    func clear() throws {}
+}
+
+private final class PublishURLProtocol: URLProtocol {
+    static var handler: ((URLRequest) -> (Int,Data))?
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let (code,data) = Self.handler!(request)
+        client?.urlProtocol(self,didReceive:HTTPURLResponse(url:request.url!,statusCode:code,httpVersion:nil,headerFields:nil)!,cacheStoragePolicy:.notAllowed)
+        client?.urlProtocol(self,didLoad:data);client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
 }
