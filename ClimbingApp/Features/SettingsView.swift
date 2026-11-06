@@ -82,6 +82,8 @@ struct SettingsView: View {
             Section {
                 LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
                 NavigationLink("Privacy Policy") { PrivacyPolicyView() }.accessibilityIdentifier("privacyPolicy")
+                Link("Contact support", destination: URL(string: "mailto:chalkbook.support@gmail.com")!)
+                    .frame(minHeight: 44).accessibilityValue("chalkbook.support@gmail.com").accessibilityIdentifier("contactSupport")
             }
             if auth.account != nil {
                 Section {
