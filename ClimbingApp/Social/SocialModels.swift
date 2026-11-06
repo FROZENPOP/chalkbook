@@ -83,8 +83,12 @@ struct SharedSession: Codable, Identifiable {
     init(session: ClimbingSession, owner: UUID) {
         id = UUID(); owner_id = owner; source_session_id = session.id
         visibility = .private; caption = ""; session_day = session.day
-        attempts = session.totals.attempts; sends = session.totals.sends
-        duration_minutes = session.durationMinutes; completeness = session.totals.label
+        // Leave out values the server would reject, so an unusual session still shares.
+        let totals = session.totals
+        let shownAttempts = totals.attempts.flatMap { $0 <= 100_000 ? $0 : nil }
+        attempts = shownAttempts
+        sends = totals.sends.flatMap { $0 <= 100_000 && $0 <= (shownAttempts ?? .max) ? $0 : nil }
+        duration_minutes = session.durationMinutes.flatMap { $0 <= 10_080 ? $0 : nil }; completeness = totals.label
     }
 
     var rpcValues: [String: Any] {

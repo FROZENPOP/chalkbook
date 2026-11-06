@@ -9,6 +9,10 @@ final class JournalRulesTests: XCTestCase {
         let additional = JournalRules.totals(detailedAttempts: 5, detailedSends: 2, batches: [.init(coverage: .additional, attempts: 7, sends: 2)])
         XCTAssertEqual(additional.attempts, 12); XCTAssertEqual(additional.sends, 4)
     }
+    func testHugeTotalsAreRejectedWithoutOverflowing() {
+        let total = JournalRules.totals(detailedAttempts: 3, detailedSends: 1, batches: [.init(coverage: .additional, attempts: .max, sends: nil), .init(coverage: .additional, attempts: .max, sends: nil)])
+        XCTAssertNil(total.attempts); XCTAssertFalse(total.conflicts.isEmpty)
+    }
     func testSendsOnlyDoNotInventAttempts() {
         let total = JournalRules.totals(detailedAttempts: 0, detailedSends: 0, batches: [.init(coverage: .wholeSession, attempts: nil, sends: 4)])
         XCTAssertNil(total.attempts); XCTAssertEqual(total.sends, 4)

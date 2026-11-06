@@ -168,7 +168,7 @@ final class SocialStore {
         guard !removals.removingProfile else { errorMessage = "Your profile removal is waiting to sync. Retry removals before creating another profile."; return false }
         let username = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard username.range(of: "^[a-z0-9_]{3,24}$", options: .regularExpression) != nil, (1...60).contains(name.count),bio.count<=240,(photo?.count ?? 0)<=65_536 else {
+        guard username.range(of: "^[a-z0-9_]{3,24}$", options: .regularExpression) != nil, (1...60).contains(name.unicodeScalars.count),bio.unicodeScalars.count<=240,(photo?.count ?? 0)<=65_536 else {
             errorMessage = SocialError.invalidProfile.localizedDescription; return false
         }
         return await perform(auth) {

@@ -16,7 +16,7 @@ async function clientSecret(env, now) {
 export async function revokeApple(request, env, send = fetch) {
   if (request.method !== 'POST') return new Response(null, { status: 405 });
   const code = (await request.json().catch(() => ({}))).authorization_code;
-  if (typeof code !== 'string' || !code) return new Response(null, { status: 400 });
+  if (typeof code !== 'string' || !code || code.length > 1024) return new Response(null, { status: 400 });
   if (!env.APPLE_PRIVATE_KEY || !env.APPLE_KEY_ID || !env.APPLE_TEAM_ID || !env.APPLE_CLIENT_ID) return new Response(null, { status: 503 });
   try {
     const secret = await clientSecret(env, Math.floor(Date.now() / 1000));

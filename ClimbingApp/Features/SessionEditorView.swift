@@ -100,7 +100,7 @@ struct SessionEditorView: View {
             }) { dismiss() }
         } else if isRecap {
             let entered = minutes.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !entered.isEmpty && (Int(entered) ?? -1) < 0 { store.errorMessage = "Enter a duration in whole minutes or leave it blank."; return }
+            if !entered.isEmpty && !(0...10_080).contains(Int(entered) ?? -1) { store.errorMessage = "Enter a duration of up to 10,080 minutes (one week), or leave it blank."; return }
             created = store.createRecap(date: date, gym: gym, location: location, notes: notes, minutes: Int(entered))
         } else if let started = store.start(date: .now, location: location, notes: notes, gym: gym) {
             onStart(started)

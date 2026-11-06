@@ -59,6 +59,10 @@ enum JournalRules {
             if (b.attempts ?? 0) < 0 || (b.sends ?? 0) < 0 { conflicts.append("Totals cannot be negative.") }
             if let a = b.attempts, let s = b.sends, s > a { conflicts.append("Sends cannot exceed attempts in the same activity.") }
         }
+        // Checked before adding so huge totals can't overflow and crash.
+        if batches.contains(where: { ($0.attempts ?? 0) > 100_000 || ($0.sends ?? 0) > 100_000 }) {
+            return ActivityTotals(attempts: nil, sends: nil, conflicts: conflicts + ["Totals can be at most 100,000."], hasRecalledActivity: true)
+        }
         let knownA = detailedAttempts + additional.compactMap(\.attempts).reduce(0,+)
         let knownS = detailedSends + additional.compactMap(\.sends).reduce(0,+)
         let wholeA = whole.compactMap(\.attempts), wholeS = whole.compactMap(\.sends)
