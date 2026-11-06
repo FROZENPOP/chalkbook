@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check, run, test, or accessibility-audit Sendr on a standard iPhone simulator."""
+"""Check, run, test, or accessibility-audit Chalkbook on a standard iPhone simulator."""
 import argparse
 import json
 from pathlib import Path

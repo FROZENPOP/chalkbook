@@ -328,7 +328,7 @@ final class SocialStore {
         }
         suggestions.reset(); me = nil; feed.reset(); friendships = []; peopleRecords = []; blocks = []
         auth.signOut()
-        if appleGrantRemains { auth.errorMessage = "Your account is deleted. To remove Sendr from your Apple Account too, go to iPhone Settings > your name > Sign-In & Security > Sign in with Apple." }
+        if appleGrantRemains { auth.errorMessage = "Your account is deleted. To remove Chalkbook from your Apple Account too, go to iPhone Settings > your name > Sign-In & Security > Sign in with Apple." }
         return auth.account == nil
     }
 

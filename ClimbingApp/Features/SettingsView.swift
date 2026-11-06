@@ -112,7 +112,7 @@ struct SettingsView: View {
             }
         } message: { Text("Permanently deletes your account, Friends profile and shared entries. Your journal stays on this iPhone. This can’t be undone.") }
         .fileExporter(isPresented: $exporting, document: exportDocument, contentType: .json,
-                      defaultFilename: "Sendr-\(SessionDay.key(for: .now))") { result in
+                      defaultFilename: "Chalkbook-\(SessionDay.key(for: .now))") { result in
             if case let .failure(error) = result { message = error.localizedDescription }
         }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in

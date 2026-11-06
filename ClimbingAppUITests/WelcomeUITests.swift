@@ -25,6 +25,6 @@ import XCTest
         app.tabBars.buttons["Journal"].tap()
         app.profileButton.tap()
         XCTAssertTrue(app.buttons["openLogin"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["You’re using Sendr as a guest"].exists)
+        XCTAssertTrue(app.staticTexts["You’re using Chalkbook as a guest"].exists)
     }
 }
