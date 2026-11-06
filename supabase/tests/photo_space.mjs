@@ -1,4 +1,4 @@
-// Friends photo space budget: trim the poster's own oldest photos, else post without photos. Run with Node and @electric-sql/pglite (0.5.11).
+// Friends photo space budget: trim the poster's own oldest photos only if that makes room, else post without photos. Run with Node and @electric-sql/pglite (0.5.11).
 import { readFile, readdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -59,7 +59,37 @@ assert.equal(big.outcome, 'trimmed');
 assert.deepEqual(await photosOn(big.source), { n: 3, c: 3 });
 for (const p of [p2, p3, p4]) assert.deepEqual(await photosOn(p.source), { n: 0, c: 0 });
 
-// Climbers can't read or change the budget.
+// Trimming can't make enough room: no_space, and nothing else is deleted.
+await admin('delete from public.shared_route_photos');
+await admin('update public.shared_sessions set route_photo_count=0');
+const bob2 = await post(b, 2), small = await post(a, 1);
+assert.deepEqual([bob2.outcome, small.outcome], ['saved', 'saved']);
+const tooBig = await post(a, 3);
+assert.equal(tooBig.outcome, 'no_space');
+assert.deepEqual(await photosOn(tooBig.source), { n: 0, c: 0 });
+assert.deepEqual(await photosOn(small.source), { n: 1, c: 1 });
+assert.deepEqual(await photosOn(bob2.source), { n: 2, c: 2 });
+
+// Storage is full: bad photos still raise, and nothing is deleted or inserted.
+const photoIds = async () => (await admin('select id from public.shared_route_photos order by id')).map(r => r.id);
+const before = await photoIds();
+for (const owner of [a, b]) for (const bad of [{ id: 'not-a-uuid', original_base64: jpeg }, { id: randomUUID(), original_base64: Buffer.from('not a jpeg').toString('base64') },
+  { id: randomUUID(), original_base64: jpeg, highlighted_base64: Buffer.from('not a jpeg').toString('base64') }]) {
+  await as(owner);
+  const source = randomUUID();
+  await assert.rejects(db.query("select public.save_shared_session_with_photos($1,'friends','','2026-11-05',null,1,null,'Sends only',$2::jsonb)",
+    [source, JSON.stringify([bad])]), /Invalid photo data/);
+  assert.equal(await photosOn(source), undefined);
+}
+assert.deepEqual(await photoIds(), before);
+
+// Climbers can't read or change the budget, and only signed-in climbers can save.
 await as(a);
 await assert.rejects(db.query('select social_private.photo_space_budget()'), /permission denied/);
+for (const fn of ['social_private', 'public'].map(s => `${s}.save_shared_session_with_photos(uuid,text,text,text,integer,integer,integer,text,jsonb)`)) {
+  const [g] = await admin(`select has_function_privilege('authenticated','${fn}','execute') auth, has_function_privilege('anon','${fn}','execute') anon,
+    exists(select 1 from pg_proc p, aclexplode(p.proacl) x where p.oid='${fn}'::regprocedure and x.grantee=0) pub,
+    (select proacl is null from pg_proc where oid='${fn}'::regprocedure) defaults`);
+  assert.deepEqual(g, { auth: true, anon: false, pub: false, defaults: false }, fn);
+}
 console.log('photo space checks passed');
