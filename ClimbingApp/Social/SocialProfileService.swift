@@ -3,7 +3,8 @@ import Foundation
 extension SocialStore {
     func profilePage(_ auth:AccountSession,id:UUID) async throws -> SocialProfilePage {
         try await authorize(auth)
-        let profiles=try JSONDecoder().decode([SocialProfile].self,from:await request("/rest/v1/climber_profiles?id=eq.\(id.uuidString)&select=*"))
+        // One climber by id, connected or not (search, suggestions, invites); the table only lists connected climbers.
+        let profiles=try JSONDecoder().decode([SocialProfile].self,from:await request("/rest/v1/rpc/climber_profile",method:"POST",values:["target":id.uuidString]))
         guard let profile=profiles.first else { throw SocialError.server }
         let details=try await profileDetails(auth,id:id)
         let entries=try JSONDecoder().decode([SharedSession].self,from:await request("/rest/v1/shared_sessions?owner_id=eq.\(id.uuidString)&select=*&order=session_day.desc&limit=200"))

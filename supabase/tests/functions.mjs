@@ -41,11 +41,19 @@ assert.equal((await revokeApple(call({}), env, apple().send)).status, 400);
 assert.equal((await revokeApple(call({ authorization_code: 'code' }), {}, apple().send)).status, 503);
 assert.equal((await revokeApple(call({}, 'GET'), env, apple().send)).status, 405);
 
-// The alert carries a fixed message and nothing from the report.
-const sent = [];
-assert.equal((await reportAlert(call({ reason: 'secret' }), { REPORT_ALERT_WEBHOOK_URL: 'https://hook.invalid' }, async (url, init) => { sent.push({ url, body: init.body }); return new Response(null, { status: 204 }); })).status, 204);
-assert.equal(sent[0].url, 'https://hook.invalid'); assert.ok(!sent[0].body.includes('secret'));
+// The alert carries a fixed message and nothing from the report, and only fires for a report the caller just filed.
+const alertEnv = { REPORT_ALERT_WEBHOOK_URL: 'https://hook.invalid', SUPABASE_URL: 'https://db.invalid' };
+const alerting = (claimed) => { const sent = []; return { sent, send: async (url, init) => { sent.push({ url, init });
+  return url.startsWith('https://db.invalid') ? Response.json(claimed) : new Response(null, { status: 204 }); } }; };
+const signed = body => new Request('https://test.invalid', { method: 'POST', body: JSON.stringify(body), headers: { apikey: 'sb_publishable_x', Authorization: 'Bearer user' } });
+let hook = alerting(true);
+assert.equal((await reportAlert(signed({ reason: 'secret' }), alertEnv, hook.send)).status, 204);
+assert.equal(hook.sent[0].url, 'https://db.invalid/rest/v1/rpc/claim_report_alert'); assert.equal(hook.sent[0].init.headers.Authorization, 'Bearer user');
+assert.equal(hook.sent[1].url, 'https://hook.invalid'); assert.ok(!hook.sent[1].init.body.includes('secret'));
+hook = alerting(false);
+assert.equal((await reportAlert(signed({}), alertEnv, hook.send)).status, 204);
+assert.equal(hook.sent.length, 1, 'no report to claim, no ping');
 assert.equal((await reportAlert(call({}), {}, async () => new Response())).status, 503);
-assert.equal((await reportAlert(call({}), { REPORT_ALERT_WEBHOOK_URL: 'https://hook.invalid' }, async () => { throw new Error('offline'); })).status, 502);
+assert.equal((await reportAlert(call({}), alertEnv, async () => { throw new Error('offline'); })).status, 502);
 
 console.log('Edge function checks passed.');

@@ -20,7 +20,7 @@ const profile = (name, display, avatar = null) => db.query('select public.save_s
 const share = day => db.query("select public.save_shared_session($1,'friends','',$2,null,1,null,'Sends only')",[randomUUID(),day]);
 
 // Names: no invisible, spoofing or staff-looking names.
-for (const display of ['​', ' ', 'Bob‮evil', 'Line\nbreak', 'Chalkbook Support'])
+for (const display of ['\u200b', '\u00a0', 'Bob\u202eevil', 'Line\nbreak', 'Chalkbook Support'])
   await assert.rejects(profile('alice', display), /check constraint/, JSON.stringify(display));
 for (const name of ['support', 'admin', 'chalkbook_team'])
   await assert.rejects(profile(name, 'Alice'), /check constraint/, name);
@@ -35,7 +35,24 @@ await share(new Date().toISOString().slice(0,10));
 const entry = (await db.query('select id from public.shared_sessions limit 1')).rows[0].id;
 
 // Comments must have visible text, and at most 10 a minute.
-await assert.rejects(db.query('select public.add_session_comment($1,$2)',[entry,' ​']), /check constraint/);
+await assert.rejects(db.query('select public.add_session_comment($1,$2)',[entry,'\u00a0\u200b']), /check constraint/);
 for (let i = 0; i < 10; i++) await db.query('select public.add_session_comment($1,$2)',[entry,`nice ${i}`]);
 await assert.rejects(db.query('select public.add_session_comment($1,$2)',[entry,'one more']), /Too many comments/);
+// A report pings the moderator once, nothing else can, and reports are capped per day.
+const b = '00000000-0000-0000-0000-000000000002';
+const as = async id => { await db.exec('reset role'); await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]); await db.exec('set role authenticated'); };
+await db.exec('reset role'); await db.query('insert into auth.users values($1)',[b]);
+await as(b); await db.query("select public.save_social_profile('bob','Bob',false)");
+await as(a);
+const claim = async () => (await db.query('select public.claim_report_alert() as ok')).rows[0].ok;
+assert.equal(await claim(), false, 'no report, no alert');
+await db.query("select public.report_climber($1,'spam')",[b]);
+assert.equal(await claim(), true);
+assert.equal(await claim(), false, 'one alert per report');
+for (let i = 1; i < 20; i++) await db.query("select public.report_climber($1,'spam')",[b]);
+await assert.rejects(db.query("select public.report_climber($1,'spam')",[b]), /Too many reports/);
+// Strangers can't list every climber, but can still open one profile by id.
+await as(a);
+assert.deepEqual((await db.query('select id from public.climber_profiles')).rows.map(r=>r.id), [a]);
+assert.equal((await db.query('select * from public.climber_profile($1)',[b])).rows[0].username, 'bob');
 console.log('input limit checks passed');

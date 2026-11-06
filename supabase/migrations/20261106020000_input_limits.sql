@@ -39,4 +39,21 @@ revoke all on function social_private.limit_input() from public,anon,authenticat
 create trigger limit_shared_session before insert or update on public.shared_sessions for each row execute function social_private.limit_input();
 create trigger limit_comment before insert on public.session_comments for each row execute function social_private.limit_input();
 create trigger limit_report before insert on public.social_reports for each row execute function social_private.limit_input();
+
+-- Each report can ping the moderator once, so the report-alert function can't be used to spam them.
+alter table public.social_reports add column alerted boolean not null default false;
+create function social_private.claim_report_alert() returns boolean
+language plpgsql security definer set search_path='' as $$
+begin
+ if auth.uid() is null then return false; end if;
+ update public.social_reports r set alerted=true
+  where r.reporter=auth.uid() and not r.alerted and r.created_at>now()-interval '5 minutes';
+ return found;
+end $$;
+revoke all on function social_private.claim_report_alert() from public,anon;
+grant execute on function social_private.claim_report_alert() to authenticated;
+create function public.claim_report_alert() returns boolean
+language sql security invoker set search_path='' as $$ select social_private.claim_report_alert(); $$;
+revoke all on function public.claim_report_alert() from public,anon;
+grant execute on function public.claim_report_alert() to authenticated;
 commit;

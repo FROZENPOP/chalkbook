@@ -30,7 +30,7 @@ create table public.routes (
   grade_kind text not null default 'exact' check(grade_kind in ('exact','range','color','colorRange','unknown')),
   grade text not null default '' check(length(grade) <= 20),
   grade_upper text not null default '' check(length(grade_upper) <= 20),
-  set_on date,
+  set_on date check(set_on between date '2000-01-01' and date '2100-01-01'),
   status text not null default 'active' check(status in ('active','retired')),
   created_by uuid references auth.users(id) on delete set null,
   updated_at timestamptz not null default now(),
@@ -54,9 +54,9 @@ create table public.sessions (
   id uuid primary key,
   owner_id uuid not null references auth.users(id) on delete cascade,
   gym_id uuid references public.gyms(id) on delete set null,
-  started_at timestamptz not null,
+  started_at timestamptz not null check(started_at between timestamptz '2000-01-01' and timestamptz '2100-01-01'),
   ended_at timestamptz,
-  tz text not null check(length(tz) between 1 and 64),
+  tz text not null check(tz ~ '^[A-Za-z0-9_+/-]{1,64}$'),
   visibility text not null default 'followers' check(visibility in ('private','followers','public')),
   caption text not null default '' check(length(caption) <= 1000),
   manual_attempts integer check(manual_attempts between 0 and 100000),
@@ -76,7 +76,7 @@ create table public.attempts (
   personal_route_id uuid references public.personal_routes(id) on delete set null,
   seq integer not null check(seq between 0 and 100000),
   sent boolean not null,
-  at timestamptz not null,
+  at timestamptz not null check(at between timestamptz '2000-01-01' and timestamptz '2100-01-01'),
   precision text not null default 'exact' check(precision in ('exact','day')),
   updated_at timestamptz not null default now(),
   deleted_at timestamptz,
@@ -101,7 +101,7 @@ create table public.media (
   session_id uuid references public.sessions(id) on delete cascade,
   route_id uuid references public.routes(id) on delete set null,
   kind text not null check(kind in ('photo','video')),
-  storage_path text not null check(length(storage_path) between 1 and 500),
+  storage_path text not null check(length(storage_path) between 1 and 500 and storage_path !~ '(^|/)\.\.?(/|$)'),
   check(split_part(storage_path,'/',1) = owner_id::text), -- Storage access can key off this row, so a row may only name its owner's files.
   visibility text not null default 'session' check(visibility in ('private','session')), -- 'session' follows the session's audience.
   updated_at timestamptz not null default now(),
@@ -146,6 +146,10 @@ $$;
 create function social_private.session_visible(session uuid) returns boolean
 language sql stable security definer set search_path='' as $$
  select coalesce((select social_private.visible_session(owner_id,visibility,hide_gym,deleted_at) from public.sessions where id=session),false)
+$$;
+create function social_private.shared_by_other(session uuid) returns boolean
+language sql stable security definer set search_path='' as $$
+ select exists(select 1 from public.shared_sessions where source_session_id=session and owner_id<>auth.uid())
 $$;
 create function social_private.owns_session(session uuid) returns boolean
 language sql stable security definer set search_path='' as $$
@@ -199,7 +203,8 @@ create policy personal_routes_owner on public.personal_routes for all to authent
 create policy route_notes_owner on public.route_notes for all to authenticated
  using(owner_id=(select auth.uid())) with check(owner_id=(select auth.uid()));
 create policy sessions_read on public.sessions for select to authenticated using(social_private.visible_session(owner_id,visibility,hide_gym,deleted_at));
-create policy sessions_add on public.sessions for insert to authenticated with check(owner_id=(select auth.uid()));
+-- A friend can see a shared post's source_session_id, so they must not be able to claim that id first.
+create policy sessions_add on public.sessions for insert to authenticated with check(owner_id=(select auth.uid()) and not social_private.shared_by_other(id));
 create policy sessions_edit on public.sessions for update to authenticated using(owner_id=(select auth.uid())) with check(owner_id=(select auth.uid()));
 create policy attempts_read on public.attempts for select to authenticated
  using(owner_id=(select auth.uid()) or (deleted_at is null and social_private.session_visible(session_id)));
@@ -263,4 +268,26 @@ grant select on public.gyms, public.walls, public.routes, public.personal_routes
 grant insert, update on public.gyms, public.walls, public.routes, public.personal_routes, public.sessions, public.attempts,
  public.route_notes, public.media to authenticated;
 grant insert, delete on public.kudos, public.comments to authenticated;
+revoke all on function social_private.shared_by_other(uuid) from public,anon;
+grant execute on function social_private.shared_by_other(uuid) to authenticated;
+
+-- Places are shared and only their creator edits them, so cap how many one account can add.
+create function social_private.limit_places() returns trigger
+language plpgsql security definer set search_path='' as $$
+declare made integer;
+begin
+ if new.created_by is null then return new; end if;
+ if tg_table_name='gyms' then select count(*) into made from public.gyms where created_by=new.created_by;
+  if made>=200 then raise exception 'Gym limit reached'; end if;
+ elsif tg_table_name='walls' then select count(*) into made from public.walls where created_by=new.created_by;
+  if made>=2000 then raise exception 'Wall limit reached'; end if;
+ else select count(*) into made from public.routes where created_by=new.created_by;
+  if made>=20000 then raise exception 'Route limit reached'; end if;
+ end if;
+ return new;
+end $$;
+revoke all on function social_private.limit_places() from public,anon,authenticated;
+create trigger limit_gyms before insert on public.gyms for each row execute function social_private.limit_places();
+create trigger limit_walls before insert on public.walls for each row execute function social_private.limit_places();
+create trigger limit_routes before insert on public.routes for each row execute function social_private.limit_places();
 commit;
