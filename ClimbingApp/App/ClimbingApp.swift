@@ -114,6 +114,7 @@ private struct WorkspaceRoot: View {
                 #endif
                 #if DEBUG
                 if AccessibilityAuditFixtures.enabled { try AccessibilityAuditFixtures.seed(store.mainContext) }
+                try ScreenshotDemo.seed(store.mainContext)
                 #endif
                 container = store
             } else {
@@ -132,6 +133,11 @@ struct AppRoot: View {
     @State private var social: SocialStore
     @Environment(\.scenePhase) private var scenePhase
     @State private var setupProfile = false
+    #if DEBUG
+    @State private var tab = ScreenshotDemo.startTab
+    #else
+    @State private var tab = 0
+    #endif
 
     init(container: ModelContainer, profileKey: String = "guest", profileDirectory: URL? = nil) {
         let testing = ProcessInfo.processInfo.arguments.contains("--ui-testing")
@@ -144,17 +150,17 @@ struct AppRoot: View {
     var body: some View {
         VStack(spacing: 0) {
             SaveErrorBanner()
-            TabView {
+            TabView(selection: $tab) {
                 NavigationStack {
                     #if DEBUG
                     if AccessibilityAuditFixtures.enabled { AccessibilityAuditDestination() } else { HomeView() }
                     #else
                     HomeView()
                     #endif
-                }.tabItem { Label("Journal", systemImage: "book") }
-                NavigationStack { ProjectsView() }.tabItem { Label("Projects", systemImage: "figure.climbing") }
-                NavigationStack { ProgressViewScreen() }.tabItem { Label("Progress", systemImage: "chart.bar.xaxis") }
-                NavigationStack { friendsRoot }.tabItem { Label("Friends", systemImage: "person.2") }
+                }.tabItem { Label("Journal", systemImage: "book") }.tag(0)
+                NavigationStack { ProjectsView() }.tabItem { Label("Projects", systemImage: "figure.climbing") }.tag(1)
+                NavigationStack { ProgressViewScreen() }.tabItem { Label("Progress", systemImage: "chart.bar.xaxis") }.tag(2)
+                NavigationStack { friendsRoot }.tabItem { Label("Friends", systemImage: "person.2") }.tag(3)
             }
         }
         .id(store.dataRevision)

@@ -17,6 +17,8 @@ final class SocialStore {
     let suggestions = FriendSuggestions()
     private(set) var mediaRevision = 0
     var errorMessage: String?
+    /// Set after a photo post when Friends photo storage was full; the share screen shows it once.
+    var photoNotice: String?
     /// Set when an Apple account has no saved Friends session and Apple must confirm the account again.
     private(set) var needsAppleSignIn = false
     let configuration: SupabaseConfiguration?
@@ -197,8 +199,18 @@ final class SocialStore {
                 guard photos.count <= 3 else { throw SocialError.server }
                 values["photos"] = try photos.map { try $0.validated().rpcValues }
             }
-            _ = try await self.request(photos == nil ? "/rest/v1/rpc/save_shared_session" : "/rest/v1/rpc/save_shared_session_with_photos", method: "POST", values: values)
+            let saved = try await self.request(photos == nil ? "/rest/v1/rpc/save_shared_session" : "/rest/v1/rpc/save_shared_session_with_photos", method: "POST", values: values)
+            if photos != nil { self.photoNotice = Self.photoNotice(saved) }
             try await self.reload()
+        }
+    }
+
+    /// The server reports how a photo post fit in Friends photo storage.
+    nonisolated static func photoNotice(_ response: Data) -> String? {
+        switch try? JSONDecoder().decode(String.self, from: response) {
+        case "trimmed": "Friends photo storage is full, so photos were removed from your older Friends posts to make room. They’re still saved in your log on this iPhone."
+        case "no_space": "Friends photo storage is full, so this post was shared without photos while Chalkbook is in beta. Your photos are still saved in your log on this iPhone."
+        default: nil
         }
     }
 

@@ -45,6 +45,8 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Chalkbook doesn’t save anything to Health. It only reads the climbing workouts you choose to link.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Read the climbing workouts you link, their energy, and heart rate, to show them in your private session logs. Logging works without Health access.</string>
 	<key>UIApplicationSceneManifest</key>

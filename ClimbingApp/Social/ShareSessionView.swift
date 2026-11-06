@@ -65,7 +65,7 @@ struct ShareSessionView: View {
                         Text("Only what’s shown here is sent. Notes, gym details, videos, markup and Health data stay private. Route photos are removed from Friends after 30 days.").font(.caption)
                     }
                     Section {
-                        Button("Save reviewed entry") { Task { if let preview, await social.publish(auth, entry: preview, photos:reviewedPhotos) { dismiss() } } }
+                        Button("Save reviewed entry") { Task { if let preview, await social.publish(auth, entry: preview, photos:reviewedPhotos), social.photoNotice == nil { dismiss() } } }
                             .disabled(social.busy || preparingPhoto || !photosLoaded || draft.caption.unicodeScalars.count > 1000)
                     }
                 } else if social.configuration != nil && auth.account == nil {
@@ -94,6 +94,9 @@ struct ShareSessionView: View {
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close", systemImage: "xmark") { dismiss() }.accessibleToolbarAction() } }
             .task { await load() }
             .sheet(isPresented: $login) { LoginPortalView() }
+            .alert("Shared", isPresented: Binding(get: { social.photoNotice != nil }, set: { if !$0 { social.photoNotice = nil; dismiss() } })) {
+                Button("OK") {}
+            } message: { Text(social.photoNotice ?? "") }
             .onDisappear { preparation?.cancel() }
         }
     }

@@ -52,4 +52,14 @@ final class SharedRoutePhotoTests: XCTestCase {
         XCTAssertNil(draft.rpcValues["photos"])
         XCTAssertFalse(String(describing:draft.rpcValues).contains("Private notes"))
     }
+
+    func testStorageFullOutcomesExplainPhotosStayInTheLog() {
+        let trimmed = SocialStore.photoNotice(Data(#""trimmed""#.utf8))
+        let noSpace = SocialStore.photoNotice(Data(#""no_space""#.utf8))
+        XCTAssertTrue(trimmed?.contains("removed from your older Friends posts") == true)
+        XCTAssertTrue(noSpace?.contains("without photos while Chalkbook is in beta") == true)
+        for notice in [trimmed, noSpace] { XCTAssertTrue(notice?.contains("still saved in your log") == true) }
+        XCTAssertNil(SocialStore.photoNotice(Data(#""saved""#.utf8)))
+        XCTAssertNil(SocialStore.photoNotice(Data())) // older servers return nothing
+    }
 }
