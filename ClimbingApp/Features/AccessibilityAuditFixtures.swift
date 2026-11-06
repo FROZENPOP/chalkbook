@@ -5,14 +5,16 @@ import SwiftUI
 /// Isolated launch routes to the actual screens. Both arguments are required; no real account,
 /// HealthKit access, or backend is used. These records live only in the existing UI-test store.
 @MainActor enum AccessibilityAuditFixtures {
-    static var enabled: Bool { ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--accessibility-audit") }
+    /// The audit, or the screenshot demo, which reuses the audit's local Friends screens.
+    static var enabled: Bool { audit || ScreenshotDemo.enabled }
+    static var audit: Bool { ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--accessibility-audit") }
     static var screen: String {
         let args = ProcessInfo.processInfo.arguments
         guard let i = args.firstIndex(of: "--accessibility-audit"), args.indices.contains(i + 1) else { return "home" }
         return args[i + 1]
     }
     static func seed(_ context: ModelContext) throws {
-        guard enabled, !ProcessInfo.processInfo.arguments.contains("--audit-empty") else { return }
+        guard audit, !ProcessInfo.processInfo.arguments.contains("--audit-empty") else { return }
         let session = ClimbingSession(date: .now.addingTimeInterval(-7200), location: "Audit gym")
         session.isComplete = true; session.endedAt = session.startedAt.addingTimeInterval(3600)
         context.insert(session)

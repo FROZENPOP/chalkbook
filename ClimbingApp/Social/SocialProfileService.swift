@@ -12,6 +12,9 @@ extension SocialStore {
     }
 
     func profileDetails(_ auth:AccountSession,id:UUID) async throws -> SocialProfileDetails? {
+        #if DEBUG
+        if ScreenshotDemo.enabled { return nil } // Friends avatars show initials; no backend call
+        #endif
         try await authorize(auth)
         return try JSONDecoder().decode([SocialProfileDetails].self,from:await request("/rest/v1/climber_profile_details?id=eq.\(id.uuidString)&select=*")).first
     }

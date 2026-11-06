@@ -113,7 +113,7 @@ private struct WorkspaceRoot: View {
                 }
                 #endif
                 #if DEBUG
-                if AccessibilityAuditFixtures.enabled { try AccessibilityAuditFixtures.seed(store.mainContext) }
+                if AccessibilityAuditFixtures.audit { try AccessibilityAuditFixtures.seed(store.mainContext) }
                 try ScreenshotDemo.seed(store.mainContext)
                 #endif
                 container = store
@@ -153,13 +153,19 @@ struct AppRoot: View {
             TabView(selection: $tab) {
                 NavigationStack {
                     #if DEBUG
-                    if AccessibilityAuditFixtures.enabled { AccessibilityAuditDestination() } else { HomeView() }
+                    if AccessibilityAuditFixtures.audit { AccessibilityAuditDestination() } else { HomeView().modifier(ScreenshotDemoPush(tab: 0)) }
                     #else
                     HomeView()
                     #endif
                 }.tabItem { Label("Journal", systemImage: "book") }.tag(0)
                 NavigationStack { ProjectsView() }.tabItem { Label("Projects", systemImage: "figure.climbing") }.tag(1)
-                NavigationStack { ProgressViewScreen() }.tabItem { Label("Progress", systemImage: "chart.bar.xaxis") }.tag(2)
+                NavigationStack {
+                    #if DEBUG
+                    ProgressViewScreen().modifier(ScreenshotDemoPush(tab: 2))
+                    #else
+                    ProgressViewScreen()
+                    #endif
+                }.tabItem { Label("Progress", systemImage: "chart.bar.xaxis") }.tag(2)
                 NavigationStack { friendsRoot }.tabItem { Label("Friends", systemImage: "person.2") }.tag(3)
             }
         }
@@ -201,6 +207,8 @@ struct AppRoot: View {
             SharedRoutePhotoFixtureView()
         } else if ProcessInfo.processInfo.arguments.contains("--ui-testing") && ProcessInfo.processInfo.arguments.contains("--test-friend-search") {
             AddFriendsView()
+        } else if ScreenshotDemo.enabled {
+            FriendsView(auditProfile: SocialAuditSample.me)
         } else { FriendsView() }
         #else
         FriendsView()
