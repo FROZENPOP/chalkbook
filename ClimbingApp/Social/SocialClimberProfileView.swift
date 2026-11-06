@@ -58,6 +58,7 @@ struct SessionReactionBar: View {
     @State private var busy=false
     @State private var loaded=false
     @State private var error:String?
+    @State private var confirmingBlock=false
     @Environment(\.dynamicTypeSize) private var textSize
     var body: some View {
         VStack(alignment:.leading,spacing:8) {
@@ -68,6 +69,10 @@ struct SessionReactionBar: View {
             if let comments, !comments.isEmpty { commentPreview(comments) }
         }.task(id:entry.id) { await load() }
         .task(id:entry.id) { comments=try? await social.comments(auth,entry:entry.id) }
+        // The block reloads friends, blocks and the feed, so the poster's posts drop out.
+        .confirmationDialog("Block this climber?",isPresented:$confirmingBlock,titleVisibility:.visible) {
+            Button("Block climber",role:.destructive) { Task { await social.safetyAction(auth,target:entry.owner_id,block:true) } }
+        } message: { Text("You won’t see each other’s posts or profiles.") }
     }
     private var reactionButtons: some View {
         let layout=textSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment:.leading,spacing:10)) : AnyLayout(HStackLayout(spacing:10))
@@ -93,6 +98,7 @@ struct SessionReactionBar: View {
             }.buttonStyle(.plain).accessibilityLabel("Comments\(comments.map { ", \($0.count)" } ?? "")").accessibilityIdentifier("openComments")
             if social.me != nil && social.userID != entry.owner_id {
                 Menu {
+                    Button("Block climber",role:.destructive) { confirmingBlock=true }
                     NavigationLink("Report post") { ReportClimberView(target:entry.owner_id,entry:entry.id) }
                 } label: { Image(systemName:"ellipsis").frame(width:44,height:44) }
                     .accessibilityLabel("Post options").accessibilityIdentifier("postOptions")
