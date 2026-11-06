@@ -117,7 +117,7 @@ supabase/
 ├── migrations/   Schema, RLS policies and RPCs, applied in order
 ├── functions/    Edge functions (Deno)
 └── tests/        Permission tests against a real Postgres engine (PGlite)
-web/              Privacy policy and friend-invite landing pages
+web/              Friend-invite landing page
 scripts/          Dev tooling: simulator runner, screenshot capture, store art, icon
 ```
 
@@ -159,7 +159,7 @@ cd supabase/tests && npm install && npm test
 
 ## Privacy
 
-Chalkbook has no analytics, ads or tracking. The journal stays on the device unless you explicitly share a session. Read the full [privacy policy](web/privacy.html).
+Chalkbook has no analytics, ads or tracking. The journal stays on the device unless you explicitly share a session. Read the full [privacy policy](ClimbingApp/App/privacy.html).
 
 ---
 
