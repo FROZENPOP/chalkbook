@@ -1,7 +1,5 @@
 # Friends setup
 
-**Deployment status:** All three migrations are installed in `climbing-app-dev` and permission checks passed on October 26, 2026. See [SUPABASE_AUDIT.md](SUPABASE_AUDIT.md) for verified settings and the remaining optional password-auth advisory. The steps below also describe setting up a fresh project.
-
 Friends uses mutual requests, not followers. Groups are deferred. A public account still requires friend-request approval. Each reviewed session snapshot can be Private, Friends, or Public. Private accounts cap Public entries to approved friends. Local journals remain private and offline; this is not full journal synchronization.
 
 ## Create the backend

@@ -35,3 +35,11 @@ ClimbingApp/Social/Supabase.local.json
 *.provisionprofile
 
 # Keep the shared Xcode scheme and Package.resolved tracked.
+
+# Local-only notes, tool output and review material
+graphify-out/
+screenshots-first-launch/
+app-review-notes.txt
+.claude/
+*.local.*
+!*.local.example.*

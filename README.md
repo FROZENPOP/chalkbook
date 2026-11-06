@@ -1,95 +1,166 @@
-# Chalkbook · iOS
+<p align="center">
+  <img src="marketing/store-art/header-3840x1646.png" alt="Chalkbook: log every attempt, send your projects" width="100%">
+</p>
 
-A native, offline-capable personal bouldering log built with SwiftUI, SwiftData, and Swift Charts.
+<h1 align="center">Chalkbook</h1>
 
-## Development
+<p align="center">
+  <b>A bouldering journal for iPhone.</b> Log every attempt, track your projects across sessions, see your progress, and share sessions with friends.
+</p>
 
-- Xcode 27.1 (27A9275), Swift 6.4 toolchain; project uses Swift 5 language mode.
-- iOS 17.0 minimum deployment target; standard iPhones are the initial supported device family. iPhone Duo and iPad-specific work are deferred.
-- Google Sign-In 10.0.0 is pinned through Swift Package Manager; Xcode resolves its dependencies. SwiftUI, SwiftData, PhotosUI, AVKit, and Charts ship with Xcode.
-- Friends and reviewed session sharing use Supabase; see [SUPABASE_SETUP.md](SUPABASE_SETUP.md). Mutual friend requests replace followers; groups are deferred. Until configured, Friends shows a setup state.
-- Guest logging needs no account configuration. See [AUTH_SETUP.md](AUTH_SETUP.md) to enable live Apple and Google sign-in.
-- Open `ClimbingApp.xcodeproj`, choose the **ClimbingApp** scheme, select **Climb Log - iPhone 16 (iOS 27.0)**, and Run.
-- A physical iPhone requires selecting your own development team in Signing & Capabilities. No team is embedded in this repository.
+<p align="center">
+  <img alt="iOS 17+" src="https://img.shields.io/badge/iOS-17%2B-black?logo=apple">
+  <img alt="SwiftUI" src="https://img.shields.io/badge/SwiftUI-SwiftData-FAB05C?logo=swift&logoColor=white">
+  <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-3ECF8E?logo=supabase&logoColor=white">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-240%2B-brightgreen">
+</p>
 
-For a repeatable setup, use the standard-library-only helper. It selects the newest installed runtime compatible with the selected phone and never chooses the Duo:
+---
 
-```sh
-python3 scripts/ios_dev.py check
-python3 scripts/ios_dev.py run
-python3 scripts/ios_dev.py test
-python3 scripts/ios_dev.py test --device se
+Chalkbook is a native iOS app I designed and built end to end: the SwiftUI client, the local data model and its migrations, the Supabase backend (schema, row-level security, edge functions), and the test suites for both. The journal works fully offline and without an account; Friends is an optional, privacy-first layer on top.
+
+<p align="center">
+  <img src="marketing/screenshots/6.3/1-journal.png" width="16%" alt="Journal">
+  <img src="marketing/screenshots/6.3/2-session.png" width="16%" alt="Session">
+  <img src="marketing/screenshots/6.3/3-projects.png" width="16%" alt="Projects">
+  <img src="marketing/screenshots/6.3/4-progress.png" width="16%" alt="Progress">
+  <img src="marketing/screenshots/6.3/5-stats.png" width="16%" alt="Stats">
+  <img src="marketing/screenshots/6.3/6-friends.png" width="16%" alt="Friends">
+</p>
+
+<sub>Screenshots and recordings use built-in demo data: the climbers, gyms and routes are made up.</sub>
+
+## Feature walkthrough
+
+### 1. Journal and sessions
+
+<img src="docs/media/demo-journal.gif" width="280" align="right" alt="Opening a session and scrolling its climbs">
+
+Start a session at your gym and log climbs as you go: grade, hold color, style tags, notes, and every attempt and send. Chalkbook tells a **flash** apart from a first-try send this session and from a repeat, so your numbers stay honest.
+
+- Start, resume, backdate, edit and finish sessions; each keeps its calendar date and original time zone.
+- Undo the latest attempt, correct outcomes after the fact, or log a whole-session recap when you didn't track individual attempts. Unknown values stay unknown instead of being guessed.
+- Browse history by gym or by date.
+- Optionally link an Apple Health climbing workout to a session (read-only).
+
+<br clear="right">
+
+### 2. Projects
+
+<img src="docs/media/demo-projects.gif" width="280" align="right" alt="Browsing projects with route photos">
+
+A project is a climb you keep coming back to. It follows you across sessions with its full attempt history and a private notebook.
+
+- Attach up to three photos or videos per route from Photos or Files.
+- **Hold highlighting:** tap a hold and Chalkbook dims everything that isn't that color, so the route stands out on a busy wall. It runs entirely on-device.
+- Mark up route photos with private annotations, and pin your "next move" for the next session.
+
+<br clear="right">
+
+### 3. Progress and stats
+
+<img src="docs/media/demo-progress.gif" width="280" align="right" alt="Consistency calendar and stats time ranges">
+
+- A **consistency calendar** shows which days you climbed and your current streak.
+- Stats over 30 days, 90 days or all time: sessions, attempts, sends, send rate, and your hardest send per grade scale, charted with Swift Charts.
+- Grade scales (V-scale, Fontainebleau, or each gym's own custom scale) are kept separate and never silently converted.
+
+<br clear="right">
+
+### 4. Friends
+
+<img src="docs/media/demo-friends.gif" width="280" align="right" alt="Scrolling the friends feed and opening a post">
+
+Friends is opt-in and built around review before anything leaves the phone.
+
+- Mutual friend requests (no followers), username search, QR and link invites, and suggested friends.
+- You choose what each shared session shows and who sees it: Private, Friends or Public. A preview shows exactly what will be published. Local notes, gym locations, Health data and original photos never leave the device.
+- Reactions and comments on shared sessions.
+- Safety: block, report, and full account deletion that cascades on the server and revokes Sign in with Apple.
+
+<br clear="right">
+
+### Also
+
+- **Accounts:** Sign in with Apple or Google, or use the app as a guest. Each account keeps its own separate local journal.
+- **Backups:** export a versioned JSON backup to Files, validate and preview it before restoring.
+- **Gyms:** save gyms with Apple Maps place suggestions, a default gym, and a custom grade list per gym.
+- **Accessibility:** Dynamic Type, VoiceOver labels and identifiers throughout, and 44-point touch targets.
+
+## Tech stack
+
+| Layer | What it uses |
+|---|---|
+| UI | SwiftUI, Observation, Swift Charts, PhotosUI, AVKit, MapKit |
+| Local data | SwiftData with versioned schemas and migration plans; Keychain for credentials |
+| Imaging | Core Graphics and ImageIO (hold highlighting, resizing, stripping photo location metadata), Core Image (QR invite codes) |
+| Platform | HealthKit (read-only), Sign in with Apple, Google Sign-In (SPM) |
+| Backend | Supabase: PostgreSQL with row-level security on every table, `SECURITY DEFINER` RPCs for mutations, Storage for shared photos |
+| Edge functions | TypeScript on Deno: Apple token revocation on account deletion, moderation report alerts |
+| Tests | XCTest unit and UI tests; backend permission tests in Node with PGlite (Postgres in WebAssembly) |
+
+## Architecture
+
+```
+ClimbingApp/
+├── App/          App entry point, launch arguments, bundled privacy policy
+├── Domain/       Pure logic: grades, journal rules, progress math, calendar, hold detection
+├── Data/         SwiftData models, schema versions V1 → V7, stores, JSON backup
+├── Features/     SwiftUI screens: journal, sessions, projects, progress, settings
+├── Health/       HealthKit workout reading and linking
+├── Auth/         Apple and Google sign-in, per-account local stores
+├── Social/       Friends: Supabase client, feed, sharing, invites, removal outbox
+└── UI/           Theme and shared components
+ClimbingAppTests/     Unit tests (domain, persistence, migrations, social, Health)
+ClimbingAppUITests/   End-to-end UI journeys
+supabase/
+├── migrations/   Schema, RLS policies and RPCs, applied in order
+├── functions/    Edge functions (Deno)
+└── tests/        Permission tests against a real Postgres engine (PGlite)
+web/              Privacy policy and friend-invite landing pages
+scripts/          Dev tooling: simulator runner, screenshot capture, store art, icon
 ```
 
-The default is iPhone 16; `--device se` uses iPhone SE (3rd generation) for compact-screen checks. Xcode 27 displays simulators in Device Hub. The installed iOS 27.1 runtime supports the Duo only; standard iPhones use the installed iOS 27.0 runtime.
+A few decisions worth calling out:
 
-Command-line build:
+- **Offline first.** The journal is local SwiftData and never needs a network. Social features publish *reviewed snapshots*, not the journal, so a bad connection can't lose climbing data.
+- **Honest data.** Attempts, sends and recaps are modeled separately so an aggregate recap never pretends to be individual attempts, and unknown totals stay unknown in the stats.
+- **Safe migrations.** Every schema change is a new `VersionedSchema` with a migration stage, covered by tests that open older stores.
+- **Removals can't get lost.** Unsharing or deleting a shared session first writes a durable, per-account removal outbox, then syncs it when online, with a visible pending state and retry.
+- **Server-side authorization.** The app only holds a publishable key. Every read and write is enforced by Postgres row-level security, and the permission tests cover friends, privacy levels, blocks, reports, deletion and anonymous access.
+
+## Running it locally
+
+Requirements: Xcode 27, an iOS 17+ simulator.
 
 ```sh
-xcodebuild -project ClimbingApp.xcodeproj -scheme ClimbingApp \
-  -destination 'generic/platform=iOS Simulator' \
-  -derivedDataPath "$HOME/Library/Caches/ClimbLog/DerivedData" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build
+git clone https://github.com/FROZENPOP/chalkbook.git
+cd chalkbook
+open ClimbingApp.xcodeproj   # scheme: ClimbingApp
 ```
 
-List available simulators with `xcrun simctl list devices available`, then use a device's UUID:
+The app runs as a guest with no configuration. Sign-in and Friends need your own provider keys, which live in two git-ignored files:
+
+- `Configuration/Auth.local.xcconfig`: Apple team and Google client IDs. See [AUTH_SETUP.md](AUTH_SETUP.md).
+- `ClimbingApp/Social/Supabase.local.json`: Supabase project URL and publishable key. See [SUPABASE_SETUP.md](SUPABASE_SETUP.md).
+
+To see the app with demo data (debug builds only), add the launch arguments `--ui-testing --screenshot-demo`.
+
+### Tests
 
 ```sh
-xcodebuild -project ClimbingApp.xcodeproj -scheme ClimbingApp \
-  -destination 'platform=iOS Simulator,id=SIMULATOR_UUID' \
-  -derivedDataPath "$HOME/Library/Caches/ClimbLog/DerivedData" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- test
+# App unit and UI tests (pick any available simulator)
+xcodebuild test -project ClimbingApp.xcodeproj -scheme ClimbingApp \
+  -destination 'platform=iOS Simulator,name=iPhone 17'
+
+# Backend permission tests (no hosted project needed)
+cd supabase/tests && npm install && npm test
 ```
 
-The shared scheme includes 71 domain/persistence/Health/Keychain/profile/social boundary tests and fifteen UI checks for logging, cross-session projects, honest recaps, gyms, custom grades, the account portal, and optional media selection, preview, and persistence. UI tests use a separate persistent store and reset only that test store. Tiny bundled route fixtures are seeded into the test app’s Files folder automatically; tests still attach them through the real importer.
+## Privacy
 
-Source folders are synchronized with Xcode: adding a Swift file does not require editing the project. `scripts/create_project.py` reproduces the project configuration using Python's standard library. Avoid regenerating after manual project-setting changes without updating that script.
+Chalkbook has no analytics, ads or tracking. The journal stays on the device unless you explicitly share a session. Read the full [privacy policy](web/privacy.html).
 
-## Implemented in the initial version
+---
 
-- Journal / Projects / Progress tabs, with Settings and history in Journal.
-- Start, resume, backdate, edit, finish/review, and delete sessions.
-- Keep stable climbs/projects across sessions, with photo previews, a private notebook, and complete attempt history.
-- Record additional unlogged batches or whole-session totals, keeping unknown metrics unknown and rejecting contradictions.
-- Correct attempt outcomes, day/order/precision, difficulty, dates, and prior history; preserve uncertainty when deleting evidence.
-- Read and explicitly link a selected Apple Health climbing workout; refresh/replace/unlink it without changing journal activity.
-- Add/edit/delete climbs with V or Fontainebleau grades, hold color, styles, notes, and previous experience.
-- Record unsuccessful attempts and sends, undo the latest attempt, and review attempt history.
-- Distinguish flashes, first-try sends this session, and repeats.
-- Browse session history by gym or calendar date, with a completed-session filter.
-- View activity by week, attempts, sends, completion rate, and highest send per grade scale over 30 days, 90 days, or all time.
-- Save gyms, choose a default gym, and switch or add gyms directly from session/climb forms. Gym names offer Apple Maps suggestions with editable addresses; manual entry works offline.
-- Give each gym its own named scale; type a grade freely or tap a saved grade choice.
-- Attach up to 3 route photos or videos (25 MB each) from Photos or Files and view them from the route.
-- Sign in/out using Apple or Google once provider setup is complete; each identity has a separate local log.
-- Set up or edit a private display name, optional profile photo, and bio. New signed-in accounts are offered profile setup; Sign out sits at the bottom of Settings.
-- Export versioned JSON backups, validate and preview a restore, replace the log with confirmation, and delete local data.
-- Save every mutation explicitly; roll back failed changes and show an error.
-
-Sessions retain calendar date and original time zone. Attempts retain difficulty descriptors from logging; independent climb UUIDs link project history across sessions. Aggregate recap entries never masquerade as individual attempts.
-
-## Storage and scope
-
-Climbing data and route media stay in the app's local SwiftData store. Apple/Google sign-in uses the providers’ native SDKs; full private log sync and cloud media upload are not configured. The optional Supabase integration publishes only explicitly reviewed session summaries; local notes, gym locations, media and Health data are excluded. Export backups to Files; uninstalling the app can delete the local log. Grade scales remain separate and are never automatically converted. Backups include saved gyms and media; JSON backup files are limited to 150 MB.
-
-This is a development build. Follow-up work includes broader history filters, goals, rope climbing, an app icon, private synchronization, and device testing. Physical-device signing, OAuth provider IDs, App Store distribution, and cloud sync are not configured. HealthKit read/link behavior and source compatibility require signed physical-device testing; workout export is absent.
-
-See [PRODUCT_REQUIREMENTS.md](PRODUCT_REQUIREMENTS.md) for feature contracts and acceptance gates, [PLAN.md](PLAN.md) for product direction and [DEVELOPMENT.md](DEVELOPMENT.md) for validation status and manual checks.
-
-Repository: [FROZENPOP/ClimbingAppIOS](https://github.com/FROZENPOP/ClimbingAppIOS). The connected GitHub plugin can publish authorized changes; separate local Git authentication is optional.
-
-
-## Quick use
-
-1. From **Journal**, open **Settings → Saved gyms**, add a gym, and choose its default scale. For custom scales, name the scale and optionally list grade choices.
-2. Start a session. Your default gym is selected; each climb inherits that gym and scale. Use the gym menu to switch or add another gym.
-3. Type a custom grade or tap a saved choice. Add photos/videos optionally, then Save and log attempts/sends.
-4. Open **Settings → Sign in or create an account** for the Apple/Google portal. Provider activation is documented in AUTH_SETUP.md.
-
-Projects can be saved while creating/editing a climb. Use **Choose existing climb or project** in a later session; use **Log a past session** for a recap without individual attempt details. Apple Health linking is available in session details and does not require app login.
-
-Simulator builds use local ad-hoc signing so Google’s SDK and the account vault can access Keychain. Build products live in `~/Library/Caches/ClimbLog/DerivedData`, outside synced Documents folders that can add metadata incompatible with signing. This needs no paid Apple membership for Simulator; physical-device signing and Sign in with Apple have separate requirements.
-
-Profile photos are copied, resized to at most 512 pixels, and re-encoded without original location metadata. Profiles are protected local files, separated by provider/account identity and guest. Profile changes do not change your Google/Apple email and are not included in journal backups or cloud sync.
-
-Friends uses a dedicated Add friends screen inspired by friend-first apps: username search, a shareable username card, clear request states, and separate Activity / Friends / Requests views. Search is debounced and queries Supabase directly; no contact upload or group feature is included.
-
-Optional climbing bios/photos, ranked name and username discovery, friend QR/app links, and session reactions are implemented with an additional Supabase migration. Project notebooks support a pinned next move and private, editable photo markup. See SUPABASE_SETUP.md for deployment and invite hosting requirements. SwiftData V6 and JSON backup V4 preserve these additions without modifying original photos.
+<p align="center">Designed and built by Shreyas Sindhaval. © 2026, all rights reserved.</p>
