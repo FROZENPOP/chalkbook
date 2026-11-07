@@ -130,7 +130,7 @@ struct FriendPersonRow: View {
                     }
                     if working { SwiftUI.ProgressView().accessibilityLabel("Updating request") }
                 }.disabled(social.busy || working)
-                if failed { Text("Couldn’t update this request. Please try again.").font(.caption).foregroundStyle(ClimbTheme.error) }
+                if failed { Text("Couldn’t update this request. \(social.errorMessage ?? "Please try again.")").font(.caption).foregroundStyle(ClimbTheme.error) }
             }
         }
     }

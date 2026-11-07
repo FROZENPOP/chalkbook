@@ -13,11 +13,11 @@ struct FriendsFeedCursor: Equatable {
                      URLQueryItem(name:"order",value:"session_day.desc,id.desc"),
                      URLQueryItem(name:"limit",value:String(min(20,max(1,limit))))]
         if let after {
-            guard after.day.utf8.count == 10, after.day.range(of:"^[0-9]{4}-[0-9]{2}-[0-9]{2}$",options:.regularExpression) != nil else { throw SocialError.server }
+            guard after.day.utf8.count == 10, after.day.range(of:"^[0-9]{4}-[0-9]{2}-[0-9]{2}$",options:.regularExpression) != nil else { throw SocialError.feedPage }
             query.append(URLQueryItem(name:"or",value:"(session_day.lt.\(after.day),and(session_day.eq.\(after.day),id.lt.\(after.id.uuidString)))"))
         }
         var parts = URLComponents(); parts.path = "/rest/v1/shared_sessions"; parts.queryItems = query
-        guard let path = parts.string else { throw SocialError.server }
+        guard let path = parts.string else { throw SocialError.feedPage }
         return path
     }
 }

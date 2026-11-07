@@ -41,7 +41,7 @@ final class FriendSearch {
         } catch {
             guard operation == revision, !Task.isCancelled else { return }
             if error is CancellationError { state = .idle }
-            else { errorMessage=(error as? SocialError)?.localizedDescription ?? SocialError.server.localizedDescription;state = .failed }
+            else { errorMessage=SocialError.message(for: error);state = .failed }
         }
     }
 }

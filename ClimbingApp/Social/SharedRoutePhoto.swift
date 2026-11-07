@@ -17,7 +17,7 @@ struct SharedRoutePhoto: Codable, Equatable, Identifiable, Sendable {
                   CGImageSourceGetType(source) as String? == "public.jpeg",
                   let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
                   let width = props[kCGImagePropertyPixelWidth] as? Int, let height = props[kCGImagePropertyPixelHeight] as? Int,
-                  (1...1024).contains(width), (1...1024).contains(height) else { throw SocialError.server }
+                  (1...1024).contains(width), (1...1024).contains(height) else { throw SocialError.photoUnreadable }
         }
         return self
     }
@@ -41,7 +41,7 @@ struct SharedRoutePhoto: Codable, Equatable, Identifiable, Sendable {
         for quality in [0.85, 0.7, 0.55, 0.4, 0.25] {
             try Task.checkCancellation()
             let bytes = NSMutableData()
-            guard let destination = CGImageDestinationCreateWithData(bytes, "public.jpeg" as CFString, 1, nil) else { throw SocialError.server }
+            guard let destination = CGImageDestinationCreateWithData(bytes, "public.jpeg" as CFString, 1, nil) else { throw SocialError.photoUnreadable }
             // CGImage pixels only: never copy source EXIF/GPS or private stroke annotations.
             CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
             if CGImageDestinationFinalize(destination), bytes.length <= maximumBytes { return bytes as Data }

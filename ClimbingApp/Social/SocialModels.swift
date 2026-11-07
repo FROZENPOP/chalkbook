@@ -114,7 +114,8 @@ struct SupabaseConfiguration: Decodable {
 }
 
 enum SocialError: LocalizedError {
-    case setup, signIn, appleSignIn, server, invalidProfile, migrationNeeded, contentRejected
+    case setup, signIn, appleSignIn, server, invalidProfile, migrationNeeded, contentRejected, usernameTaken
+    case removalPending, tooManyPhotos, photoUnreadable, climberUnavailable, feedPage
     var errorDescription: String? {
         switch self {
         case .setup: "Friends is waiting for Supabase setup. Your private journal still works offline."
@@ -124,6 +125,36 @@ enum SocialError: LocalizedError {
         case .invalidProfile: "Choose a username with 3–24 lowercase letters, numbers or underscores, and a name with 1–60 characters."
         case .migrationNeeded: "This Friends update isn’t available yet. Please try again later. Your local journal is unaffected."
         case .contentRejected: "This includes words the community rules don’t allow. Edit it and try again."
+        case .usernameTaken: "That username is taken. Try another one."
+        case .removalPending: "This entry is waiting to be removed. Retry removals before publishing it again."
+        case .tooManyPhotos: "Choose up to 3 photos and try again."
+        case .photoUnreadable: "This photo couldn’t be prepared for sharing. Choose another photo."
+        case .climberUnavailable: "This climber is no longer available."
+        case .feedPage: "More posts couldn’t load. Pull down to refresh the feed."
         }
     }
+
+    /// The most specific message for any Friends failure: connection, server answer or the server's own reason.
+    static func message(for error: Error) -> String {
+        switch error {
+        case let error as SocialError: return error.localizedDescription
+        case let error as RemovalHTTPError: return error.errorDescription ?? SocialError.server.localizedDescription
+        case let error as FriendsProblem: return error.message
+        case let error as URLError:
+            switch error.code {
+            case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff:
+                return "You’re offline. Connect to the internet and try again."
+            case .timedOut: return "Friends took too long to respond. Check your connection and try again."
+            case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .secureConnectionFailed:
+                return "Chalkbook couldn’t reach the Friends service. Try again in a few minutes."
+            default: break
+            }
+        case is DecodingError: return "Friends sent a reply this version of Chalkbook can’t read. Update the app and try again."
+        default: break
+        }
+        return SocialError.server.localizedDescription
+    }
 }
+
+/// A failure whose message was already worked out, passed on unchanged.
+struct FriendsProblem: Error { let message: String }

@@ -156,7 +156,15 @@ final class AccountSession {
                           email: credential.email, identityToken: credential.identityToken.flatMap { String(data: $0, encoding: .utf8) },
                           authorizationCode: credential.authorizationCode.flatMap { String(data: $0, encoding: .utf8) })
         case let .failure(error):
-            if (error as NSError).code != ASAuthorizationError.canceled.rawValue { errorMessage = error.localizedDescription }
+            switch (error as NSError).code {
+            case ASAuthorizationError.canceled.rawValue: break
+            // Apple's own text here is a bare error code, so name the likely cause instead.
+            case ASAuthorizationError.unknown.rawValue, ASAuthorizationError.notInteractive.rawValue:
+                errorMessage = "Apple sign-in couldn’t start. Check that you’re signed in to an Apple Account in the Settings app, then try again."
+            case ASAuthorizationError.failed.rawValue, ASAuthorizationError.invalidResponse.rawValue, ASAuthorizationError.notHandled.rawValue:
+                errorMessage = "Apple couldn’t confirm your sign-in. Check your connection and try again."
+            default: errorMessage = error.localizedDescription
+            }
         }
     }
 

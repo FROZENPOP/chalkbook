@@ -139,6 +139,25 @@ private final class TokenURLProtocol: URLProtocol {
         XCTAssertEqual(auth.account?.subject, apple.subject)
     }
 
+    func testErrorsNameTheProblem() {
+        XCTAssertEqual(SocialError.message(for: URLError(.notConnectedToInternet)), "You’re offline. Connect to the internet and try again.")
+        XCTAssertTrue(SocialError.message(for: RemovalHTTPError(status: 400, code: "P0001", serverMessage: "Too many comments, try again in a minute")).contains("commenting too quickly"))
+        XCTAssertTrue(SocialError.message(for: RemovalHTTPError(status: 429)).contains("Wait a minute"))
+        XCTAssertTrue(SocialError.message(for: RemovalHTTPError(status: 503)).contains("having trouble"))
+        XCTAssertEqual(SocialError.message(for: CocoaError(.fileReadUnknown)), SocialError.server.localizedDescription, "Unknown failures keep the general message")
+    }
+
+    func testTakenUsernameSaysSo() async {
+        let auth = auth(apple)
+        auth.completeApple(subject: apple.subject, name: nil, email: nil, identityToken: "apple-jwt")
+        let social = store(apple) { grant in
+            grant.isEmpty ? (409, Data(#"{"code":"23505","message":"duplicate key value violates unique constraint \"climber_profiles_username_key\""}"#.utf8)) : self.token("refresh-1")
+        }
+        let saved = await social.saveProfile(auth, username: "frozenpop", name: "Climber", isPrivate: true)
+        XCTAssertFalse(saved)
+        XCTAssertEqual(social.errorMessage, SocialError.usernameTaken.localizedDescription)
+    }
+
     func testOnlyANewSignInAsksForProfileSetup() {
         let auth = auth(apple)
         XCTAssertFalse(auth.takeFreshSignIn(), "A saved account at launch isn't a new sign-in")

@@ -67,12 +67,15 @@ final class SocialStore {
         if let values { request.httpBody = try JSONSerialization.data(withJSONObject: values) }
         let (data, response) = try await network.data(for: request)
         guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
-            let code = (try? JSONSerialization.jsonObject(with:data) as? [String:Any])?["code"] as? String
+            let body = try? JSONSerialization.jsonObject(with:data) as? [String:Any]
+            let code = body?["code"] as? String
+            if code == "23505", (body?["message"] as? String)?.contains("username") == true { throw SocialError.usernameTaken }
             if ["PGRST202","PGRST205","42P01"].contains(code ?? "") { throw SocialError.migrationNeeded }
             if code == "SN001" { throw SocialError.contentRejected }
             throw RemovalHTTPError(status: (response as? HTTPURLResponse)?.statusCode ?? 0,
                                    missingContent: (response as? HTTPURLResponse)?.statusCode == 410 ||
-                                   ((response as? HTTPURLResponse)?.statusCode == 404 && code == "PGRST116"))
+                                   ((response as? HTTPURLResponse)?.statusCode == 404 && code == "PGRST116"),
+                                   code: code, serverMessage: body?["message"] as? String)
         }
         if authenticated { scheduleRemovals() }
         return data
@@ -115,7 +118,7 @@ final class SocialStore {
         } catch {
             accessToken = nil; expiresAt = .distantPast
             feed.reset() // Do not keep showing possibly revoked entries after a failed refresh.
-            errorMessage = (error as? SocialError)?.localizedDescription ?? SocialError.server.localizedDescription
+            errorMessage = SocialError.message(for: error)
             needsAppleSignIn = error as? SocialError == .appleSignIn
             return false
         }
@@ -192,15 +195,15 @@ final class SocialStore {
 
     func publish(_ auth: AccountSession, entry: SharedSession, photos: [SharedRoutePhoto]? = nil) async -> Bool {
         guard !removals.contains(sessionID: entry.source_session_id) else {
-            errorMessage = "This entry is waiting to be removed. Retry removals before publishing it again."
+            errorMessage = SocialError.removalPending.localizedDescription
             return false
         }
         var stored = false
         let refreshed = await perform(auth) {
-            guard !self.removals.contains(sessionID: entry.source_session_id) else { throw SocialError.server }
+            guard !self.removals.contains(sessionID: entry.source_session_id) else { throw SocialError.removalPending }
             var values = entry.rpcValues
             if let photos {
-                guard photos.count <= 3 else { throw SocialError.server }
+                guard photos.count <= 3 else { throw SocialError.tooManyPhotos }
                 values["photos"] = try photos.map { try $0.validated().rpcValues }
             }
             let saved = try await self.request(photos == nil ? "/rest/v1/rpc/save_shared_session" : "/rest/v1/rpc/save_shared_session_with_photos", method: "POST", values: values)

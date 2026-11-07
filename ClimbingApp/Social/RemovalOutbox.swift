@@ -4,11 +4,49 @@ import Observation
 struct RemovalHTTPError: LocalizedError {
     let status: Int
     var missingContent = false
+    /// The Postgres error code and message the server sent, when it sent one.
+    var code: String? = nil
+    var serverMessage: String? = nil
     var errorDescription: String? {
-        status == 401 || status == 403
-            ? "The Friends service couldn’t authorize this request. Review access or sign in again, then retry."
-            : SocialError.server.localizedDescription
+        if let serverMessage, let known = Self.reasons[serverMessage] { return known }
+        switch code {
+        case "23514": return "Part of this is too long or not allowed. Shorten it and try again."
+        case "23505": return "This is already saved. Refresh and try again."
+        default: break
+        }
+        switch status {
+        case 401: return "Your Friends sign-in has expired. Sign out and sign in again, then retry."
+        case 403: return "Friends didn’t allow this for your account. Sign out and sign in again, then retry."
+        case 404, 410: return "This is no longer available. It may have been deleted or made private."
+        case 409: return "This conflicts with something already saved. Refresh and try again."
+        case 413: return "This is too large to send. Use fewer or smaller photos and try again."
+        case 429: return "Too many requests in a short time. Wait a minute and try again."
+        case 500...: return "The Friends service is having trouble right now. Try again in a few minutes. No successful save has been confirmed."
+        default: return SocialError.server.localizedDescription
+        }
     }
+
+    // The reasons the Friends database gives when it refuses a request (raise exception in supabase/migrations).
+    private static let reasons = [
+        "Sign in required": "Your Friends sign-in has expired. Sign out and sign in again, then retry.",
+        "Invalid photo selection": "Choose up to 3 photos and try again.",
+        "Invalid photo fields": "One of these photos couldn’t be read. Choose it again or pick another photo.",
+        "Invalid photo data": "One of these photos couldn’t be read. Choose it again or pick another photo.",
+        "Unavailable": "This is no longer available. It may have been deleted or made private.",
+        "Entry unavailable": "This post is no longer available. It may have been deleted or made private.",
+        "Content unavailable": "This post is no longer available. It may have been deleted or made private.",
+        "Comment unavailable": "This comment is no longer available. It may have been deleted.",
+        "Climber unavailable": "This climber is no longer available.",
+        "Too many reports today": "You’ve sent 20 reports today, the daily limit. You can report again tomorrow.",
+        "Too many comments, try again in a minute": "You’re commenting too quickly. Wait a minute and try again.",
+        "Shared session limit reached": "You’ve shared 2,000 sessions, the limit. Delete an older shared session to share this one.",
+        "Gym limit reached": "You’ve added 200 gyms, the limit.",
+        "Wall limit reached": "You’ve added 2,000 walls, the limit.",
+        "Route limit reached": "You’ve added 20,000 routes, the limit.",
+        "Unknown action": "Chalkbook sent a request the Friends service didn’t accept. Update the app and try again.",
+        "Setting required": "Chalkbook sent a request the Friends service didn’t accept. Update the app and try again.",
+        "Invalid session day": "This session’s date couldn’t be shared. Check the date and try again.",
+    ]
 }
 
 struct PendingRemoval: Codable, Identifiable, Equatable {

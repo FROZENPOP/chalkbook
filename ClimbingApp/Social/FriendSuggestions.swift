@@ -65,7 +65,7 @@ struct FriendSuggestion: Decodable, Identifiable, Equatable {
         } catch {
             guard generation == token else { return }
             // Refresh may reflect a revoked block/setting. Never keep stale recommendations.
-            items = []; hasMore = false; errorMessage = (error as? SocialError)?.localizedDescription ?? SocialError.server.localizedDescription
+            items = []; hasMore = false; errorMessage = SocialError.message(for: error)
         }
     }
     func act(_ id: UUID, dismiss: Bool, service: any FriendSuggestionServing) async {
@@ -81,7 +81,7 @@ struct FriendSuggestion: Decodable, Identifiable, Equatable {
         } catch {
             guard generation == token else { return }
             if dismiss { retryDismiss.insert(id) } else { retryDismiss.remove(id) }
-            rowErrors[id] = dismiss ? "Couldn’t confirm hiding this suggestion. Try again." : "Couldn’t confirm the request. Try again."
+            rowErrors[id] = (dismiss ? "Couldn’t hide this suggestion. " : "Couldn’t send the request. ") + SocialError.message(for: error)
         }
     }
     func loadDiscovery(_ service: any FriendSuggestionServing) async {
@@ -118,7 +118,7 @@ struct FriendSuggestion: Decodable, Identifiable, Equatable {
     }
     func add(_ id: UUID) async throws {
         // The same request RPC as search/profile Add; never accepts on the caller's behalf.
-        guard await store.action(auth,target:id,action:"request") else { throw SocialError.server }
+        guard await store.action(auth,target:id,action:"request") else { throw FriendsProblem(message: store.errorMessage ?? SocialError.server.localizedDescription) }
     }
     func discovery() async throws -> Bool {
         try await store.authorize(auth)

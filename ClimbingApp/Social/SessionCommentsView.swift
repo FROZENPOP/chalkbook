@@ -74,17 +74,17 @@ struct SessionCommentsView: View {
 
     private func load() async {
         do { comments = try await social.comments(auth, entry: entry.id); error = nil }
-        catch { if comments == nil { self.error = error.localizedDescription } }
+        catch { if comments == nil { self.error = SocialError.message(for: error) } }
     }
     private func send() async {
         sending = true; defer { sending = false }
         // The draft stays in the field until the server confirms the save.
         do { comments = (comments ?? []) + [try await social.addComment(auth, entry: entry.id, body: trimmed)]; text = ""; error = nil }
-        catch { self.error = error.localizedDescription }
+        catch { self.error = SocialError.message(for: error) }
     }
     private func delete(_ comment: SessionComment) async {
         do { try await social.deleteComment(auth, id: comment.id); comments?.removeAll { $0.id == comment.id }; error = nil }
-        catch { self.error = error.localizedDescription }
+        catch { self.error = SocialError.message(for: error) }
     }
     private func block(_ climber: UUID) async {
         if await social.safetyAction(auth, target: climber, block: true) { comments?.removeAll { $0.user_id == climber } }
