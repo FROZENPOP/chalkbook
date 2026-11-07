@@ -12,7 +12,7 @@
   <img alt="iOS 17+" src="https://img.shields.io/badge/iOS-17%2B-black?logo=apple">
   <img alt="SwiftUI" src="https://img.shields.io/badge/SwiftUI-SwiftData-FAB05C?logo=swift&logoColor=white">
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-3ECF8E?logo=supabase&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-240%2B-brightgreen">
+  <a href="https://github.com/FROZENPOP/chalkbook/actions/workflows/unit-tests.yml"><img alt="Unit tests" src="https://github.com/FROZENPOP/chalkbook/actions/workflows/unit-tests.yml/badge.svg"></a>
 </p>
 
 ---

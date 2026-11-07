@@ -1,0 +1,67 @@
+name: Unit tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: unit-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  database-policies:
+    # Migrations and RLS run in PGlite (Postgres in WASM); no Docker or hosted project needed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: supabase/tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: supabase/tests/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  unit-tests:
+    # UI and accessibility suites (~25 min) stay local: python3 scripts/ios_dev.py test
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select newest Xcode
+        run: |
+          xcode=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: build/SourcePackages
+          key: spm-${{ hashFiles('ClimbingApp.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+
+      - name: Run unit tests
+        # Auth.local.xcconfig and Supabase.local.json are optional; without them social features stay off.
+        run: |
+          device=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=[x for r,l in json.load(sys.stdin)['devices'].items() if 'iOS' in r for x in l if x['name'].startswith('iPhone')]; print(d[-1]['udid'])")
+          xcodebuild test \
+            -project ClimbingApp.xcodeproj -scheme ClimbingApp \
+            -destination "platform=iOS Simulator,id=$device" \
+            -only-testing:ClimbingAppTests \
+            -parallel-testing-enabled NO \
+            -clonedSourcePackagesDirPath build/SourcePackages \
+            -resultBundlePath build/UnitTests.xcresult \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=-  # ad-hoc signing; Keychain tests need entitlements
+
+      - name: Upload results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: build/UnitTests.xcresult
