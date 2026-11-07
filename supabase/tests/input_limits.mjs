@@ -51,6 +51,10 @@ assert.equal(await claim(), true);
 assert.equal(await claim(), false, 'one alert per report');
 for (let i = 1; i < 20; i++) await db.query("select public.report_climber($1,'spam')",[b]);
 await assert.rejects(db.query("select public.report_climber($1,'spam')",[b]), /Too many reports/);
+// Reports from other accounts are claimed but don't ping again within 10 minutes.
+await as(b); await db.query("select public.report_climber($1,'spam')",[a]);
+assert.equal(await claim(), false, 'one ping per 10 minutes across reporters');
+assert.equal(await claim(), false);
 // Strangers can't list every climber, but can still open one profile by id.
 await as(a);
 assert.deepEqual((await db.query('select id from public.climber_profiles')).rows.map(r=>r.id), [a]);

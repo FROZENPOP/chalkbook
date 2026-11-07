@@ -102,6 +102,16 @@ assert.equal(eleventh.outcome, 'no_space');
 for (const p of ten) assert.deepEqual(await photosOn(p.source), { n: 1, c: 1 });
 assert.deepEqual(await photosOn(bobFull.source), { n: 3, c: 3 });
 
+// Each account has its own quota: past it, the poster's oldest photos make room even when the shared budget has space.
+await admin('delete from public.shared_route_photos'); await admin('update public.shared_sessions set route_photo_count=0');
+await setBudget(100);
+await admin(`create or replace function social_private.account_photo_budget() returns bigint language sql stable set search_path='' as $$ select ${2 * jpeg.length}::bigint $$`);
+const [q1, q2, q3] = [await post(b), await post(b), await post(b)];
+assert.deepEqual([q1, q2, q3].map(p => p.outcome), ['saved', 'saved', 'trimmed']);
+assert.deepEqual(await photosOn(q1.source), { n: 0, c: 0 }, 'oldest own post trimmed');
+assert.deepEqual(await photosOn(q3.source), { n: 1, c: 1 });
+await as(a); await assert.rejects(db.query('select social_private.account_photo_budget()'), /permission denied/);
+
 // Climbers can't read or change the budget, and only signed-in climbers can save.
 await as(a);
 await assert.rejects(db.query('select social_private.photo_space_budget()'), /permission denied/);
