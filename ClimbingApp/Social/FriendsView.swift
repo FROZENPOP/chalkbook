@@ -22,9 +22,9 @@ struct SocialProfileEditor: View {
         NavigationStack {
             Form {
                 Section(header: Text("Discoverable profile").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
-                    TextField("Username", text: $username).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    TextField("Display name", text: $name)
-                    Text("Visible to signed-in climbers. Your email stays private.").font(.caption)
+                    TextField("Username *", text: $username).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityLabel("Username, required")
+                    TextField("Display name *", text: $name).accessibilityLabel("Display name, required")
+                    Text("Visible to signed-in climbers. Your email stays private. * Required").font(.caption)
                 }
                 Section(header: Text("Optional climbing profile").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     ProfileAvatar(photo:photo)
@@ -58,10 +58,10 @@ struct SocialProfileEditor: View {
                 }
                 if social.me == nil {
                     // Required before any user-generated content is shared (App Store Guideline 1.2).
-                    Section(header: Text("Community rules").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
+                    Section(header: Text("Community rules and privacy").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         Text("No objectionable, hateful, sexual or harassing content, and no abuse of other climbers. Report or block anyone who breaks these rules. We review reports and remove content and accounts that break them.").font(.caption)
-                        Toggle("I agree to the community rules", isOn: $agreed).accessibilityIdentifier("agreeCommunityRules")
-                        NavigationLink("Privacy Policy") { PrivacyPolicyView() }
+                        NavigationLink("Read the Privacy Policy") { PrivacyPolicyView() }
+                        Toggle("I agree to the community rules and the Privacy Policy *", isOn: $agreed).accessibilityLabel("I agree to the community rules and the Privacy Policy, required").accessibilityIdentifier("agreeCommunityRules")
                     }
                 }
                 if let message = social.errorMessage { Text(message).foregroundStyle(ClimbTheme.error) }

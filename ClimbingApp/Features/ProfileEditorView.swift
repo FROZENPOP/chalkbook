@@ -21,8 +21,13 @@ struct ProfileAvatar: View {
 struct ProfileEditorView: View {
     @Environment(ProfileStore.self) private var profiles
     @Environment(AccountSession.self) private var auth
+    @Environment(SocialStore.self) private var social
     @Environment(\.dismiss) private var dismiss
     var setup = false
+    @State private var username = ""
+    @State private var isPrivate = true
+    @State private var agreed = false
+    @State private var friendsLoaded = false
     @State private var name = ""
     @State private var bio = ""
     @State private var photo: Data?
@@ -32,7 +37,16 @@ struct ProfileEditorView: View {
     @State private var initialized = false
     @State private var importError: String?
 
-    private var valid: Bool { !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && name.trimmingCharacters(in: .whitespacesAndNewlines).count <= 60 && bio.count <= 500 }
+    private var valid: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && name.trimmingCharacters(in: .whitespacesAndNewlines).count <= 60 && bio.count <= 500 &&
+            (!syncFriends || (!username.trimmingCharacters(in: .whitespaces).isEmpty && bio.unicodeScalars.count <= 240 && (social.me != nil || agreed)))
+    }
+    // One editor for the whole profile: signed-in climbers also set their Friends username, privacy and agreement here.
+    private var signedIn: Bool { auth.account != nil && social.configuration != nil }
+    private var joining: Bool { social.me == nil }
+    // Setup requires a username; editing later can leave it blank to stay off Friends.
+    private var usernameRequired: Bool { friendsLoaded && (!joining || setup) }
+    private var syncFriends: Bool { friendsLoaded && (!joining || setup || !username.trimmingCharacters(in: .whitespaces).isEmpty) }
     var body: some View {
         NavigationStack {
             Form {
@@ -49,8 +63,41 @@ struct ProfileEditorView: View {
                     if let importError { Text(importError).font(.subheadline).foregroundStyle(ClimbTheme.error) }
                 }
                 Section(header: Text("About you").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
-                    TextField("Display name", text: $name).textContentType(.name).textInputAutocapitalization(.words).accessibilityIdentifier("profileName")
+                    TextField("Display name *", text: $name).textContentType(.name).textInputAutocapitalization(.words).accessibilityLabel("Display name, required").accessibilityIdentifier("profileName")
+                    if friendsLoaded {
+                        TextField(usernameRequired ? "Username *" : "Username", text: $username).textContentType(.username).textInputAutocapitalization(.never).autocorrectionDisabled()
+                            .accessibilityLabel(usernameRequired ? "Username, required" : "Username").accessibilityIdentifier("setupUsername")
+                    }
+                    Text("* Required").font(.caption).foregroundStyle(ClimbTheme.secondaryText).accessibilityHidden(true)
                     TextField("A little about your climbing (optional)", text: $bio, axis: .vertical).lineLimit(3...6).accessibilityIdentifier("profileBio")
+                    if syncFriends { Text("\(bio.unicodeScalars.count)/240 characters").font(.caption).foregroundStyle(ClimbTheme.secondaryText) }
+                }
+                if signedIn {
+                    Section(header: Text("Friends").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
+                        if friendsLoaded {
+                            Text(joining && !setup ? "Add a username to join Friends, or leave it blank to stay off Friends. Usernames are 3–24 lowercase letters, numbers or underscores." :
+                                    "Your username is 3–24 lowercase letters, numbers or underscores, and is visible to signed-in climbers. Your email stays private.")
+                                .font(.caption).foregroundStyle(ClimbTheme.secondaryText)
+                            Toggle("Private account", isOn: $isPrivate)
+                            if let discovery = social.suggestions.discoveryEnabled {
+                                Toggle("Let friends of friends find me", isOn: Binding(get: { discovery }, set: { value in
+                                    Task { await social.suggestions.setDiscovery(value, service: SocialSuggestionService(store: social, auth: auth)) }
+                                })).disabled(social.suggestions.savingSetting)
+                            }
+                            if joining {
+                                // Required before any user-generated content is shared (App Store Guideline 1.2).
+                                Text("No objectionable, hateful, sexual or harassing content, and no abuse of other climbers. Report or block anyone who breaks these rules. We review reports and remove content and accounts that break them.").font(.caption)
+                                NavigationLink("Read the Privacy Policy") { PrivacyPolicyView() }
+                                Toggle("I agree to the community rules and the Privacy Policy *", isOn: $agreed).accessibilityLabel("I agree to the community rules and the Privacy Policy, required").accessibilityIdentifier("setupAgree")
+                            }
+                        } else if !social.busy && !social.needsAppleSignIn {
+                            Button("Retry loading your Friends profile") { Task { await loadFriends() } }
+                        }
+                        if social.busy { SwiftUI.ProgressView(friendsLoaded ? "Saving your Friends profile…" : "Loading your Friends profile…") }
+                        if let message = social.errorMessage { Text(message).font(.subheadline).foregroundStyle(ClimbTheme.error) }
+                        // After a relaunch Apple's sign-in token is gone, so Apple confirms again before Friends can load or save.
+                        if social.needsAppleSignIn { AppleConfirmButton { if friendsLoaded { save(retry: profiles.errorMessage != nil) } else { await loadFriends() } } }
+                    }
                 }
                 if let account = auth.account {
                     Section(header: Text("Sign-in account").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
@@ -78,7 +125,7 @@ struct ProfileEditorView: View {
                     }.disabled(importing)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save(retry: profiles.errorMessage != nil) }.disabled(importing || !valid).accessibilityIdentifier("saveProfile")
+                    Button("Save") { save(retry: profiles.errorMessage != nil) }.disabled(importing || social.busy || !valid).accessibilityIdentifier("saveProfile")
                 }
             }
             .onAppear {
@@ -86,6 +133,7 @@ struct ProfileEditorView: View {
                 name = profiles.profile?.name ?? auth.account?.name ?? ""
                 bio = profiles.profile?.bio ?? ""; photo = profiles.profile?.photo
             }
+            .task { if signedIn { await loadFriends() } }
             .task(id: selection) {
                 guard let selection else { return }
                 importing = true; importError = nil
@@ -121,8 +169,24 @@ struct ProfileEditorView: View {
         }
     }
 
+    /// Loads the Friends profile so editing shows the current username, privacy and discovery setting.
+    private func loadFriends() async {
+        await social.refresh(auth)
+        guard social.errorMessage == nil else { return }
+        if let me = social.me {
+            username = me.username; isPrivate = me.is_private
+            if bio.isEmpty, let details = try? await social.profileDetails(auth, id: me.id) { bio = details.bio }
+            await social.suggestions.loadDiscovery(SocialSuggestionService(store: social, auth: auth))
+        }
+        friendsLoaded = true
+    }
+
     private func save(retry: Bool) {
         let success = retry ? profiles.retrySave(name: name, bio: bio, photo: photo) : profiles.save(name: name, bio: bio, photo: photo)
-        if success { dismiss() }
+        guard success else { return }
+        guard syncFriends else { dismiss(); return }
+        let socialBio = String(String.UnicodeScalarView(bio.unicodeScalars.prefix(240)))
+        let socialPhoto = photo.flatMap { try? SocialPhoto.prepare($0) }
+        Task { if await social.saveProfile(auth, username: username, name: name, isPrivate: isPrivate, bio: socialBio, photo: socialPhoto) { dismiss() } }
     }
 }

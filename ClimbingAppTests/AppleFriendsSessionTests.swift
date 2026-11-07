@@ -129,6 +129,27 @@ private final class TokenURLProtocol: URLProtocol {
         XCTAssertNil(sessions.load(apple.storageKey))
     }
 
+    func testAppleIDConfirmedThisRunSurvivesAStaleRevokedState() async {
+        let auth = auth(apple)
+        auth.appleCredentialRevoked()
+        XCTAssertNil(auth.account, "A saved Apple ID that Apple revoked signs out")
+        auth.completeApple(subject: apple.subject, name: nil, email: nil, identityToken: "apple-jwt")
+        auth.appleCredentialRevoked()
+        await auth.verifyExistingSession()
+        XCTAssertEqual(auth.account?.subject, apple.subject)
+    }
+
+    func testOnlyANewSignInAsksForProfileSetup() {
+        let auth = auth(apple)
+        XCTAssertFalse(auth.takeFreshSignIn(), "A saved account at launch isn't a new sign-in")
+        auth.completeApple(subject: apple.subject, name: nil, email: nil, identityToken: "apple-jwt")
+        XCTAssertFalse(auth.takeFreshSignIn(), "Confirming the same Apple ID again isn't a new sign-in")
+        auth.signOut()
+        auth.completeApple(subject: apple.subject, name: nil, email: nil, identityToken: "apple-jwt")
+        XCTAssertTrue(auth.takeFreshSignIn())
+        XCTAssertFalse(auth.takeFreshSignIn(), "Setup opens once per sign-in")
+    }
+
     func testAppleAccountDeletionConfirmsThenDeletesAndSignsOut() async {
         let auth = auth(apple)
         let social = store(apple) { grant in grant.isEmpty ? (200, Data()) : self.token("refresh-1") }

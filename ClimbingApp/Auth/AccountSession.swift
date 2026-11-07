@@ -132,6 +132,10 @@ final class AccountSession {
     private var appleIdentityToken: String?
     // Single use and valid for minutes. Apple's revoke API needs it when the account is deleted.
     private var appleAuthorizationCode: String?
+    // Right after an app is re-approved, Apple can still report the old revoked state, so an Apple ID confirmed in this run is trusted until relaunch.
+    private var appleConfirmedSubject: String?
+    // Set when a different account signs in, so profile setup opens even after an earlier "Not now".
+    private var signedInFresh = false
     private var revision = 0
     private var restored = false
 
@@ -162,7 +166,16 @@ final class AccountSession {
         let name = name ?? ""
         activate(ClimberAccount(provider: .apple, subject: subject,
                                 name: name.isEmpty ? existing?.name ?? "Climber" : name, email: email ?? existing?.email))
-        if account?.subject == subject { appleIdentityToken = identityToken; appleAuthorizationCode = authorizationCode }
+        if account?.subject == subject { appleIdentityToken = identityToken; appleAuthorizationCode = authorizationCode; appleConfirmedSubject = subject }
+    }
+
+    func appleCredentialRevoked() {
+        if account?.provider == .apple && account?.subject != appleConfirmedSubject { signOut() }
+    }
+
+    func takeFreshSignIn() -> Bool {
+        defer { signedInFresh = false }
+        return signedInFresh
     }
 
     func takeAppleAuthorizationCode() -> String? {
@@ -192,6 +205,7 @@ final class AccountSession {
     private func activate(_ verifiedAccount: ClimberAccount) {
         do {
             try vault.save(verifiedAccount)
+            if account?.storageKey != verifiedAccount.storageKey { signedInFresh = true }
             revision += 1
             isBusy = false
             account = verifiedAccount
@@ -208,6 +222,7 @@ final class AccountSession {
             friendsSessions.clear()
             appleIdentityToken = nil
             appleAuthorizationCode = nil
+            appleConfirmedSubject = nil
             revision += 1
             googleSignOut()
             account = nil
@@ -242,6 +257,7 @@ final class AccountSession {
         let operation = revision
         switch current.provider {
         case .apple:
+            guard current.subject != appleConfirmedSubject else { return }
             do {
                 let state = try await ASAuthorizationAppleIDProvider().credentialState(forUserID: current.subject)
                 guard operation == revision else { return }

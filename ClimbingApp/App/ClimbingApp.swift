@@ -42,7 +42,7 @@ struct ClimbingApp: App {
                 if phase == .active && !testing { Task { await auth.verifyExistingSession() } }
             }
             .onReceive(NotificationCenter.default.publisher(for: ASAuthorizationAppleIDProvider.credentialRevokedNotification)) { _ in
-                if auth.account?.provider == .apple { auth.signOut() }
+                auth.appleCredentialRevoked()
             }
         }
     }
@@ -175,14 +175,16 @@ struct AppRoot: View {
         .environment(profiles)
         .environment(social)
         .task {
-            setupProfile = invitations.target == nil && auth.account != nil && profiles.profile == nil && profiles.errorMessage == nil
+            let fresh = auth.takeFreshSignIn()
+            setupProfile = invitations.target == nil && auth.account != nil && profiles.errorMessage == nil &&
+                (profiles.profile == nil || (fresh && profiles.profile?.setupComplete != true))
             await social.retryRemovals(auth)
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await social.retryRemovals(auth) } }
         }
         .sheet(isPresented: $setupProfile) {
-            ProfileEditorView(setup: true).environment(profiles)
+            ProfileEditorView(setup: true).environment(profiles).environment(social)
         }
         .sheet(isPresented:Binding(get:{ invitations.target != nil },set:{ if !$0 { invitations.target=nil } })) {
             NavigationStack {

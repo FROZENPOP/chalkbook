@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(\.dynamicTypeSize) private var textSize
     @Environment(AccountSession.self) private var auth
     @Environment(SocialStore.self) private var social
+    @Environment(ProfileStore.self) private var profiles
     @AppStorage("healthEnabled") private var healthEnabled = false
     @State private var showLogin = false
     @State private var editProfile = false
@@ -101,7 +102,7 @@ struct SettingsView: View {
         }
         .id(textSize)
         .navigationTitle("Settings")
-        .sheet(isPresented: $editProfile) { ProfileEditorView() }
+        .sheet(isPresented: $editProfile) { ProfileEditorView(setup: profiles.profile?.setupComplete != true) }
         .sheet(isPresented: $showLogin) { LoginPortalView() }
         .confirmationDialog("Sign out of your account?", isPresented: $confirmSignOut, titleVisibility: .visible) {
             Button("Sign out", role: .destructive) { auth.signOut() }
