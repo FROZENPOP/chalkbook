@@ -176,9 +176,8 @@ final class SocialStore {
         guard !removals.removingProfile else { errorMessage = "Your profile removal is waiting to sync. Retry removals before creating another profile."; return false }
         let username = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard username.range(of: "^[a-z0-9_]{3,24}$", options: .regularExpression) != nil, (1...60).contains(name.unicodeScalars.count),bio.unicodeScalars.count<=240,(photo?.count ?? 0)<=65_536 else {
-            errorMessage = SocialError.invalidProfile.localizedDescription; return false
-        }
+        if let problem = ProfileInput.problem(username: username, name: name, bio: bio) { errorMessage = problem; return false }
+        guard (photo?.count ?? 0)<=65_536 else { errorMessage = "This profile photo is too large. Choose another photo."; return false }
         return await perform(auth) {
             _ = try await self.request("/rest/v1/rpc/save_social_profile_v2", method: "POST", values: ["username": username, "display_name": name, "is_private": isPrivate,"bio":bio,"avatar_base64":photo?.base64EncodedString() as Any? ?? NSNull()])
             try await self.reload()

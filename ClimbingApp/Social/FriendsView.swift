@@ -25,6 +25,7 @@ struct SocialProfileEditor: View {
                     TextField("Username *", text: $username).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityLabel("Username, required")
                     TextField("Display name *", text: $name).accessibilityLabel("Display name, required")
                     Text("Visible to signed-in climbers. Your email stays private. * Required").font(.caption)
+                    if !username.isEmpty, let problem = ProfileInput.problem(username: username, name: name, bio: bio) { Text(problem).font(.caption).foregroundStyle(ClimbTheme.error) }
                 }
                 Section(header: Text("Optional climbing profile").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                     ProfileAvatar(photo:photo)
@@ -67,7 +68,7 @@ struct SocialProfileEditor: View {
                 if let message = social.errorMessage { Text(message).foregroundStyle(ClimbTheme.error) }
                 Button("Save social profile") {
                     Task { if await social.saveProfile(auth, username: username, name: name, isPrivate: isPrivate,bio:bio,photo:photo) { dismiss() } }
-                }.disabled(social.busy || !ready || importing || bio.unicodeScalars.count>240 || (social.me == nil && !agreed))
+                }.disabled(social.busy || !ready || importing || ProfileInput.problem(username: username, name: name, bio: bio) != nil || (social.me == nil && !agreed))
                 if let loadError { Text(loadError).foregroundStyle(ClimbTheme.error);if !ready { Button("Retry loading profile") { Task { await loadDetails() } } } }
                 if social.me != nil {
                     Section {

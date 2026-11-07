@@ -27,15 +27,24 @@ for (const name of ['support', 'admin', 'chalkbook_team'])
 await assert.rejects(profile('alice', 'Alice', Buffer.from('not a jpeg').toString('base64')), /avatar_is_jpeg/);
 await profile('alice', 'Alicé 🧗', Buffer.from('ffd8ffe0','hex').toString('base64'));
 
+// Bios, captions and comments: no hidden or text-direction characters, but line breaks are fine.
+const bio = text => db.query('select public.save_social_profile_v2($1,$2,false,$3,null)',['alice','Alice',text]);
+for (const text of ['safe\u202eevil', 'bell\u0007', 'hidden\u200bword', '\ufeffstart'])
+  await assert.rejects(bio(text), /bio_plain/, JSON.stringify(text));
+await bio('Line one\nLine two\twith a tab');
+
 // Session days must be real dates, not far in the future.
 await assert.rejects(share('9999-12-31'), /Invalid session day/);
 await assert.rejects(share('2026-99-99'));
 await assert.rejects(share('1999-12-31'), /Invalid session day/);
+await assert.rejects(db.query("select public.save_shared_session($1,'friends',$2,$3,null,1,null,'Sends only')",
+  [randomUUID(),'great\u202esend',new Date().toISOString().slice(0,10)]), /caption_plain/);
 await share(new Date().toISOString().slice(0,10));
 const entry = (await db.query('select id from public.shared_sessions limit 1')).rows[0].id;
 
 // Comments must have visible text, and at most 10 a minute.
 await assert.rejects(db.query('select public.add_session_comment($1,$2)',[entry,'\u00a0\u200b']), /check constraint/);
+await assert.rejects(db.query('select public.add_session_comment($1,$2)',[entry,'nice\u202eclimb']), /body_plain/);
 for (let i = 0; i < 10; i++) await db.query('select public.add_session_comment($1,$2)',[entry,`nice ${i}`]);
 await assert.rejects(db.query('select public.add_session_comment($1,$2)',[entry,'one more']), /Too many comments/);
 // A report pings the moderator once, nothing else can, and reports are capped per day.

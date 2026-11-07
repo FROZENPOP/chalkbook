@@ -44,7 +44,23 @@ import XCTest
         let store = SocialStore(configuration: nil)
         let success = await store.saveProfile(AccountSession(vault: GuestAccountVault()), username: "bad name!", name: "Climber", isPrivate: true)
         XCTAssertFalse(success)
-        XCTAssertEqual(store.errorMessage, SocialError.invalidProfile.localizedDescription)
+        XCTAssertEqual(store.errorMessage, "Usernames are 3–24 lowercase letters, numbers or underscores.")
+    }
+
+    func testProfileInputNamesEachProblem() {
+        func problem(_ username: String = "alice", _ name: String = "Alice", _ bio: String = "") -> String? { ProfileInput.problem(username: username, name: name, bio: bio) }
+        XCTAssertNil(problem())
+        XCTAssertNil(problem("Alice_99", "Alicé 🧗", "Line one\nLine two"), "Usernames are lowercased; emoji, accents and line breaks in a bio are fine")
+        XCTAssertEqual(problem("support"), "That username is reserved. Choose another one.")
+        XCTAssertEqual(problem("chalkbook_team"), "That username is reserved. Choose another one.")
+        XCTAssertEqual(problem("a"), "Usernames are 3–24 lowercase letters, numbers or underscores.")
+        XCTAssertEqual(problem("bob';drop table--"), "Usernames are 3–24 lowercase letters, numbers or underscores.")
+        XCTAssertEqual(problem("alice", "  "), "Enter a display name of 1–60 characters.")
+        XCTAssertEqual(problem("alice", "Bob\u{202E}evil"), "Your display name has hidden or formatting characters. Retype it without them.")
+        XCTAssertEqual(problem("alice", "Zero\u{200B}width"), "Your display name has hidden or formatting characters. Retype it without them.")
+        XCTAssertEqual(problem("alice", "Chalkbook Support"), "Display names can’t include “Chalkbook”.")
+        XCTAssertEqual(problem("alice", "Alice", String(repeating: "a", count: 241)), "Keep your bio to 240 characters or fewer.")
+        XCTAssertEqual(problem("alice", "Alice", "safe\u{202E}evil"), "Your bio has hidden or formatting characters. Retype it without them.")
     }
 
     func testCommentDecodesServerRowWithAndWithoutAuthor() throws {

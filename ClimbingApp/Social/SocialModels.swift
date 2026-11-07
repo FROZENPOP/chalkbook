@@ -114,7 +114,7 @@ struct SupabaseConfiguration: Decodable {
 }
 
 enum SocialError: LocalizedError {
-    case setup, signIn, appleSignIn, server, invalidProfile, migrationNeeded, contentRejected, usernameTaken
+    case setup, signIn, appleSignIn, server, migrationNeeded, contentRejected, usernameTaken
     case removalPending, tooManyPhotos, photoUnreadable, climberUnavailable, feedPage
     var errorDescription: String? {
         switch self {
@@ -122,7 +122,6 @@ enum SocialError: LocalizedError {
         case .signIn: "Sign in to connect to Friends."
         case .appleSignIn: "Continue with Apple to connect to Friends. Your journal is unaffected."
         case .server: "The Friends service couldn’t complete this request. Check your connection and retry. No successful save has been confirmed."
-        case .invalidProfile: "Choose a username with 3–24 lowercase letters, numbers or underscores, and a name with 1–60 characters."
         case .migrationNeeded: "This Friends update isn’t available yet. Please try again later. Your local journal is unaffected."
         case .contentRejected: "This includes words the community rules don’t allow. Edit it and try again."
         case .usernameTaken: "That username is taken. Try another one."
@@ -153,6 +152,36 @@ enum SocialError: LocalizedError {
         default: break
         }
         return SocialError.server.localizedDescription
+    }
+}
+
+/// The Friends profile rules the server enforces (supabase/migrations), checked first so the climber sees why.
+enum ProfileInput {
+    static let reserved: Set<String> = ["admin", "administrator", "moderator", "mod", "support", "help", "official", "staff", "team", "security", "apple"]
+
+    /// Controls, zero-width and text-direction characters, which can hide or reverse text other climbers read.
+    static func hasHiddenCharacters(_ text: String, allowLineBreaks: Bool = false) -> Bool {
+        text.unicodeScalars.contains { scalar in
+            if allowLineBreaks && ["\t", "\n", "\r"].contains(scalar) { return false }
+            switch scalar.value {
+            case 0x00...0x1F, 0x7F...0x9F, 0x200B...0x200F, 0x202A...0x202E, 0x2060, 0x2066...0x2069, 0xFEFF: return true
+            default: return false
+            }
+        }
+    }
+
+    /// The first problem the server would refuse, or nil.
+    static func problem(username: String, name: String, bio: String) -> String? {
+        let username = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if username.range(of: "^[a-z0-9_]{3,24}$", options: .regularExpression) == nil { return "Usernames are 3–24 lowercase letters, numbers or underscores." }
+        if reserved.contains(username) || username.contains("chalkbook") { return "That username is reserved. Choose another one." }
+        if !(1...60).contains(name.unicodeScalars.count) { return "Enter a display name of 1–60 characters." }
+        if hasHiddenCharacters(name) { return "Your display name has hidden or formatting characters. Retype it without them." }
+        if name.localizedCaseInsensitiveContains("chalkbook") { return "Display names can’t include “Chalkbook”." }
+        if bio.unicodeScalars.count > 240 { return "Keep your bio to 240 characters or fewer." }
+        if hasHiddenCharacters(bio, allowLineBreaks: true) { return "Your bio has hidden or formatting characters. Retype it without them." }
+        return nil
     }
 }
 

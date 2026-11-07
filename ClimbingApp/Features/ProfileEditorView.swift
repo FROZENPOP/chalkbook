@@ -39,8 +39,9 @@ struct ProfileEditorView: View {
 
     private var valid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && name.trimmingCharacters(in: .whitespacesAndNewlines).count <= 60 && bio.count <= 500 &&
-            (!syncFriends || (!username.trimmingCharacters(in: .whitespaces).isEmpty && bio.unicodeScalars.count <= 240 && (social.me != nil || agreed)))
+            (!syncFriends || (inputProblem == nil && (social.me != nil || agreed)))
     }
+    private var inputProblem: String? { ProfileInput.problem(username: username, name: name, bio: bio) }
     // One editor for the whole profile: signed-in climbers also set their Friends username, privacy and agreement here.
     private var signedIn: Bool { auth.account != nil && social.configuration != nil }
     private var joining: Bool { social.me == nil }
@@ -68,6 +69,8 @@ struct ProfileEditorView: View {
                         TextField(usernameRequired ? "Username *" : "Username", text: $username).textContentType(.username).textInputAutocapitalization(.never).autocorrectionDisabled()
                             .accessibilityLabel(usernameRequired ? "Username, required" : "Username").accessibilityIdentifier("setupUsername")
                     }
+                    // Shown once a username is typed; an empty required username already explains a disabled Save.
+                    if syncFriends, !username.isEmpty, let inputProblem { Text(inputProblem).font(.caption).foregroundStyle(ClimbTheme.error) }
                     Text("* Required").font(.caption).foregroundStyle(ClimbTheme.secondaryText).accessibilityHidden(true)
                     TextField("A little about your climbing (optional)", text: $bio, axis: .vertical).lineLimit(3...6).accessibilityIdentifier("profileBio")
                     if syncFriends { Text("\(bio.unicodeScalars.count)/240 characters").font(.caption).foregroundStyle(ClimbTheme.secondaryText) }

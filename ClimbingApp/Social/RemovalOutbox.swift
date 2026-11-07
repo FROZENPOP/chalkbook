@@ -10,7 +10,15 @@ struct RemovalHTTPError: LocalizedError {
     var errorDescription: String? {
         if let serverMessage, let known = Self.reasons[serverMessage] { return known }
         switch code {
-        case "23514": return "Part of this is too long or not allowed. Shorten it and try again."
+        case "23514":
+            // The check constraint's name says which rule failed.
+            let rule = serverMessage ?? ""
+            if rule.contains("_plain") { return "This has hidden or formatting characters. Retype it without them." }
+            if rule.contains("not_staff") { return "Display names can’t include “Chalkbook”." }
+            if rule.contains("not_reserved") { return "That username is reserved. Choose another one." }
+            if rule.contains("_visible") { return "Add some visible text and try again." }
+            if rule.contains("avatar") { return "This profile photo couldn’t be used. Choose another photo." }
+            return "Part of this is too long. Shorten it and try again."
         case "23505": return "This is already saved. Refresh and try again."
         default: break
         }
