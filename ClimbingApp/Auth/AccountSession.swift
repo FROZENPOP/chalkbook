@@ -260,12 +260,19 @@ final class AccountSession {
         return token
     }
 
+    // Apple treats simulators as untrusted and always reports REVOKED there, which would sign out on every launch.
+    #if targetEnvironment(simulator)
+    private static let isSimulator = true
+    #else
+    private static let isSimulator = false
+    #endif
+
     func verifyExistingSession() async {
         guard let current = account else { return }
         let operation = revision
         switch current.provider {
         case .apple:
-            guard current.subject != appleConfirmedSubject else { return }
+            guard current.subject != appleConfirmedSubject, !Self.isSimulator else { return }
             do {
                 let state = try await ASAuthorizationAppleIDProvider().credentialState(forUserID: current.subject)
                 guard operation == revision else { return }
