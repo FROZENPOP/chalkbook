@@ -139,6 +139,50 @@ private final class TokenURLProtocol: URLProtocol {
         XCTAssertEqual(auth.account?.subject, apple.subject)
     }
 
+    func testAppleRevocationSignsOutFiveMinutesAfterConfirmation() {
+        let auth = auth(apple)
+        var clock = Date(timeIntervalSince1970: 1_800_000_000)
+        auth.now = { clock }
+        auth.completeApple(subject: apple.subject, name: nil, email: nil, identityToken: "apple-jwt")
+        clock += 299
+        auth.appleCredentialRevoked()
+        XCTAssertNotNil(auth.account, "A stale revoked state right after confirmation is ignored")
+        clock += 2
+        auth.appleCredentialRevoked()
+        XCTAssertNil(auth.account)
+    }
+
+    func testGoogleExchangeSendsTheNonceOnlyWhenTheTokenHasOne() async throws {
+        let google = ClimberAccount(provider: .google, subject: "google-test", name: "G", email: nil)
+        let auth = auth(google), hashed = auth.newGoogleNonce()
+        let signIn = GoogleNonceTests.jwt(["sub": google.subject, "nonce": hashed])
+        let raw = try XCTUnwrap(auth.friendsNonce(for: signIn))
+        for (token, nonce) in [(signIn, raw as String?), (GoogleNonceTests.jwt(["sub": google.subject]), nil)] {
+            sessions.clear()
+            let social = store(google, identityToken: { _ in token }) { _ in self.token("fresh") }
+            let ok = await social.perform(auth) {}
+            XCTAssertTrue(ok)
+            XCTAssertEqual(calls.map(\.grant), ["id_token"])
+            XCTAssertEqual(calls.first?.values["id_token"] as? String, token)
+            XCTAssertEqual(calls.first?.values["nonce"] as? String, nonce)
+            XCTAssertEqual(calls.first?.values.keys.contains("nonce"), nonce != nil)
+        }
+    }
+
+    func testRejectedSignInTokenSaysToSignInAgain() async {
+        let google = ClimberAccount(provider: .google, subject: "google-test", name: "G", email: nil)
+        let msg = "Passed nonce and nonce in id_token should either both exist or not."
+        let social = store(google, identityToken: { _ in "google-jwt" }) { _ in
+            (400, Data(#"{"code":400,"error_code":"bad_jwt","msg":"\#(msg)"}"#.utf8))
+        }
+        let ok = await social.perform(auth(google)) {}
+        XCTAssertFalse(ok)
+        XCTAssertEqual(social.errorMessage, "Friends couldn’t confirm your sign-in. Sign out and sign in again, then retry.")
+        do { _ = try await social.request("/auth/v1/user", authenticated: false); XCTFail("A 400 throws") } catch let error as RemovalHTTPError {
+            XCTAssertEqual(error.code, "bad_jwt"); XCTAssertEqual(error.serverMessage, msg)
+        } catch { XCTFail("\(error)") }
+    }
+
     func testErrorsNameTheProblem() {
         XCTAssertEqual(SocialError.message(for: URLError(.notConnectedToInternet)), "You’re offline. Connect to the internet and try again.")
         XCTAssertTrue(SocialError.message(for: RemovalHTTPError(status: 400, code: "P0001", serverMessage: "Too many comments, try again in a minute")).contains("commenting too quickly"))

@@ -14,10 +14,10 @@ struct ClimberAccount: Codable, Equatable {
     let name: String
     let email: String?
 
-    var storageKey: String {
-        SHA256.hash(data: Data("\(provider.rawValue):\(subject)".utf8)).map { String(format: "%02x", $0) }.joined()
-    }
+    var storageKey: String { sha256Hex("\(provider.rawValue):\(subject)") }
 }
+
+func sha256Hex(_ text: String) -> String { SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined() }
 
 protocol AccountVault {
     func load() throws -> ClimberAccount?
@@ -132,8 +132,12 @@ final class AccountSession {
     private var appleIdentityToken: String?
     // Single use and valid for minutes. Apple's revoke API needs it when the account is deleted.
     private var appleAuthorizationCode: String?
-    // Right after an app is re-approved, Apple can still report the old revoked state, so an Apple ID confirmed in this run is trusted until relaunch.
+    // Right after an app is re-approved, Apple can still report the old revoked state, so an Apple ID confirmed in this run is trusted for 5 minutes.
     private var appleConfirmedSubject: String?
+    private var appleConfirmedAt = Date.distantPast
+    var now: () -> Date = Date.init
+    // Google puts SHA256 of this in the sign-in ID token, and Supabase needs the raw value to accept it.
+    private var googleNonce: String?
     // Set when a different account signs in, so profile setup opens even after an earlier "Not now".
     private var signedInFresh = false
     private var revision = 0
@@ -174,11 +178,13 @@ final class AccountSession {
         let name = name ?? ""
         activate(ClimberAccount(provider: .apple, subject: subject,
                                 name: name.isEmpty ? existing?.name ?? "Climber" : name, email: email ?? existing?.email))
-        if account?.subject == subject { appleIdentityToken = identityToken; appleAuthorizationCode = authorizationCode; appleConfirmedSubject = subject }
+        if account?.subject == subject { appleIdentityToken = identityToken; appleAuthorizationCode = authorizationCode; appleConfirmedSubject = subject; appleConfirmedAt = now() }
     }
 
+    private var appleRecentlyConfirmed: Bool { account?.subject == appleConfirmedSubject && now().timeIntervalSince(appleConfirmedAt) < 300 }
+
     func appleCredentialRevoked() {
-        if account?.provider == .apple && account?.subject != appleConfirmedSubject { signOut() }
+        if account?.provider == .apple && !appleRecentlyConfirmed { signOut() }
     }
 
     func takeFreshSignIn() -> Bool {
@@ -200,7 +206,7 @@ final class AccountSession {
         defer { if revision == operation { isBusy = false } }
         GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientID)
         do {
-            let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: controller)
+            let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: controller, hint: nil, additionalScopes: nil, nonce: newGoogleNonce())
             guard operation == revision else { return }
             guard let subject = result.user.userID, !subject.isEmpty else { throw AccountError.missingIdentity }
             activate(ClimberAccount(provider: .google, subject: subject, name: result.user.profile?.name ?? "Climber", email: result.user.profile?.email))
@@ -208,6 +214,29 @@ final class AccountSession {
             guard operation == revision else { return }
             if (error as NSError).code != GIDSignInError.canceled.rawValue { errorMessage = error.localizedDescription }
         }
+    }
+
+    /// Keeps a new raw nonce and returns its SHA256 hex for Google.
+    func newGoogleNonce() -> String {
+        // SystemRandomNumberGenerator is cryptographically secure on Apple platforms.
+        let raw = (0..<32).map { _ in String(format: "%02x", UInt8.random(in: .min ... .max)) }.joined()
+        googleNonce = raw
+        return sha256Hex(raw)
+    }
+
+    /// The raw nonce Supabase needs for this ID token, or nil when the token has no nonce (Apple, or a Google token refreshed since sign-in).
+    func friendsNonce(for idToken: String) throws -> String? {
+        let parts = idToken.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3 else { return nil }
+        var payload = parts[1].replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
+        guard let data = Data(base64Encoded: payload), let claims = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let claim = claims["nonce"] as? String else { return nil }
+        // After a relaunch the raw nonce is gone, and the SDK has no forced refresh to drop the claim before the token expires.
+        guard let raw = googleNonce, sha256Hex(raw) == claim else {
+            throw FriendsProblem(message: "Google sign-in needs refreshing. Sign out and sign in with Google again.")
+        }
+        return raw
     }
 
     private func activate(_ verifiedAccount: ClimberAccount) {
@@ -231,6 +260,7 @@ final class AccountSession {
             appleIdentityToken = nil
             appleAuthorizationCode = nil
             appleConfirmedSubject = nil
+            googleNonce = nil
             revision += 1
             googleSignOut()
             account = nil
@@ -272,7 +302,7 @@ final class AccountSession {
         let operation = revision
         switch current.provider {
         case .apple:
-            guard current.subject != appleConfirmedSubject, !Self.isSimulator else { return }
+            guard !appleRecentlyConfirmed, !Self.isSimulator else { return }
             do {
                 let state = try await ASAuthorizationAppleIDProvider().credentialState(forUserID: current.subject)
                 guard operation == revision else { return }

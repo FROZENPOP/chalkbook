@@ -68,14 +68,16 @@ final class SocialStore {
         let (data, response) = try await network.data(for: request)
         guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
             let body = try? JSONSerialization.jsonObject(with:data) as? [String:Any]
-            let code = body?["code"] as? String
-            if code == "23505", (body?["message"] as? String)?.contains("username") == true { throw SocialError.usernameTaken }
+            // PostgREST sends code and message; Supabase Auth sends a numeric code with error_code and msg (or error_description).
+            let code = body?["error_code"] as? String ?? body?["code"] as? String
+            let message = body?["msg"] as? String ?? body?["error_description"] as? String ?? body?["message"] as? String
+            if code == "23505", message?.contains("username") == true { throw SocialError.usernameTaken }
             if ["PGRST202","PGRST205","42P01"].contains(code ?? "") { throw SocialError.migrationNeeded }
             if code == "SN001" { throw SocialError.contentRejected }
             throw RemovalHTTPError(status: (response as? HTTPURLResponse)?.statusCode ?? 0,
                                    missingContent: (response as? HTTPURLResponse)?.statusCode == 410 ||
                                    ((response as? HTTPURLResponse)?.statusCode == 404 && code == "PGRST116"),
-                                   code: code, serverMessage: body?["message"] as? String)
+                                   code: code, serverMessage: message)
         }
         if authenticated { scheduleRemovals() }
         return data
@@ -93,8 +95,12 @@ final class SocialStore {
         }
         if data == nil {
             let token = try await identityToken(auth)
-            data = try await request("/auth/v1/token?grant_type=id_token", method: "POST",
-                                     values: ["provider": current.provider.rawValue, "id_token": token], authenticated: false)
+            var values = ["provider": current.provider.rawValue, "id_token": token]
+            if let nonce = try auth.friendsNonce(for: token) { values["nonce"] = nonce }
+            do { data = try await request("/auth/v1/token?grant_type=id_token", method: "POST", values: values, authenticated: false) }
+            catch let rejected as RemovalHTTPError where (400..<500).contains(rejected.status) && rejected.status != 429 {
+                throw FriendsProblem(message: "Friends couldn’t confirm your sign-in. Sign out and sign in again, then retry.")
+            }
         }
         let session = try JSONDecoder().decode(TokenResponse.self, from: data ?? Data())
         guard auth.account == current else { throw SocialError.signIn }
