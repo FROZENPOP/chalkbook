@@ -15,7 +15,8 @@ struct SessionDetailView: View {
     @State private var editingAttempt: ClimbAttempt?
     @State private var reviewing = false
     @State private var manualAttempt = false
-    @State private var sharing = false
+    @State private var shareProblem: String?
+    @State private var shareNotice: String?
     private var selected: ClimbEntry? { session.allClimbs.first { $0.id == session.selectedClimbID } ?? session.orderedClimbs.last }
 
     var body: some View {
@@ -45,6 +46,16 @@ struct SessionDetailView: View {
                         if !session.notes.isEmpty { Text(session.notes).font(.subheadline).foregroundStyle(ClimbTheme.secondaryText) }
                     }
                 }
+                if let message = shareProblem ?? shareNotice {
+                    Surface {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(shareProblem == nil ? message : "Friends wasn’t updated. \(message)").font(.subheadline)
+                                .foregroundStyle(shareProblem == nil ? Color.primary : ClimbTheme.error).fixedSize(horizontal: false, vertical: true)
+                            Button(shareProblem == nil ? "OK" : "Retry") { if shareProblem == nil { shareNotice = nil } else { syncShare() } }
+                                .buttonStyle(.bordered).frame(minHeight: 44).accessibilityIdentifier("sessionShareStatus")
+                        }
+                    }
+                }
                 HStack {
                     Text("Your climbs").font(.title2.bold()).id("sessionClimbs")
                     Spacer()
@@ -59,7 +70,7 @@ struct SessionDetailView: View {
                 if session.allClimbs.isEmpty {
                     EmptyState(title: "Find your first boulder", symbol: "figure.climbing", message: "Add a climb and record each try along the way.")
                 }
-                if let selected { ClimbCard(climb: selected, canLog: !session.isComplete, loggingSession: session) }
+                if let selected { ClimbCard(climb: selected, canLog: !session.isComplete, loggingSession: session, onEditorClose: syncShare) }
                 if !session.isComplete, !session.recordedAttempts.isEmpty {
                     Button { store.undoLatest(in: session) } label: { Label("Undo latest logged attempt", systemImage: "arrow.uturn.backward").frame(minHeight: 44) }.accessibilityIdentifier("undoLatestAttempt")
                 }
@@ -104,7 +115,6 @@ struct SessionDetailView: View {
         .toolbar {
             Menu {
                 Button("Edit session", systemImage: "pencil") { sheet = .edit }
-                if session.isComplete { Button("Share / privacy", systemImage: "square.and.arrow.up") { sharing = true } }
                 Button("Delete session", systemImage: "trash", role: .destructive) { confirmDelete = true }
             } label: { Label("Session options", systemImage: "ellipsis.circle") }
         }
@@ -120,13 +130,21 @@ struct SessionDetailView: View {
         .sheet(item: $editingAggregate) { AggregateEditorView(session: session, existing: $0) }
         .sheet(item: $editingAttempt) { AttemptEditorView(attempt: $0) }
         .sheet(isPresented: $manualAttempt) { ManualAttemptView(session: session) }
-        .sheet(isPresented: $reviewing) { FinishReviewView(session: session) }
-        .sheet(isPresented: $sharing) { ShareSessionView(session: session) }
+        .sheet(isPresented: $reviewing, onDismiss: syncShare) { FinishReviewView(session: session) }
         .confirmationDialog("Delete this session and its recorded activity?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete session", role: .destructive) {
                 if social.deleteSession(session, store: store, auth: auth) { dismiss() }
             }
         } message: { Text("Its attempts and any shared recap are removed. Climbs and projects stay.") }
+    }
+
+    /// Posts a finished session, or media added to it, to Friends. Problems show above the climbs.
+    private func syncShare() {
+        guard session.isComplete else { return }
+        Task {
+            shareProblem = await SessionEditorView.syncShare(social, auth, session)
+            shareNotice = social.photoNotice; social.photoNotice = nil
+        }
     }
 }
 
@@ -136,6 +154,7 @@ struct ClimbCard: View {
     let climb: ClimbEntry
     let canLog: Bool
     var loggingSession: ClimbingSession? = nil
+    var onEditorClose: () -> Void = {}
     private var displayedAttempts: [ClimbAttempt] { guard let loggingSession else { return climb.attempts }; return climb.attempts.filter { $0.effectiveSessionID == loggingSession.id } }
     @State private var editing: ClimbEntry?
     @State private var cooldown = false
@@ -197,7 +216,7 @@ struct ClimbCard: View {
                 return store.save { media.annotationJSON = json; media.updatedAt = .now }
             }
         }
-        .sheet(item: $editing) { entry in
+        .sheet(item: $editing, onDismiss: onEditorClose) { entry in
             ClimbEditorView(session: loggingSession ?? entry.session, climb: entry)
         }
     }

@@ -7,6 +7,7 @@ import XCTest
     private func launch(_ screen: String, darkLarge: Bool = false, empty: Bool = false, extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing", "--reset-test-data", "--accessibility-audit", screen] + extra
+        if screen == "share" { app.launchArguments.append("--audit-social-sample") } // Edit session's Friends section needs a (sample) account
         if empty {
             app.launchArguments.append("--audit-empty")
             if screen == "feed" { app.launchArguments.append("--test-empty-feed") }
@@ -24,11 +25,16 @@ import XCTest
         case "history": ready = app.textFields["historySearch"]
         case "session-editor": ready = app.buttons["saveSession"]
         case "climb-editor": ready = app.buttons["saveClimb"]
-        case "share": ready = app.textFields["Separate public caption"]
+        case "share": ready = app.buttons["saveSession"]
         case "annotation": ready = app.descendants(matching: .any)["routeMarkupCanvas"].firstMatch
         default: ready = app.navigationBars.firstMatch
         }
         XCTAssertTrue(ready.exists || ready.waitForExistence(timeout: 15), "Screen must be ready before auditing: \(screen)")
+        if screen == "share" {
+            let caption = app.textFields["shareCaption"]
+            for _ in 0..<8 { if caption.exists && caption.isHittable { break }; app.swipeUp() }
+            XCTAssertTrue(caption.isHittable, "Friends section must be on screen before auditing")
+        }
         XCTAssertTrue(app.tabBars.buttons["Journal"].exists)
         return app
     }

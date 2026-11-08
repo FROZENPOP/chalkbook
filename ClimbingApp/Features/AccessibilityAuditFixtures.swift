@@ -17,6 +17,7 @@ import SwiftUI
         guard audit, !ProcessInfo.processInfo.arguments.contains("--audit-empty") else { return }
         let session = ClimbingSession(date: .now.addingTimeInterval(-7200), location: "Audit gym")
         session.isComplete = true; session.endedAt = session.startedAt.addingTimeInterval(3600)
+        session.visibility = .friends
         context.insert(session)
         let climb = ClimbEntry(label: "Yellow slab", color: "Yellow", grade: "V2")
         climb.projectRaw = "active"; climb.session = session; session.climbs.append(climb); context.insert(climb)
@@ -85,7 +86,7 @@ struct AccessibilityAuditDestination: View {
         case "suggested": SuggestedFriendsFixtureView()
         case "social-profile":
             SocialClimberProfileView(climberID: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!, auditPage: .init(profile: .init(id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!, username: "slab_climber", display_name: "Alex Climber", is_private: true), details: .init(id: UUID(), bio: "Working on slab technique.", avatar_base64: nil), entries: []))
-        case "share": if let session = sessions.first { ShareSessionView(session: session, auditEntry: SharedSession(session: session, owner: UUID())) }
+        case "share": SessionEditorView(session: sessions.first) // Edit session's Friends section; tests add --audit-social-sample
         case "annotation": if let media = climbs.first?.media.first { RouteAnnotationView(media: media) }
         case "highlight": if let media = climbs.first?.media.first {
             HoldHighlightView(item: draft(media), save: { _ in true })
