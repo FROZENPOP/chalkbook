@@ -89,7 +89,7 @@ struct FriendsView: View {
                 }
             }
         }
-        .refreshable { await refresh() }
+        .refreshable { await Task { await refresh() }.value } // SwiftUI cancels the refresh task when Friends redraws mid-refresh.
         .task { await refresh() }
         .sheet(isPresented: $login) { LoginPortalView() }
         .sheet(isPresented: $profile) { SocialProfileEditor() }

@@ -172,6 +172,6 @@ struct FriendProgressView: View {
             }
             ForEach(entries) { SharedSessionPreview(entry: $0) }
             if let message = social.errorMessage { Text(message).foregroundStyle(ClimbTheme.error) }
-        }.navigationTitle(name).refreshable { await social.refresh(auth) }
+        }.navigationTitle(name).refreshable { await Task { await social.refresh(auth) }.value }
     }
 }

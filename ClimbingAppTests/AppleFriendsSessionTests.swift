@@ -121,6 +121,18 @@ private final class TokenURLProtocol: URLProtocol {
         XCTAssertEqual(sessions.load(apple.storageKey), "refresh-1")
     }
 
+    func testCancelledRefreshIsNotAFailure() async {
+        sessions.save("refresh-1", for: apple.storageKey)
+        let auth = auth(apple), social = store(apple) { _ in self.token("refresh-2") }
+        for cancelled in [URLError(.cancelled), CancellationError()] as [Error] {
+            let ok = await social.perform(auth) { throw cancelled }
+            XCTAssertFalse(ok); XCTAssertNil(social.errorMessage)
+        }
+        let ok = await social.perform(auth) {}
+        XCTAssertTrue(ok)
+        XCTAssertEqual(calls.map(\.grant), ["refresh_token"], "a cancelled refresh keeps the Friends access token")
+    }
+
     func testSignOutForgetsFriendsSessions() {
         sessions.save("refresh-1", for: apple.storageKey)
         let auth = auth(apple)

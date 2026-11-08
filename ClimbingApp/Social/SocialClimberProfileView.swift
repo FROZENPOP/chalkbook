@@ -37,7 +37,7 @@ struct SocialClimberProfileView: View {
             }.padding(20)
         }.background(ClimbTheme.background).navigationTitle("Climber profile").navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented:$editing,onDismiss:{ Task { await load() } }) { SocialProfileEditor() }
-            .task { await load() }.refreshable { await load() }
+            .task { await load() }.refreshable { await Task { await load() }.value }
             .onChange(of:social.friendships.map(\.id).joined()+social.friendships.map(\.status).joined()+social.blocks.map { $0.id.uuidString }.joined()) { _,_ in Task { await load() } }
     }
     private func load() async {

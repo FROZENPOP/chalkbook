@@ -121,6 +121,8 @@ final class SocialStore {
             try await operation()
             errorMessage = nil; needsAppleSignIn = false
             return true
+        } catch let error where error is CancellationError || (error as? URLError)?.code == .cancelled {
+            return false // Cancelled, not failed: keep the session, the feed and any earlier message.
         } catch {
             accessToken = nil; expiresAt = .distantPast
             feed.reset() // Do not keep showing possibly revoked entries after a failed refresh.

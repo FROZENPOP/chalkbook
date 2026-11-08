@@ -81,7 +81,7 @@ struct FriendsFeedFixtureView: View {
             }.padding(20)
         }.navigationTitle("Friends").background(ClimbTheme.background)
             .task { await feed.refresh(reader) }
-            .refreshable { await feed.refresh(reader) }
+            .refreshable { await Task { await feed.refresh(reader) }.value }
     }
 }
 #endif
