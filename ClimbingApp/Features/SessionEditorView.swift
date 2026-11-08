@@ -115,7 +115,7 @@ struct SessionEditorView: View {
             }
             .task {
                 // Posting needs a Friends profile; find out before offering a visibility.
-                if friendsReady, auth.account != nil, social.configuration != nil { await social.loadProfile(auth) }
+                if friendsReady, auth.account != nil, social.configuration != nil { await social.loadProfile(auth, quietly: true) }
                 if let session, friendsReady, !shareLoaded { await loadShare(session) }
             }
             .sheet(isPresented: $login) { LoginPortalView() }

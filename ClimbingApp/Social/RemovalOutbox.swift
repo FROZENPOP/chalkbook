@@ -21,7 +21,7 @@ struct RemovalHTTPError: LocalizedError {
             return "Part of this is too long. Shorten it and try again."
         case "23505": return "This is already saved. Refresh and try again."
         // A post points at the climber's Friends profile, so without one it has nothing to attach to.
-        case "23503": return "Set up your Friends profile in the Friends tab, then try again."
+        case "23503" where serverMessage?.contains("shared_sessions_owner_id_fkey") == true: return "Set up your Friends profile in the Friends tab, then try again."
         default: break
         }
         switch status {

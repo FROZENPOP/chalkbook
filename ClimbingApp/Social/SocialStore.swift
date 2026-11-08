@@ -115,7 +115,7 @@ final class SocialStore {
     }
 
     @discardableResult
-    func perform(_ auth: AccountSession, operation: () async throws -> Void) async -> Bool {
+    func perform(_ auth: AccountSession, quietly: Bool = false, operation: () async throws -> Void) async -> Bool {
         guard !busy else { return false }
         busy = true; defer { busy = false; mediaRevision += 1; scheduleRemovals(auth) }
         do {
@@ -126,6 +126,7 @@ final class SocialStore {
         } catch let error where error is CancellationError || (error as? URLError)?.code == .cancelled {
             return false // Cancelled, not failed: keep the session, the feed and any earlier message.
         } catch {
+            guard !quietly else { return false } // A background check that failed changes nothing on screen.
             accessToken = nil; expiresAt = .distantPast
             feed.reset() // Do not keep showing possibly revoked entries after a failed refresh.
             errorMessage = SocialError.message(for: error)
@@ -172,9 +173,9 @@ final class SocialStore {
 
     /// Loads the climber's own profile when it isn't known yet. False when the lookup failed.
     @discardableResult
-    func loadProfile(_ auth: AccountSession) async -> Bool {
+    func loadProfile(_ auth: AccountSession, quietly: Bool = false) async -> Bool {
         guard me == nil else { return true }
-        return await perform(auth) {
+        return await perform(auth, quietly: quietly) {
             let own = try JSONDecoder().decode([SocialProfile].self, from: await self.request("/rest/v1/climber_profiles?id=eq.\(self.userID!.uuidString)&select=*"))
             self.me = self.removals.removingProfile ? nil : own.first; self.profileMissing = self.me == nil
         }
@@ -404,7 +405,9 @@ final class SocialStore {
             guard row != nil else { return true }
             return await removeShare(auth, sessionID: session.id)
         }
-        guard !removing else { errorMessage = SocialError.removalPending.localizedDescription; return false }
+        // A removal queued while offline (Private, then Friends again) is sent first, then the post goes up.
+        if removing, !removals.removingProfile { await retryRemovals(auth, force: true) }
+        guard !removals.contains(sessionID: session.id) else { errorMessage = SocialError.removalPending.localizedDescription; return false }
         // No profile means nothing can be posted; the session keeps its choice for when one exists.
         guard await loadProfile(auth) else { return false }
         guard me != nil else { return true }

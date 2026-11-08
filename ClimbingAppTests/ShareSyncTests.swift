@@ -265,7 +265,9 @@ private final class ShareURLProtocol: URLProtocol {
         XCTAssertTrue(saves.isEmpty)
         XCTAssertTrue(social.profileMissing)
         XCTAssertEqual(session.visibility, .friends, "the choice is kept for when a profile exists")
-        XCTAssertTrue(SocialError.message(for: RemovalHTTPError(status: 409, code: "23503")).contains("Friends profile"))
+        let noProfile = "insert or update on table \"shared_sessions\" violates foreign key constraint \"shared_sessions_owner_id_fkey\""
+        XCTAssertTrue(SocialError.message(for: RemovalHTTPError(status: 409, code: "23503", serverMessage: noProfile)).contains("Friends profile"))
+        XCTAssertFalse(SocialError.message(for: RemovalHTTPError(status: 409, code: "23503", serverMessage: "violates foreign key constraint \"session_comments_user_id_fkey\"")).contains("Friends profile"))
     }
 
     func testPrivateWhileOfflineQueuesTheRemoval() async throws {
@@ -278,6 +280,37 @@ private final class ShareURLProtocol: URLProtocol {
         let synced = await social.syncShare(auth, session: session)
         XCTAssertTrue(synced, social.errorMessage ?? "")
         XCTAssertTrue(social.removals.contains(sessionID: session.id))
+
+        // Back online and set to Friends again: the queued removal goes first, then the post.
+        ShareURLProtocol.lock.withLock {
+            ShareURLProtocol.handler = { request in
+                switch request.url!.path {
+                case "/auth/v1/token": (200, Data("{\"access_token\":\"access\",\"refresh_token\":\"refresh-3\",\"expires_in\":3600,\"user\":{\"id\":\"00000000-0000-0000-0000-000000000009\"}}".utf8))
+                case "/rest/v1/climber_profiles": (200, Data("[{\"id\":\"00000000-0000-0000-0000-000000000009\",\"username\":\"ada\",\"display_name\":\"Ada\",\"is_private\":false}]".utf8))
+                case "/rest/v1/shared_sessions": (200, Data("[]".utf8))
+                default: (200, Data("null".utf8))
+                }
+            }
+        }
+        session.visibility = .friends
+        let reshared = await social.syncShare(auth, session: session)
+        XCTAssertTrue(reshared, social.errorMessage ?? "")
+        XCTAssertFalse(social.removals.contains(sessionID: session.id))
+        XCTAssertEqual(saves.count, 1)
+        let removal = try XCTUnwrap(calls.firstIndex { $0.path == "/rest/v1/rpc/remove_shared_session" })
+        XCTAssertLessThan(removal, try XCTUnwrap(calls.firstIndex { $0.path == "/rest/v1/rpc/save_shared_session_with_photos" }))
+    }
+
+    func testQuietProfileCheckLeavesFriendsAsItWas() async throws {
+        let (social, auth) = try makeSocial()
+        ShareURLProtocol.lock.withLock {
+            let online = ShareURLProtocol.handler!
+            ShareURLProtocol.handler = { request in request.url!.path == "/rest/v1/climber_profiles" ? (503, Data()) : try online(request) }
+        }
+        let loaded = await social.loadProfile(auth, quietly: true)
+        XCTAssertFalse(loaded)
+        XCTAssertNil(social.errorMessage)
+        XCTAssertFalse(social.profileMissing)
     }
 
     func testPostPhotosComeOnlyFromTheSessionsOwnClimbs() async throws {

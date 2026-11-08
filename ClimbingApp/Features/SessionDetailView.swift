@@ -146,9 +146,10 @@ struct SessionDetailView: View {
     /// Posts a finished session, or media added to it, to Friends. Problems show above the climbs.
     private func syncShare() {
         guard session.isComplete else { return }
-        postedContent = SharedSession.content(of: session)
+        let content = SharedSession.content(of: session)
         Task {
             shareProblem = await SessionEditorView.syncShare(social, auth, session)
+            if shareProblem == nil { postedContent = content } // A failed sync retries on the next editor close.
             shareNotice = social.photoNotice; social.photoNotice = nil
         }
     }
