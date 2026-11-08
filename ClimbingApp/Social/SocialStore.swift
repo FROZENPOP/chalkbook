@@ -367,12 +367,67 @@ final class SocialStore {
     }
 
     func sharedEntry(_ auth: AccountSession, session: ClimbingSession) async -> SharedSession? {
-        guard !removals.contains(sessionID: session.id) else { return nil }
-        var result: SharedSession?
+        guard !removals.contains(sessionID: session.id), let row = await serverEntry(auth, session: session), let owner = userID else { return nil }
+        return row ?? SharedSession(session: session, owner: owner)
+    }
+
+    /// The session's own server row: nil when the lookup failed, .some(nil) when it has none.
+    private func serverEntry(_ auth: AccountSession, session: ClimbingSession) async -> SharedSession?? {
+        var result: SharedSession??
         let success = await perform(auth) {
-            let rows = try JSONDecoder().decode([SharedSession].self, from: await self.request("/rest/v1/shared_sessions?owner_id=eq.\(self.userID!.uuidString)&source_session_id=eq.\(session.id.uuidString)&select=*"))
-            result = rows.first ?? SharedSession(session: session, owner: self.userID!)
+            result = try JSONDecoder().decode([SharedSession].self, from: await self.request("/rest/v1/shared_sessions?owner_id=eq.\(self.userID!.uuidString)&source_session_id=eq.\(session.id.uuidString)&select=*")).first
         }
         return success ? result : nil
+    }
+
+    /// Brings Friends in line with the session's saved share settings. True when nothing is left to do.
+    func syncShare(_ auth: AccountSession, session: ClimbingSession) async -> Bool {
+        guard configuration != nil, auth.account != nil, session.isComplete, let visibility = session.visibility else { return true }
+        let removing = removals.contains(sessionID: session.id)
+        if visibility == .private {
+            // A queued removal already covers it; a session that was never shared has nothing to remove.
+            guard !removing, let row = await serverEntry(auth, session: session) else { return removing }
+            guard row != nil else { return true }
+            return await removeShare(auth, sessionID: session.id)
+        }
+        guard !removing else { errorMessage = SocialError.removalPending.localizedDescription; return false }
+        guard let row = await serverEntry(auth, session: session), let owner = userID else { return false }
+        var entry = SharedSession(session: session, owner: owner)
+        entry.id = row?.id ?? entry.id; entry.visibility = visibility; entry.caption = session.shareCaption
+        if !session.shareAttempts { entry.attempts = nil }
+        if !session.shareSends { entry.sends = nil }
+        if !session.shareDuration { entry.duration_minutes = nil }
+        // An empty list still goes out so photos from an earlier post are removed.
+        var photos: [SharedRoutePhoto] = [], skipped: [String] = []
+        if session.sharePhotos {
+            for media in session.orderedClimbs.flatMap(\.media).filter({ $0.kind == .photo }).prefix(3) {
+                do {
+                    let photo = try await SharedRoutePhoto.prepare(data: media.data, settings: RouteAnnotations.document(media.annotationJSON).highlight)
+                    photos.append(photo)
+                } catch { skipped.append(media.climb?.title ?? "a climb") }
+            }
+        }
+        entry.route_photo_count = photos.count
+        guard await publish(auth, entry: entry, photos: photos) else { return false }
+        if !skipped.isEmpty {
+            let notice = "The photo from \(skipped.joined(separator: ", ")) couldn’t be prepared, so the post went out without it. Try adding that photo again."
+            photoNotice = photoNotice.map { "\(notice) \($0)" } ?? notice
+        }
+        return true
+    }
+
+    /// Fills share settings for a session made before they existed, from its server row (Private when there is none).
+    func adoptShare(_ auth: AccountSession, session: ClimbingSession) async {
+        guard session.shareVisibility == nil, configuration != nil, auth.account != nil else { return }
+        guard !removals.contains(sessionID: session.id) else { session.visibility = .private; return }
+        guard let found = await serverEntry(auth, session: session), session.shareVisibility == nil else { return }
+        guard let row = found else { session.visibility = .private; return }
+        // A value missing only because the session has none isn't a choice to hide it.
+        let local = SharedSession(session: session, owner: row.owner_id)
+        session.visibility = row.visibility; session.shareCaption = row.caption
+        session.shareAttempts = row.attempts != nil || local.attempts == nil
+        session.shareSends = row.sends != nil || local.sends == nil
+        session.shareDuration = row.duration_minutes != nil || local.duration_minutes == nil
+        session.sharePhotos = (row.route_photo_count ?? 0) > 0 || !session.allClimbs.flatMap(\.media).contains { $0.kind == .photo }
     }
 }

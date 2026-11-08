@@ -25,6 +25,8 @@ struct ClimbingBackup: Codable {
         var id: UUID; var linkedClimbIDs: [UUID]; var selectedClimbID: UUID?
         var createdAt: Date; var updatedAt: Date; var durationKnown: Bool
         var pausedAt: Date? = nil; var pausedSeconds: Double? = nil
+        var shareVisibility: String? = nil; var shareCaption: String? = nil; var shareAttempts: Bool? = nil
+        var shareSends: Bool? = nil; var shareDuration: Bool? = nil; var sharePhotos: Bool? = nil
     }
     struct ClimbExtras: Codable {
         var pinnedNoteID: UUID? = nil
@@ -137,7 +139,9 @@ struct ClimbingBackup: Codable {
         journal = JournalArchive(sessions: sessions.map {
             SessionExtras(id: $0.id, linkedClimbIDs: $0.linkedClimbs.map(\.id), selectedClimbID: $0.selectedClimbID,
                           createdAt: $0.createdAt, updatedAt: $0.updatedAt, durationKnown: $0.durationKnown,
-                          pausedAt: $0.pausedAt, pausedSeconds: $0.pausedSeconds)
+                          pausedAt: $0.pausedAt, pausedSeconds: $0.pausedSeconds,
+                          shareVisibility: $0.shareVisibility, shareCaption: $0.shareCaption, shareAttempts: $0.shareAttempts,
+                          shareSends: $0.shareSends, shareDuration: $0.shareDuration, sharePhotos: $0.sharePhotos)
         }, climbs: all.map {
             ClimbExtras(pinnedNoteID: $0.pinnedNoteID, id: $0.id, projectRaw: $0.projectRaw, historyIncomplete: $0.historyIncomplete, gradeKind: $0.gradeKindRaw, gradeUpper: $0.gradeUpper, updatedAt: $0.updatedAt)
         }, notes: all.flatMap { climb in climb.notebook.map {
@@ -375,6 +379,9 @@ extension ClimbingStore {
                     session.selectedClimbID = item.selectedClimbID; session.createdAt = item.createdAt
                     session.updatedAt = item.updatedAt; session.durationKnown = item.durationKnown
                     session.pausedAt = item.pausedAt; session.pausedSeconds = item.pausedSeconds ?? 0
+                    session.visibility = item.shareVisibility.flatMap(EntryVisibility.init(rawValue:)); session.shareCaption = item.shareCaption ?? ""
+                    session.shareAttempts = item.shareAttempts ?? true; session.shareSends = item.shareSends ?? true
+                    session.shareDuration = item.shareDuration ?? true; session.sharePhotos = item.sharePhotos ?? true
                 }
                 for item in journal.climbs {
                     guard let climb = currentClimbs[item.id] else { continue }

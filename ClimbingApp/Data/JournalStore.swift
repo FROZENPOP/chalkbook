@@ -39,9 +39,9 @@ extension ClimbingStore {
         }
     }
 
-    func createRecap(date: Date, gym: SavedGym?, location: String, notes: String, minutes: Int?) -> ClimbingSession? {
+    func createRecap(date: Date, gym: SavedGym?, location: String, notes: String, minutes: Int?, visibility: EntryVisibility = .private) -> ClimbingSession? {
         let session = ClimbingSession(date: date, location: gym?.name ?? location, notes: notes)
-        session.gymID = gym?.id; session.isComplete = true
+        session.gymID = gym?.id; session.isComplete = true; session.visibility = visibility
         session.durationKnown = minutes != nil
         session.endedAt = date.addingTimeInterval(Double(minutes ?? 0) * 60)
         return save { context.insert(session) } ? session : nil

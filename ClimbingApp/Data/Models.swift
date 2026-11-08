@@ -1,8 +1,8 @@
 import Foundation
 import SwiftData
 
-enum ClimbingSchemaV7: VersionedSchema {
-    static var versionIdentifier: Schema.Version { Schema.Version(7, 0, 0) }
+enum ClimbingSchemaV8: VersionedSchema {
+    static var versionIdentifier: Schema.Version { Schema.Version(8, 0, 0) }
     static var models: [any PersistentModel.Type] { [ClimbingSession.self, ClimbEntry.self, ClimbAttempt.self, SavedGym.self, RouteMedia.self, AggregateEntry.self, ClimbNote.self, HealthWorkoutLink.self] }
 
     @Model
@@ -26,6 +26,12 @@ enum ClimbingSchemaV7: VersionedSchema {
         var selectedClimbID: UUID? = nil
         @Relationship(deleteRule: .nullify, inverse: \ClimbEntry.sessions) var linkedClimbs: [ClimbEntry] = []
         @Relationship(deleteRule: .cascade, inverse: \AggregateEntry.session) var aggregates: [AggregateEntry] = []
+        var shareVisibility: String? = nil // nil: made before share settings existed, nothing chosen yet
+        var shareCaption: String = ""
+        var shareAttempts: Bool = true
+        var shareSends: Bool = true
+        var shareDuration: Bool = true
+        var sharePhotos: Bool = true
 
         init(id: UUID = UUID(), date: Date = .now, location: String = "", notes: String = "") {
             self.id = id
@@ -40,6 +46,10 @@ enum ClimbingSchemaV7: VersionedSchema {
         }
 
         var title: String { location.isEmpty ? "Bouldering session" : location }
+        var visibility: EntryVisibility? {
+            get { shareVisibility.flatMap(EntryVisibility.init(rawValue:)) }
+            set { shareVisibility = newValue?.rawValue }
+        }
         var allClimbs: [ClimbEntry] {
             var seen = Set<UUID>()
             return (climbs + linkedClimbs).filter { seen.insert($0.id).inserted }
@@ -245,18 +255,18 @@ enum ClimbingSchemaV7: VersionedSchema {
 
 }
 
-typealias ClimbingSession = ClimbingSchemaV7.ClimbingSession
-typealias ClimbEntry = ClimbingSchemaV7.ClimbEntry
-typealias ClimbAttempt = ClimbingSchemaV7.ClimbAttempt
-typealias SavedGym = ClimbingSchemaV7.SavedGym
-typealias RouteMedia = ClimbingSchemaV7.RouteMedia
+typealias ClimbingSession = ClimbingSchemaV8.ClimbingSession
+typealias ClimbEntry = ClimbingSchemaV8.ClimbEntry
+typealias ClimbAttempt = ClimbingSchemaV8.ClimbAttempt
+typealias SavedGym = ClimbingSchemaV8.SavedGym
+typealias RouteMedia = ClimbingSchemaV8.RouteMedia
 
-typealias HealthWorkoutLink = ClimbingSchemaV7.HealthWorkoutLink
-typealias AggregateEntry = ClimbingSchemaV7.AggregateEntry
-typealias ClimbNote = ClimbingSchemaV7.ClimbNote
+typealias HealthWorkoutLink = ClimbingSchemaV8.HealthWorkoutLink
+typealias AggregateEntry = ClimbingSchemaV8.AggregateEntry
+typealias ClimbNote = ClimbingSchemaV8.ClimbNote
 
 enum ClimbingMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [ClimbingSchemaV1.self, ClimbingSchemaV2.self, ClimbingSchemaV3.self, ClimbingSchemaV4.self, ClimbingSchemaV5.self, ClimbingSchemaV6.self, ClimbingSchemaV7.self] }
+    static var schemas: [any VersionedSchema.Type] { [ClimbingSchemaV1.self, ClimbingSchemaV2.self, ClimbingSchemaV3.self, ClimbingSchemaV4.self, ClimbingSchemaV5.self, ClimbingSchemaV6.self, ClimbingSchemaV7.self, ClimbingSchemaV8.self] }
     static var stages: [MigrationStage] { [.lightweight(fromVersion: ClimbingSchemaV1.self, toVersion: ClimbingSchemaV2.self), .lightweight(fromVersion: ClimbingSchemaV2.self, toVersion: ClimbingSchemaV3.self), .custom(fromVersion: ClimbingSchemaV3.self, toVersion: ClimbingSchemaV4.self, willMigrate: nil, didMigrate: { context in
         for climb in try context.fetch(FetchDescriptor<ClimbingSchemaV4.ClimbEntry>()) {
             for attempt in climb.attempts {
@@ -266,13 +276,13 @@ enum ClimbingMigrationPlan: SchemaMigrationPlan {
             }
         }
         try context.save()
-    }), .lightweight(fromVersion: ClimbingSchemaV4.self, toVersion: ClimbingSchemaV5.self), .lightweight(fromVersion: ClimbingSchemaV5.self, toVersion: ClimbingSchemaV6.self), .lightweight(fromVersion: ClimbingSchemaV6.self, toVersion: ClimbingSchemaV7.self)] }
+    }), .lightweight(fromVersion: ClimbingSchemaV4.self, toVersion: ClimbingSchemaV5.self), .lightweight(fromVersion: ClimbingSchemaV5.self, toVersion: ClimbingSchemaV6.self), .lightweight(fromVersion: ClimbingSchemaV6.self, toVersion: ClimbingSchemaV7.self), .lightweight(fromVersion: ClimbingSchemaV7.self, toVersion: ClimbingSchemaV8.self)] }
 }
 
 @MainActor
 enum Persistence {
     static func container(inMemory: Bool = false, accountKey: String? = nil, rootDirectory: URL? = nil) throws -> ModelContainer {
-        let schema = Schema(versionedSchema: ClimbingSchemaV7.self)
+        let schema = Schema(versionedSchema: ClimbingSchemaV8.self)
         let configuration: ModelConfiguration
         if let accountKey, !inMemory {
             guard accountKey.count == 64, accountKey.allSatisfy({ "0123456789abcdef".contains($0) }) else {

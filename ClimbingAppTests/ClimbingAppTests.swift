@@ -219,7 +219,7 @@ final class ClimbingStoreTests: XCTestCase {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let schema = Schema(versionedSchema: ClimbingSchemaV7.self)
+        let schema = Schema(versionedSchema: ClimbingSchemaV8.self)
         let config = ModelConfiguration(schema: schema, url: directory.appending(path: "test.store"), cloudKitDatabase: .none)
         let first = try ModelContainer(for: schema, migrationPlan: ClimbingMigrationPlan.self, configurations: [config])
         let store = ClimbingStore(context: first.mainContext)

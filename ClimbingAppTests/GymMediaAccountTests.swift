@@ -133,7 +133,7 @@ final class GymMediaAccountTests: XCTestCase {
             session.climbs.append(climb); climb.attempts.append(attempt)
             try old.mainContext.save()
         }
-        let schema = Schema(versionedSchema: ClimbingSchemaV7.self)
+        let schema = Schema(versionedSchema: ClimbingSchemaV8.self)
         let updated = try ModelContainer(for: schema, migrationPlan: ClimbingMigrationPlan.self,
                                          configurations: [ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)])
         let session = try XCTUnwrap(updated.mainContext.fetch(FetchDescriptor<ClimbingSession>()).first)

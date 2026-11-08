@@ -38,7 +38,7 @@ final class ClimbingStore {
         _ = try? context.fetch(FetchDescriptor<Model>(predicate: #Predicate { $0.persistentModelID == id }))
     }
 
-    func start(date: Date, location: String, notes: String, gym: SavedGym? = nil) -> ClimbingSession? {
+    func start(date: Date, location: String, notes: String, gym: SavedGym? = nil, visibility: EntryVisibility = .private) -> ClimbingSession? {
         do {
             let sessions = try context.fetch(FetchDescriptor<ClimbingSession>())
             if let active = sessions.first(where: { !$0.isComplete }) { return active }
@@ -47,7 +47,7 @@ final class ClimbingStore {
             return nil
         }
         let session = ClimbingSession(date: date, location: location.trimmingCharacters(in: .whitespacesAndNewlines), notes: notes)
-        session.gymID = gym?.id
+        session.gymID = gym?.id; session.visibility = visibility
         if let gym { session.location = gym.name }
         return save { context.insert(session) } ? session : nil
     }
