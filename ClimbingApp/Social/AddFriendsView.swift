@@ -91,7 +91,7 @@ struct FriendPersonRow: View {
     let personID: UUID
     var showsProfileLink = true
     @State private var working = false
-    @State private var failed = false
+    @State private var failure: String?
     private var link: Friendship? { social.friendships.first { $0.requester == personID || $0.recipient == personID } }
 
     var body: some View {
@@ -130,16 +130,18 @@ struct FriendPersonRow: View {
                     }
                     if working { SwiftUI.ProgressView().accessibilityLabel("Updating request") }
                 }.disabled(social.busy || working)
-                if failed { Text("Couldn’t update this request. \(social.errorMessage ?? "Please try again.")").font(.caption).foregroundStyle(ClimbTheme.error) }
+                if let failure { Text(failure).font(.caption).foregroundStyle(ClimbTheme.error) }
             }
         }
     }
 
     private func act(_ action: String) {
-        working = true; failed = false
-        Task {
-            await social.action(auth, target: personID, action: action)
-            working = false; failed = social.errorMessage != nil
-        }
+        working = true; failure = nil
+        Task { failure = await Self.act(social, auth: auth, target: personID, action: action); working = false }
+    }
+
+    /// Captures this request's message when its call fails: the store's errorMessage is shared, so another call can change or clear it.
+    static func act(_ social: SocialStore, auth: AccountSession, target: UUID, action: String) async -> String? {
+        await social.action(auth, target: target, action: action) ? nil : "Couldn’t update this request. \(social.errorMessage ?? "Please try again.")"
     }
 }

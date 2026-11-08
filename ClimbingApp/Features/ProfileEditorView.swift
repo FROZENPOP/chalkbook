@@ -120,11 +120,7 @@ struct ProfileEditorView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(setup ? "Not now" : "Cancel") {
-                        if setup {
-                            let fallback = auth.account?.name.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Climber"
-                            let fallbackName = String((fallback.isEmpty ? "Climber" : fallback).prefix(60))
-                            if profiles.save(name: fallbackName, bio: "", photo: nil, setupComplete: false) { dismiss() }
-                        } else { dismiss() }
+                        if !setup || Self.notNow(profiles, accountName: auth.account?.name) { dismiss() }
                     }.disabled(importing)
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -185,11 +181,32 @@ struct ProfileEditorView: View {
     }
 
     private func save(retry: Bool) {
-        let success = retry ? profiles.retrySave(name: name, bio: bio, photo: photo) : profiles.save(name: name, bio: bio, photo: photo)
-        guard success else { return }
-        guard syncFriends else { dismiss(); return }
         let socialBio = String(String.UnicodeScalarView(bio.unicodeScalars.prefix(240)))
-        let socialPhoto = photo.flatMap { try? SocialPhoto.prepare($0) }
-        Task { if await social.saveProfile(auth, username: username, name: name, isPrivate: isPrivate, bio: socialBio, photo: socialPhoto) { dismiss() } }
+        importError = nil
+        do {
+            let saved = try Self.save(profiles, name: name, bio: bio, photo: photo, retry: retry, syncFriends: syncFriends) { socialPhoto in
+                Task { if await social.saveProfile(auth, username: username, name: name, isPrivate: isPrivate, bio: socialBio, photo: socialPhoto) { dismiss() } }
+            }
+            if saved && !syncFriends { dismiss() }
+        } catch { importError = error.localizedDescription }
+    }
+
+    /// Setup also opens for an existing climber after a fresh sign-in, so Not now keeps their profile; only a first setup saves a fallback name.
+    static func notNow(_ profiles: ProfileStore, accountName: String?) -> Bool {
+        guard profiles.profile == nil else { return true }
+        let fallback = accountName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return profiles.save(name: String((fallback.isEmpty ? "Climber" : fallback).prefix(60)), bio: "", photo: nil, setupComplete: false)
+    }
+
+    /// Saves locally, then hands the Friends photo on. The Friends photo is prepared before anything is saved:
+    /// sending no photo after a failed prep would remove the climber's Friends avatar.
+    static func save(_ profiles: ProfileStore, name: String, bio: String, photo: Data?, retry: Bool, syncFriends: Bool, friends: (Data?) -> Void) throws -> Bool {
+        var socialPhoto: Data?
+        if syncFriends, let photo {
+            do { socialPhoto = try SocialPhoto.prepare(photo) } catch { throw BackupError.invalid("This photo couldn’t be prepared for Friends. Choose a smaller photo and try again.") }
+        }
+        guard retry ? profiles.retrySave(name: name, bio: bio, photo: photo) : profiles.save(name: name, bio: bio, photo: photo) else { return false }
+        if syncFriends { friends(socialPhoto) }
+        return true
     }
 }
