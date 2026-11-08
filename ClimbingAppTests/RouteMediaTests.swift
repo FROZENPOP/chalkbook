@@ -58,6 +58,47 @@ final class RouteMediaTests: XCTestCase {
         XCTAssertEqual(climb.media.first?.data, photo.data)
     }
 
+    func testMediaAddedLaterToASavedClimbSurvivesReopening() throws {
+        let photo = try ImportedRouteFile.read(fixture("route-photo", extension: "png"), kind: .photo).draft
+        let video = try ImportedRouteFile.read(fixture("route-video", extension: "mov"), kind: .video).draft
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let container = try Persistence.container(rootDirectory: root)
+        let store = ClimbingStore(context: container.mainContext)
+        let session = try XCTUnwrap(store.start(date: .now, location: "", notes: ""))
+        let climb = ClimbEntry(grade: "V3")
+        XCTAssertTrue(store.save { store.context.insert(climb); session.climbs.append(climb) })
+        // What the editor does when the saved climb is reopened and media is added.
+        let drafts = climb.media.map(\.draft) + [photo, video]
+        XCTAssertTrue(store.save { try ClimbEditorView.applyMedia(drafts, to: climb, in: store.context) })
+        let reopened = try Persistence.container(rootDirectory: root)
+        let saved = try XCTUnwrap(reopened.mainContext.fetch(FetchDescriptor<ClimbEntry>()).first)
+        XCTAssertEqual(Set(saved.media.map(\.kind)), [.photo, .video])
+        XCTAssertEqual(saved.media.first { $0.kind == .video }?.data, video.data)
+    }
+
+    func testCancelledMediaLoadEndsWithAMessageAndNothingAdded() async throws {
+        let photo = try ImportedRouteFile.read(fixture("route-photo", extension: "png"), kind: .photo).draft
+        let load = Task { await RouteMediaEditor.load([1]) { _ in try await Task.sleep(for: .seconds(30)); return photo } }
+        load.cancel()
+        let (drafts, message) = await load.value
+        XCTAssertTrue(drafts.isEmpty)
+        XCTAssertEqual(message, "Adding media was interrupted. Choose it again.")
+    }
+
+    func testMediaLoadProblemsArePlainEnglish() async throws {
+        let photo = try ImportedRouteFile.read(fixture("route-photo", extension: "png"), kind: .photo).draft
+        let loaded = await RouteMediaEditor.load([1, 2]) { _ in photo }
+        XCTAssertEqual(loaded.0.count, 2); XCTAssertNil(loaded.1)
+        let tooLarge = await RouteMediaEditor.load([1]) { _ in throw BackupError.invalid("Choose a photo or video smaller than 25 MB.") }
+        XCTAssertEqual(tooLarge.1, "Choose a photo or video smaller than 25 MB.")
+        let unreadable = await RouteMediaEditor.load([1]) { _ in nil }
+        XCTAssertEqual(unreadable.1, "This item couldn’t be opened. Try another photo or video.")
+        let system = await RouteMediaEditor.load([1]) { _ in throw CocoaError(.fileReadCorruptFile) }
+        XCTAssertTrue(system.0.isEmpty)
+        XCTAssertEqual(system.1, "This photo or video couldn’t be added. Try another one, or save it to Files and choose it from there.")
+    }
+
     func testOversizedRouteAttachmentIsRejected() {
         let draft = RouteMediaDraft(kind: .photo, filename: "large.png", contentType: "public.png", data: Data(count: RouteMediaDraft.maximumBytes + 1))
         XCTAssertThrowsError(try draft.validate())

@@ -204,21 +204,7 @@ struct ClimbEditorView: View {
             entry.customScaleName = scale == .custom ? customScaleName.trimmingCharacters(in: .whitespacesAndNewlines) : ""
             entry.customGradeOrder = scale == .custom ? customOrder : []
             entry.scaleRaw = scale.rawValue; entry.grade = grade.trimmingCharacters(in: .whitespacesAndNewlines)
-            let existing = Dictionary(uniqueKeysWithValues: entry.media.map { ($0.id, $0) })
-            let retained = Set(attachments.map(\.id))
-            for item in entry.media where !retained.contains(item.id) { store.context.delete(item) }
-            entry.media = try attachments.map { draft in
-                try draft.validate()
-                if let item = existing[draft.id] {
-                    item.annotationJSON = draft.annotationJSON
-                    item.updatedAt = .now
-                    return item
-                }
-                let item = RouteMedia(id: draft.id, kind: draft.kind, filename: draft.filename, contentType: draft.contentType, data: draft.data)
-                item.annotationJSON = draft.annotationJSON
-                store.context.insert(item)
-                return item
-            }
+            try Self.applyMedia(attachments, to: entry, in: store.context)
             entry.gradeKindRaw = gradeKind.rawValue; entry.gradeUpper = gradeUpper
             entry.projectRaw = isProject ? (entry.projectRaw.isEmpty ? "active" : entry.projectRaw) : ""
             entry.updatedAt = .now
@@ -227,5 +213,24 @@ struct ClimbEditorView: View {
             if correctPastGrades { for attempt in entry.attempts { attempt.gradeSnapshot = entry.descriptor.encoded; attempt.updatedAt = .now } }
             defaultScale = scale.rawValue
         }) { dismiss() }
+    }
+
+    /// Keeps media still listed, deletes removed media and inserts new drafts, in list order.
+    static func applyMedia(_ attachments: [RouteMediaDraft], to entry: ClimbEntry, in context: ModelContext) throws {
+        let existing = Dictionary(uniqueKeysWithValues: entry.media.map { ($0.id, $0) })
+        let retained = Set(attachments.map(\.id))
+        for item in entry.media where !retained.contains(item.id) { context.delete(item) }
+        entry.media = try attachments.map { draft in
+            try draft.validate()
+            if let item = existing[draft.id] {
+                item.annotationJSON = draft.annotationJSON
+                item.updatedAt = .now
+                return item
+            }
+            let item = RouteMedia(id: draft.id, kind: draft.kind, filename: draft.filename, contentType: draft.contentType, data: draft.data)
+            item.annotationJSON = draft.annotationJSON
+            context.insert(item)
+            return item
+        }
     }
 }

@@ -159,4 +159,88 @@ final class GymFeatureUITests: XCTestCase {
         XCTAssertTrue(app.buttons["View route photo"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Play route video"].exists)
     }
+
+    @MainActor
+    private func editSelectedClimb(_ app: XCUIApplication) {
+        let pencil = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Edit '")).firstMatch
+        for _ in 0..<5 { if pencil.isHittable { break }; app.swipeDown() }
+        pencil.tap()
+        XCTAssertTrue(app.buttons["saveClimb"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    private func saveClimbEditor(_ app: XCUIApplication) {
+        let save = app.buttons["saveClimb"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: save)
+        waitForExpectations(timeout: 10)
+        save.tap()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 5), "Saving the climb should close its editor")
+    }
+
+    @MainActor
+    func testMediaAddedLaterToSavedClimbsPersists() {
+        let app = launch()
+        app.buttons["startSession"].tap()
+        app.buttons["saveSession"].tap()
+        app.buttons["addClimb"].tap()
+        saveClimbEditor(app)
+        XCTAssertFalse(app.buttons["View route photo"].exists)
+        // A climb saved without media gets a photo and a video later.
+        editSelectedClimb(app)
+        chooseRouteFile(app, name: "route-photo")
+        XCTAssertTrue(app.buttons["Remove photo"].waitForExistence(timeout: 10))
+        chooseRouteFile(app, name: "route-video")
+        XCTAssertTrue(app.buttons["Remove video"].waitForExistence(timeout: 10))
+        saveClimbEditor(app)
+        XCTAssertTrue(app.buttons["View route photo"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Play route video"].exists)
+        editSelectedClimb(app)
+        XCTAssertTrue(app.buttons["Remove photo"].exists)
+        XCTAssertTrue(app.buttons["Remove video"].exists)
+        app.buttons["Cancel"].firstMatch.tap()
+        app.terminate()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        app.buttons["resumeSession"].tap()
+        XCTAssertTrue(app.buttons["View route photo"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Play route video"].exists)
+        // The same climb in a finished session still takes media.
+        let finish = app.buttons["finishSession"]
+        for _ in 0..<5 { if finish.isHittable { break }; app.swipeUp() }
+        finish.tap()
+        app.buttons["confirmFinishSession"].tap()
+        XCTAssertTrue(app.staticTexts["Session complete"].waitForExistence(timeout: 5))
+        editSelectedClimb(app)
+        chooseRouteFile(app, name: "route-photo")
+        let removals = app.buttons.matching(NSPredicate(format: "label == 'Remove photo'"))
+        XCTAssertTrue(removals.element(boundBy: 1).waitForExistence(timeout: 10))
+        saveClimbEditor(app)
+        let photos = app.buttons.matching(NSPredicate(format: "label == 'View route photo'"))
+        XCTAssertTrue(photos.element(boundBy: 1).waitForExistence(timeout: 5))
+        XCTAssertEqual(photos.count, 2)
+    }
+
+    @MainActor
+    func testCancelledPickerLeavesSavedClimbEditable() {
+        let app = launch()
+        app.buttons["startSession"].tap()
+        app.buttons["saveSession"].tap()
+        app.buttons["addClimb"].tap()
+        saveClimbEditor(app)
+        editSelectedClimb(app)
+        let media = app.buttons["addRouteMedia"]
+        for _ in 0..<8 { if media.isHittable { break }; app.swipeUp() }
+        media.tap()
+        let cancelButtons = app.buttons.matching(NSPredicate(format: "label == 'Cancel'"))
+        XCTAssertTrue(cancelButtons.element(boundBy: 1).waitForExistence(timeout: 10), "The photo picker should open over the climb editor")
+        guard let cancel = cancelButtons.allElementsBoundByIndex.last(where: { $0.isHittable }) else {
+            XCTFail("The photo picker should have a usable Cancel button"); return
+        }
+        cancel.tap()
+        XCTAssertTrue(media.waitForExistence(timeout: 5))
+        XCTAssertTrue(media.isEnabled)
+        XCTAssertTrue(app.buttons["addRouteMediaFromFiles"].isEnabled)
+        saveClimbEditor(app)
+    }
 }

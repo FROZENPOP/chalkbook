@@ -37,30 +37,16 @@ struct RouteMediaEditor: View {
             if let message { Text(message).font(.caption).foregroundStyle(ClimbTheme.error).accessibilityIdentifier("mediaError") }
         }
         .buttonStyle(.borderless)
-        .onChange(of: selection) { _, items in
-            guard !items.isEmpty else { return }
-            isLoading = true
-        }
         .task(id: selection) {
             let items = selection
             guard !items.isEmpty else { return }
-            message = nil
-            var imported: [RouteMediaDraft] = []
-            do {
-                for item in items {
-                    try Task.checkCancellation()
-                    guard let file = try await item.loadTransferable(type: ImportedRouteFile.self) else {
-                        throw BackupError.invalid("This item couldn’t be opened. Try another photo or video.")
-                    }
-                    imported.append(file.draft)
-                }
-                try Task.checkCancellation()
-                attachments.append(contentsOf: imported.prefix(RouteMediaDraft.maximumItems - attachments.count))
-            } catch is CancellationError {
-                return
-            } catch { message = error.localizedDescription }
-            isLoading = false
-            selection = []
+            isLoading = true; message = nil
+            let (imported, problem) = await Self.load(items) { try await $0.loadTransferable(type: ImportedRouteFile.self)?.draft }
+            let room = RouteMediaDraft.maximumItems - attachments.count
+            attachments.append(contentsOf: imported.prefix(room))
+            message = problem ?? (imported.count > room ? "Add up to 3 attachments per climb." : nil)
+            // Reached even when cancelled, so Save and the picker never stay disabled.
+            isLoading = false; selection = []
         }
         .fileImporter(isPresented: $importFiles, allowedContentTypes: [.image, .movie], allowsMultipleSelection: true) { result in
             switch result {
@@ -82,11 +68,11 @@ struct RouteMediaEditor: View {
                             }
                         }.value
                         attachments.append(contentsOf: imported)
-                    } catch { message = error.localizedDescription }
+                    } catch { message = Self.problem(error) }
                     isLoading = false
                 }
             case let .failure(error):
-                if (error as NSError).code != NSUserCancelledError { message = error.localizedDescription }
+                if (error as NSError).code != NSUserCancelledError { message = Self.problem(error) }
             }
         }
         .sheet(item: $preview) { item in
@@ -96,6 +82,27 @@ struct RouteMediaEditor: View {
                 return true
             }
         }
+    }
+
+    /// Never throws: a cancelled or failed load returns no drafts and a plain-English message.
+    static func load<Item>(_ items: [Item], read: (Item) async throws -> RouteMediaDraft?) async -> ([RouteMediaDraft], String?) {
+        var drafts: [RouteMediaDraft] = []
+        do {
+            for item in items {
+                try Task.checkCancellation()
+                guard let draft = try await read(item) else { return ([], "This item couldn’t be opened. Try another photo or video.") }
+                drafts.append(draft)
+            }
+            try Task.checkCancellation()
+            return (drafts, nil)
+        } catch {
+            return ([], Task.isCancelled || error is CancellationError ? "Adding media was interrupted. Choose it again." : problem(error))
+        }
+    }
+
+    /// Our own errors already name the cause; system ones don't, so they get a generic hint.
+    static func problem(_ error: Error) -> String {
+        (error as? BackupError)?.localizedDescription ?? "This photo or video couldn’t be added. Try another one, or save it to Files and choose it from there."
     }
 }
 
