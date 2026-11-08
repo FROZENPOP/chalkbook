@@ -6,6 +6,8 @@ import Observation
 final class SocialStore {
     private(set) var userID: UUID?
     private(set) var me: SocialProfile?
+    /// True once the server says this account has no Friends profile; posts need one.
+    private(set) var profileMissing = false
     private var peopleRecords: [SocialProfile] = []
     var people: [SocialProfile] { peopleRecords + feed.profiles.filter { profile in !peopleRecords.contains { $0.id == profile.id } } }
     private(set) var friendships: [Friendship] = []
@@ -161,12 +163,22 @@ final class SocialStore {
         if Set(friendships.filter { $0.status == "accepted" }.map(\.id)) != Set(links.filter { $0.status == "accepted" }.map(\.id)) || Set(blocks.map(\.id)) != Set(blocked.map(\.id)) {
             suggestions.reset() // Mutual-name evidence may have changed; discard stale recommendations.
         }
-        peopleRecords = profiles; friendships = removals.removingProfile ? [] : links; me = removals.removingProfile ? nil : own.first; blocks = blocked
+        peopleRecords = profiles; friendships = removals.removingProfile ? [] : links; me = removals.removingProfile ? nil : own.first; profileMissing = me == nil; blocks = blocked
         // First and subsequent pages use the same RLS-protected reader. No offset or privileged RPC.
         await feed.loadNext(SocialFeedReader(store:self))
     }
 
     func refresh(_ auth: AccountSession) async { await perform(auth) { try await self.reload() } }
+
+    /// Loads the climber's own profile when it isn't known yet. False when the lookup failed.
+    @discardableResult
+    func loadProfile(_ auth: AccountSession) async -> Bool {
+        guard me == nil else { return true }
+        return await perform(auth) {
+            let own = try JSONDecoder().decode([SocialProfile].self, from: await self.request("/rest/v1/climber_profiles?id=eq.\(self.userID!.uuidString)&select=*"))
+            self.me = self.removals.removingProfile ? nil : own.first; self.profileMissing = self.me == nil
+        }
+    }
 
     func loadNextFeed(_ auth: AccountSession) async {
         guard !busy, configuration != nil, auth.account != nil else { return }
@@ -340,7 +352,7 @@ final class SocialStore {
 
     func deleteProfile(_ auth: AccountSession) async -> Bool {
         guard queueRemoval(auth, contentID: removals.ownerID ?? UUID(), kind: .socialProfile) else { return false }
-        suggestions.reset(); me = nil; feed.reset(); friendships = []; peopleRecords = []; blocks = []
+        suggestions.reset(); me = nil; profileMissing = false; feed.reset(); friendships = []; peopleRecords = []; blocks = []
         scheduleRemovals(auth)
         return true
     }
@@ -360,7 +372,7 @@ final class SocialStore {
             removals.clearAfterAccountDeletion()
             appleGrantRemains = isApple && !revoked
         }
-        suggestions.reset(); me = nil; feed.reset(); friendships = []; peopleRecords = []; blocks = []
+        suggestions.reset(); me = nil; profileMissing = false; feed.reset(); friendships = []; peopleRecords = []; blocks = []
         auth.signOut()
         if appleGrantRemains { auth.errorMessage = "Your account is deleted. To remove Chalkbook from your Apple Account too, go to iPhone Settings > your name > Sign-In & Security > Sign in with Apple." }
         return auth.account == nil
@@ -386,11 +398,16 @@ final class SocialStore {
         let removing = removals.contains(sessionID: session.id)
         if visibility == .private {
             // A queued removal already covers it; a session that was never shared has nothing to remove.
-            guard !removing, let row = await serverEntry(auth, session: session) else { return removing }
+            guard !removing else { return true }
+            // Offline: queue the removal anyway so the post comes down once Friends is reachable.
+            guard let row = await serverEntry(auth, session: session) else { errorMessage = nil; return await removeShare(auth, sessionID: session.id) }
             guard row != nil else { return true }
             return await removeShare(auth, sessionID: session.id)
         }
         guard !removing else { errorMessage = SocialError.removalPending.localizedDescription; return false }
+        // No profile means nothing can be posted; the session keeps its choice for when one exists.
+        guard await loadProfile(auth) else { return false }
+        guard me != nil else { return true }
         guard let row = await serverEntry(auth, session: session), let owner = userID else { return false }
         var entry = SharedSession(session: session, owner: owner)
         entry.id = row?.id ?? entry.id; entry.visibility = visibility; entry.caption = session.shareCaption
@@ -400,7 +417,7 @@ final class SocialStore {
         // An empty list still goes out so photos from an earlier post are removed.
         var photos: [SharedRoutePhoto] = [], skipped: [String] = []
         if session.sharePhotos {
-            for media in session.orderedClimbs.flatMap(\.media).filter({ $0.kind == .photo }).prefix(3) {
+            for media in session.sharedPhotoMedia {
                 do {
                     let photo = try await SharedRoutePhoto.prepare(data: media.data, settings: RouteAnnotations.document(media.annotationJSON).highlight)
                     photos.append(photo)
@@ -428,6 +445,6 @@ final class SocialStore {
         session.shareAttempts = row.attempts != nil || local.attempts == nil
         session.shareSends = row.sends != nil || local.sends == nil
         session.shareDuration = row.duration_minutes != nil || local.duration_minutes == nil
-        session.sharePhotos = (row.route_photo_count ?? 0) > 0 || !session.allClimbs.flatMap(\.media).contains { $0.kind == .photo }
+        session.sharePhotos = (row.route_photo_count ?? 0) > 0 || session.sharedPhotoMedia.isEmpty
     }
 }

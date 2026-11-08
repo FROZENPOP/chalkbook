@@ -91,6 +91,13 @@ struct SharedSession: Codable, Identifiable {
         duration_minutes = session.durationMinutes.flatMap { $0 <= 10_080 ? $0 : nil }; completeness = totals.label
     }
 
+    /// What a post takes from the journal, photos included. When it changes, Friends needs a sync.
+    @MainActor static func content(of session: ClimbingSession) -> [String] {
+        let entry = SharedSession(session: session, owner: session.id)
+        return [entry.session_day, entry.completeness, "\(entry.attempts ?? -1) \(entry.sends ?? -1) \(entry.duration_minutes ?? -1)"]
+            + session.sharedPhotoMedia.map { "\($0.id) \($0.annotationJSON)" }
+    }
+
     var rpcValues: [String: Any] {
         ["source_session_id": source_session_id.uuidString, "visibility": visibility.rawValue,
          "caption": caption, "session_day": session_day, "attempts": attempts.map { $0 as Any } ?? NSNull(),

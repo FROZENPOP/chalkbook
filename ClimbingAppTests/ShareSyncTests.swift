@@ -46,15 +46,17 @@ private final class ShareURLProtocol: URLProtocol {
     override func tearDown() { sessions.clear(); super.tearDown() }
 
     /// A signed-in Friends store whose server holds `row`, or no row, for any session.
-    private func makeSocial(row: SharedSession? = nil, configured: Bool = true) throws -> (SocialStore, AccountSession) {
+    private func makeSocial(row: SharedSession? = nil, configured: Bool = true, profile: Bool = true) throws -> (SocialStore, AccountSession) {
         sessions.save("refresh-1", for: apple.storageKey)
         let rows = try JSONEncoder().encode(row.map { [$0] } ?? [])
+        let profiles = try JSONEncoder().encode(profile ? [SocialProfile(id: owner, username: "ada", display_name: "Ada", is_private: false)] : [])
         ShareURLProtocol.lock.withLock {
             ShareURLProtocol.calls = []
             ShareURLProtocol.handler = { request in
                 switch request.url!.path {
                 case "/auth/v1/token": (200, Data("{\"access_token\":\"access\",\"refresh_token\":\"refresh-2\",\"expires_in\":3600,\"user\":{\"id\":\"00000000-0000-0000-0000-000000000009\"}}".utf8))
                 case "/rest/v1/shared_sessions": (200, rows)
+                case "/rest/v1/climber_profiles": (200, profiles)
                 case "/rest/v1/rpc/remove_shared_session": (500, Data()) // Keeps the removal queued so the test can see it.
                 case "/rest/v1/rpc/save_shared_session_with_photos": (200, Data("null".utf8))
                 default: (200, Data("[]".utf8))
@@ -253,6 +255,45 @@ private final class ShareURLProtocol: URLProtocol {
         XCTAssertTrue(synced, fresh.errorMessage ?? "")
         XCTAssertTrue(fresh.removals.entries.isEmpty)
         XCTAssertFalse(calls.contains { $0.path.hasPrefix("/rest/v1/rpc/") && $0.values["source_id"] as? String == never.id.uuidString })
+    }
+
+    func testNoFriendsProfileMeansNoPost() async throws {
+        let (_, session) = try makeSession(.friends, photos: [jpeg(width: 120)])
+        let (social, auth) = try makeSocial(profile: false)
+        let synced = await social.syncShare(auth, session: session)
+        XCTAssertTrue(synced, social.errorMessage ?? "")
+        XCTAssertTrue(saves.isEmpty)
+        XCTAssertTrue(social.profileMissing)
+        XCTAssertEqual(session.visibility, .friends, "the choice is kept for when a profile exists")
+        XCTAssertTrue(SocialError.message(for: RemovalHTTPError(status: 409, code: "23503")).contains("Friends profile"))
+    }
+
+    func testPrivateWhileOfflineQueuesTheRemoval() async throws {
+        let (_, session) = try makeSession(.private, photos: [])
+        let (social, auth) = try makeSocial()
+        ShareURLProtocol.lock.withLock {
+            let online = ShareURLProtocol.handler!
+            ShareURLProtocol.handler = { request in request.url!.path == "/rest/v1/shared_sessions" ? (503, Data()) : try online(request) }
+        }
+        let synced = await social.syncShare(auth, session: session)
+        XCTAssertTrue(synced, social.errorMessage ?? "")
+        XCTAssertTrue(social.removals.contains(sessionID: session.id))
+    }
+
+    func testPostPhotosComeOnlyFromTheSessionsOwnClimbs() async throws {
+        let (store, session) = try makeSession(.friends, photos: [jpeg(width: 120)])
+        let before = SharedSession.content(of: session)
+        let project = ClimbEntry(label: "Project"); project.createdAt = .distantPast
+        store.context.insert(project); session.linkedClimbs.append(project)
+        project.media.append(RouteMedia(kind: .photo, filename: "p.jpg", contentType: "public.jpeg", data: try jpeg(width: 200)))
+        try store.context.save()
+        XCTAssertEqual(SharedSession.content(of: session), before, "a linked project's photo isn't part of the post")
+        session.climbs.first?.media.append(RouteMedia(kind: .photo, filename: "b.jpg", contentType: "public.jpeg", data: try jpeg(width: 130)))
+        XCTAssertNotEqual(SharedSession.content(of: session), before)
+        let (social, auth) = try makeSocial()
+        let synced = await social.syncShare(auth, session: session)
+        XCTAssertTrue(synced, social.errorMessage ?? "")
+        XCTAssertEqual(try widths(try XCTUnwrap(saves.first)), [120, 130])
     }
 
     func testAdoptFillsSettingsFromTheServerOnlyWhenNoneAreChosen() async throws {

@@ -35,6 +35,7 @@ struct SessionEditorView: View {
     @State private var shareProblem: String?
     @State private var shareNotice: String?
     @State private var editingClimb: ClimbEntry?
+    @State private var climbContent: [String] = []
     @State private var login = false
 
     /// Signed in with Friends set up. The DEBUG audit sample stands in for an account and never reaches the network.
@@ -42,9 +43,9 @@ struct SessionEditorView: View {
         #if DEBUG
         if SocialAuditSample.enabled { return true }
         #endif
-        return auth.account != nil && social.configuration != nil
+        return auth.account != nil && social.configuration != nil && !social.profileMissing
     }
-    private var captionTooLong: Bool { caption.unicodeScalars.count > 1000 }
+    private var captionTooLong: Bool { visibility != .private && caption.unicodeScalars.count > 1000 }
 
     var body: some View {
         NavigationStack {
@@ -80,7 +81,7 @@ struct SessionEditorView: View {
                     Section(header: Text("Photos and videos").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
                         if session.orderedClimbs.isEmpty { Text("Photos and videos are added to climbs. Add a climb to this session first.") }
                         ForEach(session.orderedClimbs) { climb in
-                            Button { editingClimb = climb } label: {
+                            Button { climbContent = SharedSession.content(of: session); editingClimb = climb } label: {
                                 LabeledContent {
                                     Text("\(climb.media.filter { $0.kind == .photo }.count.counted("photo")) · \(climb.media.filter { $0.kind != .photo }.count.counted("video"))")
                                 } label: { Label(climb.title, systemImage: "photo.on.rectangle") }
@@ -112,11 +113,16 @@ struct SessionEditorView: View {
                     startTime = session.startedAt; endTime = session.endedAt ?? .now
                 } else { selectedGymID = gyms.first(where: \.isDefault)?.id ?? gyms.first?.id }
             }
-            .task { if let session, friendsReady, !shareLoaded { await loadShare(session) } }
+            .task {
+                // Posting needs a Friends profile; find out before offering a visibility.
+                if friendsReady, auth.account != nil, social.configuration != nil { await social.loadProfile(auth) }
+                if let session, friendsReady, !shareLoaded { await loadShare(session) }
+            }
             .sheet(isPresented: $login) { LoginPortalView() }
             .sheet(item: $editingClimb, onDismiss: {
                 // Media saved in the climb editor reaches Friends with the session's saved settings.
-                guard let session, session.isComplete else { return }
+                // Unsaved settings on screen go out with Save instead.
+                guard let session, session.isComplete, SharedSession.content(of: session) != climbContent, !settingsEdited(session) else { return }
                 closeAfterSync = false; Task { await sync(session) }
             }) { ClimbEditorView(session: session, climb: $0) }
             .alert("Shared", isPresented: Binding(get: { shareNotice != nil }, set: { if !$0 { shareNotice = nil; if closeAfterSync { dismiss() } } })) {
@@ -162,9 +168,13 @@ struct SessionEditorView: View {
                     SwiftUI.ProgressView("Loading Friends settings…")
                 }
             }
+        } else if social.configuration != nil && auth.account != nil {
+            Section(header: Text("Friends").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
+                Text("Set up your Friends profile in the Friends tab to share sessions.")
+            }
         } else if social.configuration != nil {
             Section(header: Text("Friends").foregroundStyle(ClimbTheme.secondaryText).font(.subheadline).fixedSize(horizontal: false, vertical: true)) {
-                Text("Sign in to share this session with friends. It stays private on this device until you do.")
+                Text("Sign in to share sessions with friends. This session stays private until you sign in and change its visibility.")
                 Button("Sign in to share") { login = true }.frame(minHeight: 44).accessibilityIdentifier("shareSignIn")
             }
         }
@@ -184,7 +194,12 @@ struct SessionEditorView: View {
         }
     }
 
-    private func photoCount(_ session: ClimbingSession) -> Int { min(3, session.orderedClimbs.flatMap(\.media).filter { $0.kind == .photo }.count) }
+    private func photoCount(_ session: ClimbingSession) -> Int { session.sharedPhotoMedia.count }
+
+    private func settingsEdited(_ session: ClimbingSession) -> Bool {
+        shareLoaded && (visibility != session.visibility || caption != session.shareCaption || shareAttempts != session.shareAttempts
+            || shareSends != session.shareSends || shareDuration != session.shareDuration || sharePhotos != session.sharePhotos)
+    }
 
     /// What syncShare sends, apart from the photos.
     private func preview(_ session: ClimbingSession) -> SharedSession {

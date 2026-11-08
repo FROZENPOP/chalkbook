@@ -17,6 +17,7 @@ struct SessionDetailView: View {
     @State private var manualAttempt = false
     @State private var shareProblem: String?
     @State private var shareNotice: String?
+    @State private var postedContent: [String]?
     private var selected: ClimbEntry? { session.allClimbs.first { $0.id == session.selectedClimbID } ?? session.orderedClimbs.last }
 
     var body: some View {
@@ -70,7 +71,10 @@ struct SessionDetailView: View {
                 if session.allClimbs.isEmpty {
                     EmptyState(title: "Find your first boulder", symbol: "figure.climbing", message: "Add a climb and record each try along the way.")
                 }
-                if let selected { ClimbCard(climb: selected, canLog: !session.isComplete, loggingSession: session, onEditorClose: syncShare) }
+                if let selected { ClimbCard(climb: selected, canLog: !session.isComplete, loggingSession: session, onEditorClose: {
+                    // Only a change to what the post carries needs a sync.
+                    if SharedSession.content(of: session) != postedContent { syncShare() }
+                }) }
                 if !session.isComplete, !session.recordedAttempts.isEmpty {
                     Button { store.undoLatest(in: session) } label: { Label("Undo latest logged attempt", systemImage: "arrow.uturn.backward").frame(minHeight: 44) }.accessibilityIdentifier("undoLatestAttempt")
                 }
@@ -131,6 +135,7 @@ struct SessionDetailView: View {
         .sheet(item: $editingAttempt) { AttemptEditorView(attempt: $0) }
         .sheet(isPresented: $manualAttempt) { ManualAttemptView(session: session) }
         .sheet(isPresented: $reviewing, onDismiss: syncShare) { FinishReviewView(session: session) }
+        .onAppear { if postedContent == nil { postedContent = SharedSession.content(of: session) } }
         .confirmationDialog("Delete this session and its recorded activity?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete session", role: .destructive) {
                 if social.deleteSession(session, store: store, auth: auth) { dismiss() }
@@ -141,6 +146,7 @@ struct SessionDetailView: View {
     /// Posts a finished session, or media added to it, to Friends. Problems show above the climbs.
     private func syncShare() {
         guard session.isComplete else { return }
+        postedContent = SharedSession.content(of: session)
         Task {
             shareProblem = await SessionEditorView.syncShare(social, auth, session)
             shareNotice = social.photoNotice; social.photoNotice = nil

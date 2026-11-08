@@ -55,6 +55,8 @@ enum ClimbingSchemaV8: VersionedSchema {
             return (climbs + linkedClimbs).filter { seen.insert($0.id).inserted }
         }
         var orderedClimbs: [ClimbEntry] { allClimbs.sorted { $0.createdAt < $1.createdAt } }
+        /// Photos a Friends post may carry: the first 3 from this session's own climbs, not linked projects.
+        var sharedPhotoMedia: [RouteMedia] { Array(climbs.sorted { $0.createdAt < $1.createdAt }.flatMap(\.media).filter { $0.kind == .photo }.prefix(3)) }
         var recordedAttempts: [ClimbAttempt] { allClimbs.flatMap(\.attempts).filter { $0.effectiveSessionID == id } }
         var totals: ActivityTotals { totals(recordedAttempts) }
         // Takes the attempts so callers walk the relationships once; that walk dominates large journals.
