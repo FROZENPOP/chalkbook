@@ -141,6 +141,7 @@ struct SessionEditorView: View {
         Picker("Visibility", selection: $visibility) { ForEach(EntryVisibility.allCases) { Text($0.title).tag($0) } }
             .frame(minHeight: 44).accessibilityIdentifier("sessionVisibility")
         if social.me?.is_private == true { Text("On a private account, Public means friends only.").font(.caption) }
+        else { Text("Friends see it in Activity. Public also shows it to anyone who opens your profile.").font(.caption) }
     }
 
     @ViewBuilder private func friendsSection(_ session: ClimbingSession) -> some View {

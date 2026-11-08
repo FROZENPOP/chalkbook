@@ -6,10 +6,14 @@ import Observation
 struct FriendsFeedCursor: Equatable {
     let day: String
     let id: UUID
-    static func path(after: Self?, limit: Int = 20) throws -> String {
+    /// `owners` is you and your friends: Activity never shows strangers' Public posts, which stay on their profiles.
+    static func path(after: Self?, limit: Int = 20, owners: [UUID]) throws -> String {
+        guard !owners.isEmpty else { throw SocialError.feedPage }
         var query = [URLQueryItem(name:"select",value:"*"),
                      // Includes your own posts so you can see their reactions and comments. Others' private posts never pass RLS.
                      URLQueryItem(name:"visibility",value:"neq.private"),
+                     // shortcut: the friend list rides in the URL (~37 bytes each), fine for hundreds; move to an RPC past ~300 friends.
+                     URLQueryItem(name:"owner_id",value:"in.(\(owners.map(\.uuidString).sorted().joined(separator:",")))"),
                      URLQueryItem(name:"order",value:"session_day.desc,id.desc"),
                      URLQueryItem(name:"limit",value:String(min(20,max(1,limit))))]
         if let after {
@@ -89,8 +93,9 @@ struct FriendsFeedPage {
     var auth: AccountSession? = nil
     func page(after: FriendsFeedCursor?, limit: Int) async throws -> FriendsFeedPage {
         if let auth { try await store.authorize(auth) }
-        guard store.userID != nil else { throw SocialError.signIn }
-        let rows = try JSONDecoder().decode([SharedSession].self,from:await store.request(FriendsFeedCursor.path(after:after,limit:limit)))
+        guard let me = store.userID else { throw SocialError.signIn }
+        let friends = store.friendships.filter { $0.status == "accepted" }.map { $0.other(than: me) }
+        let rows = try JSONDecoder().decode([SharedSession].self,from:await store.request(FriendsFeedCursor.path(after:after,limit:limit,owners:[me] + friends)))
         let ids = Set(rows.map(\.owner_id)).subtracting(store.people.map(\.id)).sorted { $0.uuidString < $1.uuidString }
         var profiles: [SocialProfile] = []
         for start in stride(from:0,to:ids.count,by:50) {
