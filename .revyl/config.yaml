@@ -1,0 +1,13 @@
+project:
+    id: 03fdaaf5-95c4-4b78-af6e-91e192e63818
+session:
+    idle_timeout_seconds: 1800
+build:
+    framework: ios
+    profiles:
+        development:
+            ios:
+                app_id: 840e81f1-bfd0-4a29-aa98-bdbd05ad8d35
+                build_commands:
+                    - xcodebuild -project ClimbingApp.xcodeproj -scheme ClimbingApp -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build
+                output_path: build/Build/Products/Debug-iphonesimulator/*.app
